@@ -1,0 +1,6 @@
+package com.specskart.whatsapp;
+
+public enum BotIntent {
+    FIND_FRAMES, EXPLORE_FRAMES, TALK_TO_EXPERT, VISIT_WEBSITE,
+    RESULTS_SHOW_FRAMES, RESULTS_NOT_NOW, GREETING, UNKNOWN
+}

@@ -1,0 +1,6 @@
+package com.specskart.lead;
+
+public enum LeadStatus {
+    NEW, CONTACTED, ENGAGED, FACE_ANALYSIS_STARTED, FACE_ANALYSIS_COMPLETED,
+    INTERESTED, FOLLOW_UP, CONVERTED, LOST
+}

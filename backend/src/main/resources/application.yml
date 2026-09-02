@@ -1,0 +1,95 @@
+spring:
+  application:
+    name: specskart-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate.format_sql: false
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: always
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+specskart:
+  store-name: ${SPECSKART_STORE_NAME:Specskart}
+  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
+  business-whatsapp-number: ${SPECSKART_BUSINESS_WA_NUMBER:+260000000000}
+  cors-origins: ${SPECSKART_CORS_ORIGINS:http://localhost:5173,http://localhost:4173}
+  session:
+    expiry-hours: ${FRAME_FINDER_SESSION_EXPIRY_HOURS:72}
+  face:
+    retain-images: ${FACE_RETAIN_IMAGES:false}
+  simulation:
+    enabled: ${SPECSKART_SIMULATION_ENABLED:true}
+  security:
+    jwt-secret: ${SESSION_SECRET:dev-only-insecure-secret-change-me-please-32bytes-minimum!!}
+    jwt-ttl-minutes: ${JWT_TTL_MINUTES:720}
+  whatsapp:
+    provider: ${WHATSAPP_PROVIDER:mock}
+    phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}
+    business-account-id: ${WHATSAPP_BUSINESS_ACCOUNT_ID:}
+    access-token: ${WHATSAPP_ACCESS_TOKEN:}
+    webhook-verify-token: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:dev-verify-token}
+    app-secret: ${WHATSAPP_APP_SECRET:}
+    graph-base-url: ${WHATSAPP_GRAPH_BASE_URL:https://graph.facebook.com/v21.0}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:h2:mem:specskart;DB_CLOSE_DELAY=-1;MODE=LEGACY
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+  h2:
+    console:
+      enabled: true
+
+---
+spring:
+  config:
+    activate:
+      on-profile: mock
+  datasource:
+    url: jdbc:h2:mem:specskart;DB_CLOSE_DELAY=-1;MODE=LEGACY
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    locations: classpath:db/migration

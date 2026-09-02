@@ -1,0 +1,18 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body { @apply bg-bone text-ink font-sans antialiased; }
+  h1,h2,h3 { @apply font-display tracking-tight; }
+}
+
+@layer components {
+  .btn { @apply inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-medium transition; }
+  .btn-primary { @apply btn bg-ink text-bone hover:bg-clay; }
+  .btn-ghost { @apply btn border border-ink/20 hover:border-ink/60; }
+  .container-x { @apply mx-auto w-full max-w-6xl px-5; }
+  .card { @apply rounded-2xl border border-ink/10 bg-white; }
+  .label { @apply text-xs font-medium uppercase tracking-widest text-ink/50; }
+}

@@ -1,0 +1,55 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: specskart
+      POSTGRES_USER: specskart
+      POSTGRES_PASSWORD: specskart
+    ports: ["5432:5432"]
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U specskart"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+  backend:
+    build: ./backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/specskart
+      DB_USERNAME: specskart
+      DB_PASSWORD: specskart
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:-http://localhost:8081}
+      SPECSKART_CORS_ORIGINS: ${FRONTEND_BASE_URL:-http://localhost:8081}
+      SESSION_SECRET: ${SESSION_SECRET:-change-me-in-prod-a-long-random-32byte-minimum-secret!!}
+      SPECSKART_ADMIN_EMAIL: ${SPECSKART_ADMIN_EMAIL:-admin@specskart.local}
+      SPECSKART_ADMIN_PASSWORD: ${SPECSKART_ADMIN_PASSWORD:-admin12345}
+      SPECSKART_SIMULATION_ENABLED: ${SPECSKART_SIMULATION_ENABLED:-true}
+      WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-mock}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_BUSINESS_ACCOUNT_ID: ${WHATSAPP_BUSINESS_ACCOUNT_ID:-}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-dev-verify-token}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+    ports: ["8080:8080"]
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_WA_LINK: ${VITE_WA_LINK:-https://wa.me/260000000000}
+    depends_on: [backend]
+    ports: ["8081:80"]
+
+volumes:
+  pgdata:
