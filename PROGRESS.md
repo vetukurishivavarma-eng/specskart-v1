@@ -5,7 +5,7 @@ _Last updated: 2026-09-03 (session 1, cont.). Session: session_014CLssw1cRChm9Hb
 ## Status: Phase 1 vertical slice COMPLETE and proven end-to-end (backend). Frontend compiles + unit-tested, not yet walked in a real browser (no Chrome extension in this env).
 
 Repo: `C:\Users\Shiva\specskart-v1` — its own git repo, branch `main`, 5 commits (HEAD `82d6bd2`).
-Backend: 17 tests green. Frontend: 7 Vitest tests green. `mock-funnel.sh` re-run clean on a fresh DB.
+Backend: 24 tests green (incl. MockMvc API-contract + rate limiter). Frontend: 7 Vitest tests green. `mock-funnel.sh` re-run clean on a fresh DB.
 Fresh standalone build; NOT related to any other workspace project.
 
 ## Toolchain notes (important for next session)
