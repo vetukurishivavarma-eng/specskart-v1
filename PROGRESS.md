@@ -4,7 +4,7 @@ _Last updated: 2026-09-03 (session 1, cont.). Session: session_014CLssw1cRChm9Hb
 
 ## Status: Phase 1 vertical slice COMPLETE and proven end-to-end (backend). Frontend compiles + unit-tested, not yet walked in a real browser (no Chrome extension in this env).
 
-Repo: `C:\Users\Shiva\specskart-v1` — its own git repo, branch `main`, 5 commits (HEAD `82d6bd2`).
+Repo: `C:\Users\Shiva\specskart-v1` — its own git repo, branch `main`, 8 commits (HEAD `4de3883`).
 Backend: 24 tests green (incl. MockMvc API-contract + rate limiter). Frontend: 7 Vitest tests green. `mock-funnel.sh` re-run clean on a fresh DB.
 Fresh standalone build; NOT related to any other workspace project.
 
@@ -49,7 +49,7 @@ Fresh standalone build; NOT related to any other workspace project.
 - [x] docker-compose (postgres/redis/backend/frontend), Dockerfiles, nginx, `.env.example`
 - [x] README (setup, mock test procedure, API list, security notes, limitations), `docs/PHASE2.md`
 
-## Added since first checkpoint (commits e646c65, 82d6bd2)
+## Added since first checkpoint (commits e646c65 · 82d6bd2 · 4e3a2d6 · 4de3883)
 - [x] Frontend Vitest + RTL suite (7 green): api.ts error mapping / 401 token clear / bearer header,
       faceGeometry ratio extraction + offline synthetic path, Store "Coming Soon" component test.
       Vitest needs `pool: threads` on this Windows box (baked into vitest.config.ts).
@@ -60,6 +60,8 @@ Fresh standalone build; NOT related to any other workspace project.
 - [x] `GET /api/admin/system/status` (WhatsApp mode/configured, simulation flag, retention, expiry,
       policy version) + dashboard status strip — satisfies spec §27 "WhatsApp integration status".
 - [x] `.gitattributes` (LF), tsconfig.app excludes test files from the prod build.
+- [x] In-memory rate limiter (60/min per IP+prefix) on webhooks/frame-finder/sim → 429 RATE_LIMITED.
+- [x] MockMvc `ApiContractTest` — locks the public error shape (401/404/410 + code + traceId).
 
 ## Not done / next session
 - [ ] Walk the frontend in a real browser (Frame Finder webcam + MediaPipe model download; CRM
@@ -68,11 +70,11 @@ Fresh standalone build; NOT related to any other workspace project.
       column names still assume Hibernate snake_case physical naming.
 - [ ] `docker compose up` has never been run here (no Docker on box).
 - [ ] Playwright E2E (WhatsApp-sim → session → analysis → admin visibility).
-- [ ] Rate limiting on public endpoints; Redis actually used (currently unused).
+- [x] Rate limiting on public endpoints (in-memory fixed window). Redis still unused (Phase 2).
 - [ ] WhatsApp: template-message support for the follow-up (currently plain interactive/text, which is
       fine inside the 24h window / mock, but real prod needs approved templates for re-engagement).
 - [ ] `MetaWhatsAppProvider` never exercised against a live number.
-- [ ] Admin: "follow-ups due" is a status count, not a real date-based reminder; no assignable-users list endpoint.
+- [ ] Admin: "follow-ups due" is a status count, not a real date-based reminder (needs `followUpAt` on Lead + migration).
 - [ ] Consider `analysisConversionPct` / dashboard "today" timezone (fixed to system zone; revisit for prod UTC).
 
 ## How to resume
