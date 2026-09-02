@@ -1,10 +1,11 @@
 # Specskart v1 — build progress
 
-_Last updated: 2026-09-03. Session: session_014CLssw1cRChm9HbQQHjUZy_
+_Last updated: 2026-09-03 (session 1, cont.). Session: session_014CLssw1cRChm9HbQQHjUZy_
 
-## Status: Phase 1 vertical slice COMPLETE and proven end-to-end (backend). Frontend compiles, not yet browser-tested.
+## Status: Phase 1 vertical slice COMPLETE and proven end-to-end (backend). Frontend compiles + unit-tested, not yet walked in a real browser (no Chrome extension in this env).
 
-Repo: `C:\Users\Shiva\specskart-v1` — its own git repo, branch `main`, 1 commit (`2f7d4b4`).
+Repo: `C:\Users\Shiva\specskart-v1` — its own git repo, branch `main`, 5 commits (HEAD `82d6bd2`).
+Backend: 17 tests green. Frontend: 7 Vitest tests green. `mock-funnel.sh` re-run clean on a fresh DB.
 Fresh standalone build; NOT related to any other workspace project.
 
 ## Toolchain notes (important for next session)
@@ -48,13 +49,25 @@ Fresh standalone build; NOT related to any other workspace project.
 - [x] docker-compose (postgres/redis/backend/frontend), Dockerfiles, nginx, `.env.example`
 - [x] README (setup, mock test procedure, API list, security notes, limitations), `docs/PHASE2.md`
 
+## Added since first checkpoint (commits e646c65, 82d6bd2)
+- [x] Frontend Vitest + RTL suite (7 green): api.ts error mapping / 401 token clear / bearer header,
+      faceGeometry ratio extraction + offline synthetic path, Store "Coming Soon" component test.
+      Vitest needs `pool: threads` on this Windows box (baked into vitest.config.ts).
+- [x] `FlywayMigrationTest` runs V1 against H2/PostgreSQL mode (catches gross SQL); `timestamptz` →
+      portable `timestamp with time zone`.
+- [x] `LeadStatusTransitionTest` (illegal transition rejected, soft-advance guard).
+- [x] `GET /api/admin/users` staff directory + lead-assign dropdown wired in LeadDetail.
+- [x] `GET /api/admin/system/status` (WhatsApp mode/configured, simulation flag, retention, expiry,
+      policy version) + dashboard status strip — satisfies spec §27 "WhatsApp integration status".
+- [x] `.gitattributes` (LF), tsconfig.app excludes test files from the prod build.
+
 ## Not done / next session
-- [ ] Run the frontend in a real browser against the running backend; walk the Frame Finder with a
-      real webcam + MediaPipe model download; screenshot the CRM. (No browser check done yet.)
-- [ ] Verify `V1__init.sql` against the JPA model with a real Postgres (`flyway validate`) — column
-      names assume Hibernate snake_case physical naming; not tested on Postgres.
+- [ ] Walk the frontend in a real browser (Frame Finder webcam + MediaPipe model download; CRM
+      screenshots). Not possible in this env — no Claude Chrome extension connected.
+- [ ] Verify `V1__init.sql` against a real Postgres (`flyway validate`) — H2/PG-mode test passes but
+      column names still assume Hibernate snake_case physical naming.
 - [ ] `docker compose up` has never been run here (no Docker on box).
-- [ ] Frontend tests (Vitest/RTL) and Playwright E2E — none written yet.
+- [ ] Playwright E2E (WhatsApp-sim → session → analysis → admin visibility).
 - [ ] Rate limiting on public endpoints; Redis actually used (currently unused).
 - [ ] WhatsApp: template-message support for the follow-up (currently plain interactive/text, which is
       fine inside the 24h window / mock, but real prod needs approved templates for re-engagement).
