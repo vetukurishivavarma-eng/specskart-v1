@@ -27,7 +27,8 @@ describe('api', () => {
     const spy = vi.fn(async () => new Response('{}', { status: 200 }))
     vi.stubGlobal('fetch', spy)
     await api('/x', { auth: true })
-    const headers = (spy.mock.calls[0][1] as RequestInit).headers as Record<string, string>
+    const init = spy.mock.calls[0]?.[1] as RequestInit
+    const headers = init.headers as Record<string, string>
     expect(headers.Authorization).toBe('Bearer abc')
   })
 })

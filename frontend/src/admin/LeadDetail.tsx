@@ -20,6 +20,11 @@ export default function LeadDetail() {
   const qc = useQueryClient()
   const [note, setNote] = useState('')
   const { data, isLoading } = useQuery({ queryKey: ['lead', id], queryFn: () => api<Detail>(`/admin/leads/${id}`, { auth: true }) })
+  const staff = useQuery({ queryKey: ['staff'], queryFn: () => api<{ id: string; name: string }[]>('/admin/users', { auth: true }) })
+  const assign = useMutation({
+    mutationFn: (userId: string) => api(`/admin/leads/${id}/assign`, { method: 'POST', auth: true, body: JSON.stringify({ userId: userId || null }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['lead', id] }),
+  })
 
   const setStatus = useMutation({
     mutationFn: (status: string) => api(`/admin/leads/${id}/status`, { method: 'PATCH', auth: true, body: JSON.stringify({ status }) }),
@@ -44,6 +49,10 @@ export default function LeadDetail() {
               {STATUSES.map((s) => <option key={s}>{s}</option>)}
             </select>
             {setStatus.isError && <span className="text-xs text-clay">{(setStatus.error as Error).message}</span>}
+            <select className="rounded-lg border border-ink/20 px-2 py-1 text-sm" value={l.assignedToUserId ?? ''} onChange={(e) => assign.mutate(e.target.value)}>
+              <option value="">Unassigned</option>
+              {staff.data?.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
           </div>
         </div>
 

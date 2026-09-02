@@ -14,6 +14,7 @@ type Perf = {
 export default function Dashboard() {
   const stats = useQuery({ queryKey: ['dash'], queryFn: () => api<Stats>('/admin/analytics/dashboard', { auth: true }) })
   const perf = useQuery({ queryKey: ['perf'], queryFn: () => api<Perf[]>('/admin/analytics/campaigns', { auth: true }) })
+  const sys = useQuery({ queryKey: ['sys'], queryFn: () => api<{ whatsappMode: string; whatsappConfigured: boolean; simulationEnabled: boolean; frameRetainImages: boolean }>('/admin/system/status', { auth: true }) })
 
   if (stats.isLoading) return <p>Loading…</p>
   const s = stats.data!
@@ -26,7 +27,18 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl">Dashboard</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl">Dashboard</h1>
+        {sys.data && (
+          <div className="flex gap-3 text-xs text-ink/55">
+            <span className={`rounded-full px-2 py-1 ${sys.data.whatsappConfigured ? 'bg-moss/15' : 'bg-clay/15 text-clay'}`}>
+              WhatsApp: {sys.data.whatsappMode}{sys.data.whatsappConfigured ? '' : ' — not configured'}
+            </span>
+            {sys.data.simulationEnabled && <span className="rounded-full bg-ink/10 px-2 py-1">Simulation on</span>}
+            <span className="rounded-full bg-ink/10 px-2 py-1">Image retention: {sys.data.frameRetainImages ? 'on' : 'off'}</span>
+          </div>
+        )}
+      </div>
       <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         {tiles.map(([k, v]) => (
           <div key={k} className="card p-4">
