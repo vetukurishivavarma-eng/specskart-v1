@@ -23,6 +23,17 @@ _Last updated: 2026-09-03 (session 2 — browser walkthrough). Session: session_
    now does it on startup (`1cc40c9`). This was the real blocker; Meta's "Recent webhook activity"
    panel showed the events but never POSTed them.
 
+### 2026-09-04 additions (committed, redeploying)
+- **Face classifier bug fixed** (`f99af61`): `geometryFromLandmarks` mixed x (norm to frame width)
+  and y (norm to frame height) in its distance math → on any non-square phone frame the face
+  length:width ratio was warped by the aspect ratio → every real face read as ROUND at floor
+  confidence. Now the pixel dims flow through and x is rescaled. Re-test on a phone.
+- **V2 migration + archive/delete** (`63aede0`): V1 had zero FKs. V2 cleans orphans, adds FK
+  cascades (hard children) / SET NULL (campaign, assignee), and an `archived_at` column. CRM lead
+  detail now has Archive/Unarchive (soft) and Delete permanently (ADMIN-only, GDPR erasure);
+  Leads page has an "Archived" toggle. **The prod deploy runs V2 automatically on boot.**
+- vitest pool threads→forks (threads hangs on this box with vitest 4). 26 backend + 8 frontend green.
+
 ### Still open for the actual ad
 - The WhatsApp access token in Render is a **24-hour temp token** — replace with the permanent
   system-user token (Business Settings → System users → Generate, no expiry).
