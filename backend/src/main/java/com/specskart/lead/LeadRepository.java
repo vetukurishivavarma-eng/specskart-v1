@@ -19,12 +19,17 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
     long countByStatus(LeadStatus status);
     long countByCampaignId(UUID campaignId);
 
+    // `cast(:q as string)` is load-bearing on PostgreSQL: a bare null bind is
+    // untyped, so `lower(concat('%', :q, '%'))` resolves to `lower(bytea)` and
+    // the query 500s. The cast gives the driver a varchar to bind. The OR group
+    // is parenthesised so the `:q is null` short-circuit covers both LIKEs.
     @Query("""
         select l from Lead l
         where (:status is null or l.status = :status)
           and (:campaignId is null or l.campaignId = :campaignId)
-          and (:q is null or lower(l.name) like lower(concat('%', :q, '%'))
-               or l.whatsappNumber like concat('%', :q, '%'))
+          and (:q is null
+               or lower(l.name) like lower(concat('%', cast(:q as string), '%'))
+               or l.whatsappNumber like concat('%', cast(:q as string), '%'))
         """)
     Page<Lead> search(@Param("status") LeadStatus status,
                       @Param("campaignId") UUID campaignId,

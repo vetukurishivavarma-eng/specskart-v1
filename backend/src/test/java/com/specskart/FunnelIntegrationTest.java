@@ -7,6 +7,7 @@ import com.specskart.framefinder.FrameFinderService;
 import com.specskart.lead.Lead;
 import com.specskart.lead.LeadRepository;
 import com.specskart.lead.LeadStatus;
+import org.springframework.data.domain.PageRequest;
 import com.specskart.whatsapp.InboundMessage;
 import com.specskart.whatsapp.MockWhatsAppProvider;
 import com.specskart.whatsapp.WhatsAppInboundService;
@@ -48,6 +49,16 @@ class FunnelIntegrationTest {
         assertThat(lead.getName()).isEqualTo("Test User");
         assertThat(events.findByLeadIdOrderByCreatedAtAsc(lead.getId()))
                 .anyMatch(e -> e.getEventType() == LeadEventType.WHATSAPP_CONVERSATION_STARTED);
+    }
+
+    @Test
+    void leadSearchRunsWithAllFiltersNull() {
+        // Regression: the CRM leads list passes q=null; on PostgreSQL the bare
+        // null bind made `lower(concat('%', :q, '%'))` resolve to lower(bytea)
+        // and 500. The `cast(:q as string)` in the query keeps it valid.
+        inbound.process(new InboundMessage("2609779999", "2609779999", "Search Me", "Hi", null, "search-1", Map.of()));
+        assertThat(leads.search(null, null, null, PageRequest.of(0, 20)).getContent()).isNotEmpty();
+        assertThat(leads.search(null, null, "search", PageRequest.of(0, 20)).getTotalElements()).isEqualTo(1);
     }
 
     @Test
