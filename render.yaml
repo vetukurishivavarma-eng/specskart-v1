@@ -65,7 +65,8 @@ services:
         value: https://graph.facebook.com/v21.0
 
   # -------------------------------------------------------------- frontend site
-  - type: static
+  - type: web
+    runtime: static
     name: specskart-web
     rootDir: frontend
     buildCommand: npm ci && npm run build
