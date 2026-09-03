@@ -38,7 +38,13 @@ export function useFaceLandmarker() {
         ? 'We could not see a face. Make sure your whole face is visible and well lit.'
         : 'We see more than one face. Please make sure only you are in frame.')
     }
-    return { geometry: geometryFromLandmarks(res.faceLandmarks[0] as any), faces }
+    // Landmark x/y are normalised to the FRAME's width/height. Pass the real
+    // pixel size so the geometry can undo the aspect-ratio distortion — without
+    // it every face reads as the same shape at floor confidence.
+    const dims = source instanceof HTMLVideoElement
+      ? { width: source.videoWidth, height: source.videoHeight }
+      : { width: source.naturalWidth, height: source.naturalHeight }
+    return { geometry: geometryFromLandmarks(res.faceLandmarks[0] as any, dims), faces }
   }, [ensure])
 
   return { analyse, loading, error }

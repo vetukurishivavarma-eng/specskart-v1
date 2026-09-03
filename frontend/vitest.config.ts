@@ -7,7 +7,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
-    pool: 'threads',
+    // 'threads' hangs (worker never responds) on this Windows box with vitest 4;
+    // 'forks' is reliable.
+    pool: 'forks',
     fileParallelism: false,
   },
 })

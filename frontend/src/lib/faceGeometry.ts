@@ -27,23 +27,37 @@ export type Geometry = {
   chinRatio: number
 }
 
-export function geometryFromLandmarks(lm: P[]): Geometry {
-  const faceHeight = dist(lm[IDX.foreheadTop], lm[IDX.chinBottom]) || 1
-  const cheek = dist(lm[IDX.leftCheek], lm[IDX.rightCheek])
-  const forehead = dist(lm[IDX.leftForehead], lm[IDX.rightForehead])
-  const jaw = dist(lm[IDX.leftJaw], lm[IDX.rightJaw])
+/**
+ * @param lm   468 MediaPipe landmarks with x,y NORMALISED to the source frame
+ *             (x to frame width, y to frame height).
+ * @param dims pixel size of the frame the landmarks came from. Required for a
+ *             correct result on any non-square frame — x and y are otherwise in
+ *             different units, which warps every width/height ratio (most badly
+ *             face length vs width, so every face collapses toward one shape
+ *             with near-floor confidence). Omit only for already-square input.
+ */
+export function geometryFromLandmarks(lm: P[], dims?: { width: number; height: number }): Geometry {
+  const aspect = dims && dims.width > 0 && dims.height > 0 ? dims.width / dims.height : 1
+  // Put x into the same unit as y ("frame heights") so Euclidean distances are
+  // comparable. Ratios stay scale-invariant because everything is over faceHeight.
+  const p = (i: number): P => ({ x: lm[i].x * aspect, y: lm[i].y, z: lm[i].z })
 
-  // jaw angle: angle at the jaw corner between the jawline and the vertical to the chin
-  const corner = lm[IDX.leftJawAngle]
-  const chin = lm[IDX.chinBottom]
-  const ear = lm[IDX.leftJaw]
+  const faceHeight = dist(p(IDX.foreheadTop), p(IDX.chinBottom)) || 1
+  const cheek = dist(p(IDX.leftCheek), p(IDX.rightCheek))
+  const forehead = dist(p(IDX.leftForehead), p(IDX.rightForehead))
+  const jaw = dist(p(IDX.leftJaw), p(IDX.rightJaw))
+
+  // jaw angle: angle at the jaw corner between the jawline and the line to the chin
+  const corner = p(IDX.leftJawAngle)
+  const chin = p(IDX.chinBottom)
+  const ear = p(IDX.leftJaw)
   const v1 = { x: chin.x - corner.x, y: chin.y - corner.y }
   const v2 = { x: ear.x - corner.x, y: ear.y - corner.y }
   const dot = v1.x * v2.x + v1.y * v2.y
   const mag = Math.hypot(v1.x, v1.y) * Math.hypot(v2.x, v2.y) || 1
   const jawAngleDeg = (Math.acos(Math.max(-1, Math.min(1, dot / mag))) * 180) / Math.PI
 
-  const chinRatio = dist(lm[IDX.noseTip], lm[IDX.chinBottom]) / faceHeight
+  const chinRatio = dist(p(IDX.noseTip), p(IDX.chinBottom)) / faceHeight
 
   return {
     faceWidthRatio: cheek / faceHeight,
