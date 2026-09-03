@@ -1,0 +1,80 @@
+# Render blueprint for the Specskart v1 live test (Phase 1).
+#
+# Render "New > Blueprint" reads this file. The build/start commands here are the
+# source of truth rather than settings typed into the dashboard.
+#
+# No database is declared on purpose. Create a Postgres separately (Neon, or a
+# Render Postgres) and paste DB_URL / DB_USERNAME / DB_PASSWORD in as env vars —
+# Render's free Postgres is deleted after ~30 days.
+#
+# All secrets and the WhatsApp config are `sync: false`: set them in the
+# dashboard after the first deploy. See docs/INTEGRATION.md.
+
+services:
+  # ---------------------------------------------------------------- backend API
+  - type: web
+    name: specskart-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    region: frankfurt
+    plan: free
+    healthCheckPath: /actuator/health
+    autoDeploy: true
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      # --- database (from your Neon/Render Postgres) ---
+      - key: DB_URL          # jdbc:postgresql://<host>/<db>?sslmode=require
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      # --- app ---
+      - key: SESSION_SECRET  # 32+ random chars, JWT signing key
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 30d
+      - key: FRONTEND_BASE_URL          # set to the specskart-web URL after first deploy
+        sync: false
+      - key: SPECSKART_CORS_ORIGINS     # same URL
+        sync: false
+      - key: SPECSKART_BUSINESS_WA_NUMBER
+        sync: false
+      - key: SPECSKART_SIMULATION_ENABLED
+        value: "false"
+      - key: FRAME_FINDER_SESSION_EXPIRY_HOURS
+        value: "72"
+      - key: FACE_RETAIN_IMAGES
+        value: "false"
+      # --- WhatsApp Cloud API (leave provider=mock until the webhook is wired) ---
+      - key: WHATSAPP_PROVIDER
+        value: mock
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_BUSINESS_ACCOUNT_ID
+        sync: false
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: WHATSAPP_APP_SECRET
+        sync: false
+      - key: WHATSAPP_WEBHOOK_VERIFY_TOKEN
+        sync: false
+      - key: WHATSAPP_GRAPH_BASE_URL
+        value: https://graph.facebook.com/v21.0
+
+  # -------------------------------------------------------------- frontend site
+  - type: static
+    name: specskart-web
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    autoDeploy: true
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_BASE          # https://specskart-api.onrender.com/api  (set after backend deploys)
+        sync: false
