@@ -10,6 +10,37 @@ tells you what to click and what value goes where.
 
 ---
 
+## LIVE DEPLOYMENT (2026-09-03)
+
+| | |
+|---|---|
+| Backend API | **https://specskart-api.onrender.com** (Render, Docker, prod profile, Frankfurt) |
+| Frontend | **https://specskart-web.onrender.com** |
+| Admin CRM | https://specskart-web.onrender.com/admin/login · `admin@specskart.local` / `admin12345` |
+| Webhook URL (for Meta) | **https://specskart-api.onrender.com/api/webhooks/whatsapp** |
+| Database | Render Postgres `specskart-db` (id `dpg-dacpf0f10e5c73bhu6l0-a`), **free — deleted ~2026-10-03**. Flyway `V1__init.sql` applied cleanly; seeded (admin user + 35 recommendation rules; no demo campaigns on prod). |
+| Render services | api `srv-dacpjcjl550s73d6g2eg` · web `srv-dacpjcjl550s73d6g2dg` |
+
+Env vars already set on the API service: `SPRING_PROFILES_ACTIVE=prod`, `DB_URL`
+(`jdbc:postgresql://dpg-dacpf0f10e5c73bhu6l0-a/specskart_db`, internal),
+`DB_USERNAME`, `DB_PASSWORD`, `SESSION_SECRET`, `FRONTEND_BASE_URL`,
+`SPECSKART_CORS_ORIGINS`, `SPECSKART_SIMULATION_ENABLED=false`,
+`WHATSAPP_PROVIDER=mock`. `VITE_API_BASE` is baked into the frontend build.
+
+**Still to set (step 5):** `WHATSAPP_PHONE_NUMBER_ID`,
+`WHATSAPP_BUSINESS_ACCOUNT_ID`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_APP_SECRET`,
+`WHATSAPP_WEBHOOK_VERIFY_TOKEN` (pick a real string, currently the insecure
+default `dev-verify-token`), `SPECSKART_BUSINESS_WA_NUMBER`, then flip
+`WHATSAPP_PROVIDER=meta`.
+
+> **Free-instance cold start is ~150 s.** If the API has been idle, hit
+> `https://specskart-api.onrender.com/actuator/health` and wait for `UP`
+> *before* clicking "Verify" on the Meta webhook, or the handshake times out.
+> Meta retries inbound message deliveries, so real messages aren't lost, just
+> delayed on the first hit after a sleep.
+
+---
+
 ## 0. What you need before starting
 
 | Thing | Notes |
