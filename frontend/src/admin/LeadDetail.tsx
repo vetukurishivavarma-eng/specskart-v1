@@ -1,7 +1,8 @@
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api } from '../lib/api'
+import { auth } from '../lib/auth'
 
 const STATUSES = ['NEW', 'CONTACTED', 'ENGAGED', 'FACE_ANALYSIS_STARTED', 'FACE_ANALYSIS_COMPLETED', 'INTERESTED', 'FOLLOW_UP', 'CONVERTED', 'LOST']
 
@@ -18,6 +19,8 @@ type Detail = {
 export default function LeadDetail() {
   const { id } = useParams()
   const qc = useQueryClient()
+  const nav = useNavigate()
+  const isAdmin = auth.user?.role === 'ADMIN'
   const [note, setNote] = useState('')
   const { data, isLoading } = useQuery({ queryKey: ['lead', id], queryFn: () => api<Detail>(`/admin/leads/${id}`, { auth: true }) })
   const staff = useQuery({ queryKey: ['staff'], queryFn: () => api<{ id: string; name: string }[]>('/admin/users', { auth: true }) })
@@ -34,6 +37,14 @@ export default function LeadDetail() {
     mutationFn: () => api(`/admin/leads/${id}/notes`, { method: 'POST', auth: true, body: JSON.stringify({ body: note }) }),
     onSuccess: () => { setNote(''); qc.invalidateQueries({ queryKey: ['lead', id] }) },
   })
+  const setArchived = useMutation({
+    mutationFn: (archived: boolean) => api(`/admin/leads/${id}/${archived ? 'archive' : 'unarchive'}`, { method: 'POST', auth: true }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['lead', id] }); qc.invalidateQueries({ queryKey: ['leads'] }) },
+  })
+  const del = useMutation({
+    mutationFn: () => api(`/admin/leads/${id}`, { method: 'DELETE', auth: true }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['leads'] }); nav('/admin/leads') },
+  })
 
   if (isLoading || !data) return <p>Loading…</p>
   const l = data.lead
@@ -42,8 +53,26 @@ export default function LeadDetail() {
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2 space-y-6">
         <div>
-          <h1 className="text-2xl">{l.name ?? 'Unknown'}</h1>
-          <p className="text-ink/55">{l.whatsappNumber} · {l.source}{l.campaignName ? ` · ${l.campaignName}` : ''}</p>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="text-2xl">{l.name ?? 'Unknown'}</h1>
+              <p className="text-ink/55">{l.whatsappNumber} · {l.source}{l.campaignName ? ` · ${l.campaignName}` : ''}</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2 text-xs">
+              <button className="btn-ghost !px-3 !py-1"
+                onClick={() => setArchived.mutate(!l.archivedAt)} disabled={setArchived.isPending}>
+                {l.archivedAt ? 'Unarchive' : 'Archive'}
+              </button>
+              {isAdmin && (
+                <button className="btn-ghost !px-3 !py-1 !border-clay/40 text-clay"
+                  disabled={del.isPending}
+                  onClick={() => { if (confirm('Permanently delete this lead and all its history? This cannot be undone.')) del.mutate() }}>
+                  Delete
+                </button>
+              )}
+            </div>
+          </div>
+          {l.archivedAt && <p className="mt-2 text-xs text-clay">Archived {new Date(l.archivedAt).toLocaleDateString()}</p>}
           <div className="mt-3 flex items-center gap-2">
             <select className="rounded-lg border border-ink/20 px-2 py-1 text-sm" value={l.status} onChange={(e) => setStatus.mutate(e.target.value)}>
               {STATUSES.map((s) => <option key={s}>{s}</option>)}

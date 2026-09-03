@@ -52,13 +52,37 @@ class FunnelIntegrationTest {
     }
 
     @Test
+    void archiveHidesFromDefaultListAndHardDeleteCascades() {
+        inbound.process(new InboundMessage("2609771234", "2609771234", "Archive Me", "Hi", null, "arch-1", Map.of()));
+        Lead lead = leads.findByWhatsappWaId("2609771234").orElseThrow();
+        var id = lead.getId();
+        assertThat(events.findByLeadIdOrderByCreatedAtAsc(id)).isNotEmpty();
+
+        leadService.setArchived(id, true);
+        assertThat(leads.search(null, null, null, false, PageRequest.of(0, 50)).getContent())
+                .noneMatch(l -> l.getId().equals(id));
+        assertThat(leads.search(null, null, null, true, PageRequest.of(0, 50)).getContent())
+                .anyMatch(l -> l.getId().equals(id));
+
+        leadService.setArchived(id, false);
+        assertThat(leads.search(null, null, null, false, PageRequest.of(0, 50)).getContent())
+                .anyMatch(l -> l.getId().equals(id));
+
+        leadService.hardDelete(id);
+        assertThat(leads.findById(id)).isEmpty();
+        assertThat(events.findByLeadIdOrderByCreatedAtAsc(id)).isEmpty(); // FK cascade
+    }
+
+    @Autowired com.specskart.lead.LeadService leadService;
+
+    @Test
     void leadSearchRunsWithAllFiltersNull() {
         // Regression: the CRM leads list passes q=null; on PostgreSQL the bare
         // null bind made `lower(concat('%', :q, '%'))` resolve to lower(bytea)
         // and 500. The `cast(:q as string)` in the query keeps it valid.
         inbound.process(new InboundMessage("2609779999", "2609779999", "Search Me", "Hi", null, "search-1", Map.of()));
-        assertThat(leads.search(null, null, null, PageRequest.of(0, 20)).getContent()).isNotEmpty();
-        assertThat(leads.search(null, null, "search", PageRequest.of(0, 20)).getTotalElements()).isEqualTo(1);
+        assertThat(leads.search(null, null, null, false, PageRequest.of(0, 20)).getContent()).isNotEmpty();
+        assertThat(leads.search(null, null, "search", false, PageRequest.of(0, 20)).getTotalElements()).isEqualTo(1);
     }
 
     @Test

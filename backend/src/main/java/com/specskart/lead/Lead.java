@@ -56,6 +56,9 @@ public class Lead extends BaseEntity {
 
     private UUID assignedToUserId;
 
+    /** Set when a CRM user archives the lead — hidden from the default list, history kept. */
+    private Instant archivedAt;
+
     /** Face analysis denormalized snapshot for fast CRM listing. */
     private String faceShape;
     private Double faceConfidence;

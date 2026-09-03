@@ -14,10 +14,11 @@ type Page = { content: Row[]; page: number; totalPages: number; totalElements: n
 export default function Leads() {
   const [status, setStatus] = useState('')
   const [q, setQ] = useState('')
+  const [archived, setArchived] = useState(false)
   const [page, setPage] = useState(0)
   const { data, isLoading } = useQuery({
-    queryKey: ['leads', status, q, page],
-    queryFn: () => api<Page>(`/admin/leads?page=${page}&size=20${status ? `&status=${status}` : ''}${q ? `&q=${encodeURIComponent(q)}` : ''}`, { auth: true }),
+    queryKey: ['leads', status, q, archived, page],
+    queryFn: () => api<Page>(`/admin/leads?page=${page}&size=20&archived=${archived}${status ? `&status=${status}` : ''}${q ? `&q=${encodeURIComponent(q)}` : ''}`, { auth: true }),
   })
 
   return (
@@ -29,6 +30,10 @@ export default function Leads() {
         <select className="rounded-lg border border-ink/20 px-3 py-2 text-sm" value={status} onChange={(e) => { setStatus(e.target.value); setPage(0) }}>
           {STATUSES.map((s) => <option key={s} value={s}>{s || 'All statuses'}</option>)}
         </select>
+        <label className="flex items-center gap-2 text-sm text-ink/70">
+          <input type="checkbox" checked={archived} onChange={(e) => { setArchived(e.target.checked); setPage(0) }} />
+          Archived
+        </label>
       </div>
 
       <div className="mt-4 overflow-x-auto">

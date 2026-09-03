@@ -45,6 +45,9 @@ public class LeadService {
     private final AttributionResolver attribution;
     private final AnalyticsService analytics;
 
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager em;
+
     public LeadService(LeadRepository leads, CampaignRepository campaigns,
                        AttributionResolver attribution, AnalyticsService analytics) {
         this.leads = leads;
@@ -133,6 +136,27 @@ public class LeadService {
 
     public Lead get(UUID id) {
         return leads.findById(id).orElseThrow(() -> ApiException.notFound("LEAD_NOT_FOUND", "Lead not found."));
+    }
+
+    @Transactional
+    public Lead setArchived(UUID leadId, boolean archived) {
+        Lead lead = get(leadId);
+        lead.setArchivedAt(archived ? Instant.now() : null);
+        return leads.save(lead);
+    }
+
+    /** Hard-delete a lead and everything hanging off it. For GDPR erasure. */
+    @Transactional
+    public void hardDelete(UUID leadId) {
+        Lead lead = get(leadId);
+        // Explicit child deletes so it works on the FK-less test schema too; the
+        // prod V2 migration adds ON DELETE CASCADE as a second line of defence.
+        for (String table : List.of("lead_notes", "lead_events", "whatsapp_messages",
+                "frame_finder_sessions", "face_analyses", "consent_records")) {
+            em.createNativeQuery("delete from " + table + " where lead_id = :id")
+                    .setParameter("id", leadId).executeUpdate();
+        }
+        leads.delete(lead);
     }
 
     public List<Lead> all() {

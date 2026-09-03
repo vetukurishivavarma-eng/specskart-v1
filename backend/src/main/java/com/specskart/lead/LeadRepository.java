@@ -25,7 +25,9 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
     // is parenthesised so the `:q is null` short-circuit covers both LIKEs.
     @Query("""
         select l from Lead l
-        where (:status is null or l.status = :status)
+        where (:archived = true and l.archivedAt is not null
+               or :archived = false and l.archivedAt is null)
+          and (:status is null or l.status = :status)
           and (:campaignId is null or l.campaignId = :campaignId)
           and (:q is null
                or lower(l.name) like lower(concat('%', cast(:q as string), '%'))
@@ -34,5 +36,6 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
     Page<Lead> search(@Param("status") LeadStatus status,
                       @Param("campaignId") UUID campaignId,
                       @Param("q") String q,
+                      @Param("archived") boolean archived,
                       Pageable pageable);
 }

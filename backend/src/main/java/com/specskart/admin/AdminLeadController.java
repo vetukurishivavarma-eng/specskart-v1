@@ -53,11 +53,12 @@ public class AdminLeadController {
     public AdminDtos.Page<AdminDtos.LeadRow> list(@RequestParam(required = false) String status,
                                                  @RequestParam(required = false) UUID campaignId,
                                                  @RequestParam(required = false) String q,
+                                                 @RequestParam(defaultValue = "false") boolean archived,
                                                  @RequestParam(defaultValue = "0") int page,
                                                  @RequestParam(defaultValue = "20") int size) {
         LeadStatus ls = status == null || status.isBlank() ? null : LeadStatus.valueOf(status);
         var pr = PageRequest.of(page, Math.min(size, 100), Sort.by(Sort.Direction.DESC, "createdAt"));
-        var result = leads.search(ls, campaignId, q == null || q.isBlank() ? null : q, pr);
+        var result = leads.search(ls, campaignId, q == null || q.isBlank() ? null : q, archived, pr);
         Map<UUID, String> names = campaignNames();
         var rows = result.map(l -> AdminMapper.row(l, names.get(l.getCampaignId()))).getContent();
         return new AdminDtos.Page<>(rows, result.getNumber(), result.getSize(),
@@ -132,6 +133,25 @@ public class AdminLeadController {
         l.setAssignedToUserId(body.userId());
         leads.save(l);
         return AdminMapper.row(l, campaignNames().get(l.getCampaignId()));
+    }
+
+    @PostMapping("/{id}/archive")
+    public AdminDtos.LeadRow archive(@PathVariable UUID id) {
+        Lead l = leadService.setArchived(id, true);
+        return AdminMapper.row(l, campaignNames().get(l.getCampaignId()));
+    }
+
+    @PostMapping("/{id}/unarchive")
+    public AdminDtos.LeadRow unarchive(@PathVariable UUID id) {
+        Lead l = leadService.setArchived(id, false);
+        return AdminMapper.row(l, campaignNames().get(l.getCampaignId()));
+    }
+
+    /** Permanent erasure (lead + timeline + messages + analyses + consents). ADMIN only — see SecurityConfig. */
+    @DeleteMapping("/{id}")
+    public Map<String, Object> delete(@PathVariable UUID id) {
+        leadService.hardDelete(id);
+        return Map.of("deleted", id);
     }
 
     private Map<UUID, String> campaignNames() {
