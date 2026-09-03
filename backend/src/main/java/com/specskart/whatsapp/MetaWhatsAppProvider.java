@@ -1,6 +1,7 @@
 package com.specskart.whatsapp;
 
 import com.specskart.config.AppProperties;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -25,6 +26,33 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
         this.props = props;
         if (props.whatsapp().accessToken() == null || props.whatsapp().phoneNumberId() == null) {
             throw new IllegalStateException("WhatsApp provider=meta requires WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID");
+        }
+    }
+
+    /**
+     * Subscribe this app to the WhatsApp Business Account so Meta actually delivers
+     * inbound-message webhooks. Subscribing the `messages` field in the app dashboard
+     * is not enough on its own — the WABA needs the app attached via this edge, and
+     * the setup UI does not always do it. Idempotent; failure here is logged, not fatal
+     * (sending still works, only inbound webhooks would be missing).
+     */
+    @PostConstruct
+    void subscribeWabaToWebhooks() {
+        String waba = props.whatsapp().businessAccountId();
+        if (waba == null || waba.isBlank()) {
+            log.warn("WHATSAPP_BUSINESS_ACCOUNT_ID not set — cannot auto-subscribe the WABA to webhooks");
+            return;
+        }
+        try {
+            http.post()
+                    .uri(props.whatsapp().graphBaseUrl() + "/" + waba + "/subscribed_apps")
+                    .header("Authorization", "Bearer " + props.whatsapp().accessToken())
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("subscribed app to WABA {} for webhook delivery", waba);
+        } catch (Exception e) {
+            log.warn("could not subscribe app to WABA {} ({}). Inbound webhooks may not be delivered "
+                    + "until this succeeds or it is done manually.", waba, e.getMessage());
         }
     }
 
