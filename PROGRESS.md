@@ -2,7 +2,38 @@
 
 _Last updated: 2026-09-03 (session 2 — browser walkthrough). Session: session_01NXPW5vtn6ZsgH2XDQA96hE_
 
-## Status: Phase 1 vertical slice COMPLETE, proven end-to-end (backend) AND now walked in a real browser (Chrome). Every page renders; CRM writes persist; Frame Finder Simulate path works. Real-webcam MediaPipe path still untested (no camera in this env).
+## Status: Phase 1 COMPLETE + walked in Chrome + **deployed to Render + REAL WhatsApp funnel proven (2026-09-03)**. A real "Hi" to the Meta test number drove lead → bot welcome buttons → "Find Frames" tap → Frame Finder link, all confirmed in prod logs.
+
+## Live deployment (2026-09-03)
+- API https://specskart-api.onrender.com (Render Docker, prod profile, Frankfurt, svc `srv-dacpjcjl550s73d6g2eg`)
+- Web https://specskart-web.onrender.com (static, svc `srv-dacpjcjl550s73d6g2dg`)
+- DB Render Postgres `specskart-db` (`dpg-dacpf0f10e5c73bhu6l0-a`) — **free, deleted ~2026-10-03**
+- Repo on GitHub: `github.com/vetukurishivavarma-eng/specskart-v1` (private)
+- Meta app `specskart-v1` (ID 908294765394610) **Published/Live**, WABA `2033874723918528`,
+  test number `+1 555 669 9655`, phone-number-id `1291647124029558`, `WHATSAPP_PROVIDER=meta`
+- Webhook: `https://specskart-api.onrender.com/api/webhooks/whatsapp`, verify token `specskart-wh-live-2026`
+
+### Three things that had to be fixed for real webhooks to arrive
+1. `/api/admin/leads` 500 on Postgres — `LeadRepository.search` binds q=null untyped → `lower(bytea)`.
+   Fixed: `cast(:q as string)` in the query (`aa0fff1`).
+2. **App must be Published** — Meta withholds real webhooks from dev-mode apps. Publishing needed only
+   a **privacy policy URL** (set to `/privacy`) — NOT Business Verification.
+3. **App must be subscribed to the WABA** via `POST /{waba-id}/subscribed_apps` — subscribing the
+   `messages` field in the dashboard is not enough and the UI doesn't do it. `MetaWhatsAppProvider`
+   now does it on startup (`1cc40c9`). This was the real blocker; Meta's "Recent webhook activity"
+   panel showed the events but never POSTed them.
+
+### Still open for the actual ad
+- The WhatsApp access token in Render is a **24-hour temp token** — replace with the permanent
+  system-user token (Business Settings → System users → Generate, no expiry).
+- Register a **real phone number** (test number can't be a CTWA ad destination) — §5 of INTEGRATION.md.
+- Create the ad + a CRM Campaign whose **External ID = the FB Ad ID** — §6.
+- MediaPipe real-webcam path: exercised for the first time when the user opens the Frame Finder link
+  on a phone during the live test.
+
+---
+
+## (superseded) earlier status: Phase 1 vertical slice COMPLETE, proven end-to-end (backend) AND walked in a real browser (Chrome). Frame Finder Simulate path works.
 
 ## Browser walkthrough — 2026-09-03 (Chrome, dev server localhost:5173 + backend :8080 dev/H2)
 Walked: Home, How it works, Store (Coming soon), Contact, Privacy — all render, editorial serif design consistent.
