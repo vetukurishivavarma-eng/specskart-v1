@@ -12,9 +12,12 @@ public record AppProperties(
         List<String> corsOrigins,
         Session session,
         Face face,
-        WhatsApp whatsapp
+        WhatsApp whatsapp,
+        Payments payments
 ) {
     public record Session(int expiryHours) {}
+    public record Payments(String provider, Flutterwave flutterwave) {}
+    public record Flutterwave(String secretKey, String secretHash, String baseUrl) {}
     public record Face(boolean retainImages) {}
     public record WhatsApp(String provider, String phoneNumberId, String businessAccountId,
                            String accessToken, String webhookVerifyToken, String appSecret, String graphBaseUrl,

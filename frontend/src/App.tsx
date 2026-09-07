@@ -4,6 +4,10 @@ import Home from './pages/Home'
 import HowItWorks from './pages/HowItWorks'
 import Contact from './pages/Contact'
 import Store from './pages/Store'
+import ProductDetail from './pages/ProductDetail'
+import Cart from './pages/Cart'
+import Checkout from './pages/Checkout'
+import OrderTracking from './pages/OrderTracking'
 import Privacy from './pages/Privacy'
 import FrameFinder from './pages/FrameFinder'
 import AdminLayout from './admin/AdminLayout'
@@ -12,6 +16,12 @@ import Dashboard from './admin/Dashboard'
 import Leads from './admin/Leads'
 import LeadDetail from './admin/LeadDetail'
 import Campaigns from './admin/Campaigns'
+import Products from './admin/Products'
+import ProductEditor from './admin/ProductEditor'
+import Orders from './admin/Orders'
+import OrderDetail from './admin/OrderDetail'
+import Promos from './admin/Promos'
+import StoreSettings from './admin/StoreSettings'
 import { auth } from './lib/auth'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -26,6 +36,10 @@ export default function App() {
         <Route path="/how-it-works" element={<HowItWorks />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/store" element={<Store />} />
+        <Route path="/store/:slug" element={<ProductDetail />} />
+        <Route path="/cart" element={<Cart />} />
+        <Route path="/checkout" element={<Checkout />} />
+        <Route path="/order/:orderNo" element={<OrderTracking />} />
         <Route path="/privacy" element={<Privacy />} />
       </Route>
       <Route path="/frame-finder" element={<FrameFinder />} />
@@ -36,6 +50,13 @@ export default function App() {
         <Route path="leads" element={<Leads />} />
         <Route path="leads/:id" element={<LeadDetail />} />
         <Route path="campaigns" element={<Campaigns />} />
+        <Route path="products" element={<Products />} />
+        <Route path="products/new" element={<ProductEditor />} />
+        <Route path="products/:id" element={<ProductEditor />} />
+        <Route path="orders" element={<Orders />} />
+        <Route path="orders/:id" element={<OrderDetail />} />
+        <Route path="promos" element={<Promos />} />
+        <Route path="store" element={<StoreSettings />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

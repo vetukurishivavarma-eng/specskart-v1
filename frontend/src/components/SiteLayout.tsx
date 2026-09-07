@@ -1,6 +1,18 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { shop } from '../lib/shop'
 
 const WA = import.meta.env.VITE_WA_LINK ?? 'https://wa.me/260000000000'
+
+function BagLink() {
+  const { data } = useQuery({ queryKey: ['cart'], queryFn: shop.cart, staleTime: 10_000 })
+  const count = data?.lines.reduce((n, l) => n + l.qty, 0) ?? 0
+  return (
+    <NavLink to="/cart" className={({ isActive }) => isActive ? 'text-ink' : 'text-ink/55 hover:text-ink'}>
+      Bag{count > 0 ? ` (${count})` : ''}
+    </NavLink>
+  )
+}
 
 export default function SiteLayout() {
   return (
@@ -8,10 +20,11 @@ export default function SiteLayout() {
       <header className="border-b border-ink/10">
         <div className="container-x flex h-16 items-center justify-between">
           <Link to="/" className="font-display text-xl font-semibold">Specskart</Link>
-          <nav className="hidden gap-8 text-sm md:flex">
+          <nav className="hidden items-center gap-8 text-sm md:flex">
             {[['/how-it-works', 'How it works'], ['/store', 'Store'], ['/contact', 'Contact']].map(([to, label]) => (
               <NavLink key={to} to={to} className={({ isActive }) => isActive ? 'text-ink' : 'text-ink/55 hover:text-ink'}>{label}</NavLink>
             ))}
+            <BagLink />
           </nav>
           <Link to="/frame-finder" className="btn-primary !px-4 !py-2 text-xs">Find My Frame</Link>
         </div>

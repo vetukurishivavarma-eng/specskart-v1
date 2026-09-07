@@ -15,4 +15,6 @@
   .container-x { @apply mx-auto w-full max-w-6xl px-5; }
   .card { @apply rounded-2xl border border-ink/10 bg-white; }
   .label { @apply text-xs font-medium uppercase tracking-widest text-ink/50; }
+  .lbl { @apply text-xs font-medium uppercase tracking-widest text-ink/50; }
+  .fld { @apply mt-1 w-full rounded-lg border border-ink/20 px-3 py-2 text-sm; }
 }

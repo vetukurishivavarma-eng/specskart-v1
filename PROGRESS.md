@@ -59,6 +59,39 @@ _Last updated: 2026-09-03 (session 2 — browser walkthrough). Session: session_
 - Commit `34b9ee5` (templates) pushed + auto-deployed.
 - ⚠️ Token + app secret went through the chat — rotate after ad testing.
 
+### 2026-09-07 — PHASE 1 AUTOMATED SHOP (committed, not yet deployed)
+Goal: no human in the sales conversation. Browse → recommend → cart → pay → confirm →
+track → status updates → abandoned-cart nudge, all automatic. New backend packages
+`catalog`, `order`, `payment`; `V3__commerce.sql` (products, product_images, promo_codes,
+carts, cart_items, orders, order_items, order_events, store_config). Money = minor units.
+- **Catalog**: `Product` + images + `PromoCode` + `StoreConfig`; `/api/public/products*`,
+  face-shape filter reuses the recommendation rules (category codes for that shape).
+- **Cart**: server-side, `X-Cart-Token` header (localStorage on the SPA); `?c=` link adopts
+  a token (WhatsApp / nudge links); `?s=` (frame-finder token) links the cart to the lead.
+- **Checkout**: `CheckoutService.start` → reserve stock, redeem promo, create order,
+  `PaymentProvider.start` → hosted checkout URL. `confirmPayment` re-verifies with the
+  gateway (idempotent) → PAID → lead CONVERTED + auto WhatsApp confirmation.
+- **Payments**: `PaymentProvider` iface. `MockPaymentProvider` (default, `?mockPaid=1`
+  return page) + `FlutterwaveProvider` (`PAYMENTS_PROVIDER=flutterwave`, `FLW_SECRET_KEY`,
+  `FLW_SECRET_HASH`). Webhook `/api/webhooks/payment` (verif-hash checked, then API-verified).
+- **Order lifecycle**: PENDING_PAYMENT→PAID→PACKED→SHIPPED→DELIVERED (+CANCELLED/REFUNDED);
+  every transition emits an OrderEvent + an automatic WhatsApp message. CANCELLED restocks.
+- **WhatsApp bot**: "Show Me Frames" now sends the 3 matched products w/ prices + a shop
+  link on a cart pre-linked to the lead. "Explore Frames" → shop link. New events
+  PRODUCTS_SHOWN / ORDER_PLACED / ORDER_PAID / ORDER_DELIVERED.
+- **Abandoned cart**: `@Scheduled` every 15 min — cart w/ items + lead + idle 1–24h + not
+  nudged → one WhatsApp reminder incl. an auto-issue promo code (seeded `FRAME10`, 10%).
+- **Storefront** (`/store`, `/store/:slug`, `/cart`, `/checkout`, `/order/:orderNo`) +
+  admin screens (Products/editor, Orders/detail w/ status buttons, Promo codes, Storefront
+  settings) under `/admin`. `AdminLayout` nav extended.
+- **Seed** (dev/mock only): 10 demo frames + `FRAME10`. Prod starts empty — admin adds real
+  products. `SPRING_PROFILES_ACTIVE=prod` won't seed products.
+- Tests: backend 30 green (`CommerceFlowTest` = cart→promo→checkout→pay→status→cancel/restock,
+  `FlywayMigrationTest` validates V3), frontend 9 green, `npm run build` clean.
+- **Deferred to Phase 2** (engagement): virtual try-on, style quiz, loyalty, referrals,
+  shareable result card, social proof, bundles, back-in-stock alerts, prescription-lens flow.
+- Physical fulfilment (pick/pack/courier hand-off) stays a back-office human step.
+
 ### Still open for the actual ad
 - FB Page (Ads Manager needs one).
 - Create the CTWA ad + a CRM Campaign whose **External ID = the FB Ad ID** — §7–§8.

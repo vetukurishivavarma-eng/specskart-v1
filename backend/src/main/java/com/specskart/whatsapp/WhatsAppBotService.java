@@ -2,8 +2,12 @@ package com.specskart.whatsapp;
 
 import com.specskart.analytics.AnalyticsService;
 import com.specskart.analytics.LeadEventType;
+import com.specskart.catalog.CatalogService;
+import com.specskart.catalog.Product;
 import com.specskart.config.AppProperties;
 import com.specskart.framefinder.FrameFinderService;
+import com.specskart.order.CartService;
+import com.specskart.order.OrderNotificationService;
 import com.specskart.lead.Lead;
 import com.specskart.lead.LeadService;
 import com.specskart.lead.LeadStatus;
@@ -38,16 +42,21 @@ public class WhatsAppBotService {
     private final LeadService leadService;
     private final AnalyticsService analytics;
     private final AppProperties props;
+    private final CatalogService catalog;
+    private final CartService carts;
 
     public WhatsAppBotService(WhatsAppProvider provider, WhatsAppMessageRepository messages,
                               FrameFinderService frameFinder, LeadService leadService,
-                              AnalyticsService analytics, AppProperties props) {
+                              AnalyticsService analytics, AppProperties props,
+                              CatalogService catalog, CartService carts) {
         this.provider = provider;
         this.messages = messages;
         this.frameFinder = frameFinder;
         this.leadService = leadService;
         this.analytics = analytics;
         this.props = props;
+        this.catalog = catalog;
+        this.carts = carts;
     }
 
     @Transactional
@@ -57,13 +66,11 @@ public class WhatsAppBotService {
         log.info("bot intent {} for lead {}", intent, lead.getId());
         switch (intent) {
             case FIND_FRAMES -> sendFrameFinderLink(lead);
-            case EXPLORE_FRAMES -> sendText(lead, "Our latest collection is here: "
-                    + props.frontendBaseUrl() + "/store  (online ordering is launching soon — reply here to reserve).");
+            case EXPLORE_FRAMES -> sendShop(lead, "Our full collection is here — every style, buy online:\n");
             case VISIT_WEBSITE -> sendText(lead, "Here's our website: " + props.frontendBaseUrl());
             case RESULTS_SHOW_FRAMES -> {
                 leadService.advanceStatusSoft(lead.getId(), LeadStatus.INTERESTED);
-                sendText(lead, "Great! Browse styles matched to your face here: "
-                        + props.frontendBaseUrl() + "/store  — reply here and we'll help you choose.");
+                sendRecommendedProducts(lead);
             }
             case RESULTS_NOT_NOW -> {
                 leadService.advanceStatusSoft(lead.getId(), LeadStatus.FOLLOW_UP);
@@ -152,6 +159,38 @@ public class WhatsAppBotService {
 
     private String waId(Lead lead) {
         return lead.getWhatsappWaId() != null ? lead.getWhatsappWaId() : lead.getWhatsappNumber();
+    }
+
+    /** A shop link on a cart pre-linked to this lead, so a purchase attributes back to the funnel. */
+    private String shopLink(Lead lead) {
+        String token = carts.startForLead(lead.getId()).getToken();
+        String url = props.frontendBaseUrl() + "/store?c=" + token;
+        if (lead.getFaceShape() != null) url += "&face=" + lead.getFaceShape();
+        return url;
+    }
+
+    private void sendShop(Lead lead, String intro) {
+        sendText(lead, intro + shopLink(lead));
+    }
+
+    /** Post-analysis "Show Me Frames": send the actual matched products with prices + a buy link. */
+    private void sendRecommendedProducts(Lead lead) {
+        String link = shopLink(lead);
+        List<Product> picks = lead.getFaceShape() == null ? List.of()
+                : catalog.forFaceShape(lead.getFaceShape(), 3);
+        if (picks.isEmpty()) {
+            sendText(lead, "Here are the frames matched to your face — shop them online:\n" + link);
+        } else {
+            StringBuilder sb = new StringBuilder("Frames matched to your face 👓\n");
+            for (Product p : picks) {
+                sb.append("\n• *").append(p.getName()).append("* — ")
+                        .append(OrderNotificationService.money(p.getPriceMinor(), p.getCurrency()))
+                        .append("\n  ").append(props.frontendBaseUrl()).append("/store/").append(p.getSlug());
+            }
+            sb.append("\n\nBrowse the full set & check out here:\n").append(link);
+            sendText(lead, sb.toString());
+        }
+        analytics.record(LeadEventType.PRODUCTS_SHOWN, lead.getId(), null);
     }
 
     private void sendText(Lead lead, String text) {

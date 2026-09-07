@@ -61,6 +61,13 @@ public class FrameFinderService {
         return new CreatedSession(s, url);
     }
 
+    /** Lead behind a Frame Finder link, if the token is valid — no side effects, never throws. */
+    @Transactional(readOnly = true)
+    public java.util.Optional<UUID> findLeadIdByToken(String rawToken) {
+        if (rawToken == null || rawToken.isBlank()) return java.util.Optional.empty();
+        return sessions.findByTokenHash(tokens.hash(rawToken)).map(FrameFinderSession::getLeadId);
+    }
+
     @Transactional
     public FrameFinderSession resolve(String rawToken) {
         FrameFinderSession s = sessions.findByTokenHash(tokens.hash(rawToken))

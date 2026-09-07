@@ -377,3 +377,20 @@ retroactively link it in Phase 1.
 | `WHATSAPP_GRAPH_BASE_URL` | `https://graph.facebook.com/v21.0` | Graph API version |
 | `WHATSAPP_FOLLOW_UP_TEMPLATE` | — (disabled) | approved template for agent re‑engagement outside 24 h (§5a) |
 | `WHATSAPP_FOLLOW_UP_TEMPLATE_LANG` | `en` | that template's language code |
+| `PAYMENTS_PROVIDER` | `mock` | `flutterwave` for real card + mobile‑money checkout |
+| `FLW_SECRET_KEY` | — | Flutterwave secret key (Dashboard → Settings → API) |
+| `FLW_SECRET_HASH` | — | Flutterwave webhook "secret hash" — set the same value in the FLW webhook settings |
+| `FLW_BASE_URL` | `https://api.flutterwave.com` | override only for sandbox |
+
+### Online shop (Phase 1)
+
+`/store` is a live storefront: browse → cart → checkout → hosted payment → order tracking,
+fully automated, with automatic WhatsApp order‑status updates and an abandoned‑cart nudge.
+Admin manages it under `/admin` (Products, Orders, Promo codes, Storefront settings) — no
+code deploy needed to add products or change prices/copy. Prod starts with an empty catalog.
+
+**Flutterwave setup:** Dashboard → Settings → **API** for the secret key; Settings →
+**Webhooks** → URL `https://specskart-api.onrender.com/api/webhooks/payment`, set a "Secret
+hash" and put the same string in `FLW_SECRET_HASH`. Then `PAYMENTS_PROVIDER=flutterwave`
++ `FLW_SECRET_KEY` on Render and redeploy. Until then the shop runs on the mock provider
+(the "pay" button just marks the order paid) so the flow is testable end to end.

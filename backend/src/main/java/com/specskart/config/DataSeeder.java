@@ -4,6 +4,7 @@ import com.specskart.auth.Role;
 import com.specskart.auth.User;
 import com.specskart.auth.UserRepository;
 import com.specskart.campaign.*;
+import com.specskart.catalog.*;
 import com.specskart.recommendation.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,13 +26,64 @@ public class DataSeeder {
     @Bean
     ApplicationRunner seed(UserRepository users, PasswordEncoder encoder, CampaignRepository campaigns,
                            FaceShapeRepository faceShapes, FrameCategoryRepository frameCategories,
-                           RecommendationRepository recs, Environment env) {
+                           RecommendationRepository recs, ProductRepository products,
+                           ProductImageRepository productImages, PromoCodeRepository promos,
+                           StoreConfigRepository storeConfig, Environment env) {
         return args -> {
             seedUsers(users, encoder, env);
             seedFrameCatalog(faceShapes, frameCategories, recs);
             seedRules(faceShapes, frameCategories, recs);
+            storeConfig.current(); // ensure the single storefront-config row exists
             if (campaigns.count() == 0 && isDemo(env)) seedCampaigns(campaigns);
+            if (products.count() == 0 && isDemo(env)) seedProducts(products, productImages, promos);
         };
+    }
+
+    private void seedProducts(ProductRepository products, ProductImageRepository images, PromoCodeRepository promos) {
+        // [slug, name, category, colour, material, gender, priceKwacha, stock, featured]
+        Object[][] rows = {
+                {"aria-wayfarer", "Aria Wayfarer", "WAYFARER", "Matte Black", "Acetate", "UNISEX", 780, 14, true},
+                {"kanyanta-aviator", "Kanyanta Aviator", "AVIATOR", "Gold", "Metal", "UNISEX", 940, 9, true},
+                {"lusaka-round", "Lusaka Round", "ROUND_FRAME", "Tortoise", "Acetate", "UNISEX", 690, 20, false},
+                {"chembe-geometric", "Chembe Geometric", "GEOMETRIC", "Gunmetal", "Metal", "MEN", 860, 7, true},
+                {"tondwa-cateye", "Tondwa Cat-eye", "CATEYE", "Burgundy", "Acetate", "WOMEN", 820, 11, false},
+                {"mumbwa-browline", "Mumbwa Browline", "BROWLINE", "Black / Silver", "Mixed", "UNISEX", 750, 13, false},
+                {"zambezi-oversized", "Zambezi Oversized", "OVERSIZED", "Crystal", "Acetate", "WOMEN", 990, 6, false},
+                {"copper-thin-rim", "Copper Thin-rim", "THIN_RIM", "Rose Gold", "Titanium", "UNISEX", 1120, 8, true},
+                {"mosi-rectangle", "Mosi Rectangle", "RECTANGLE", "Navy", "Acetate", "MEN", 710, 16, false},
+                {"nsobe-oval", "Nsobe Oval", "OVAL_FRAME", "Olive", "Acetate", "UNISEX", 680, 18, false},
+        };
+        for (Object[] r : rows) {
+            Product p = new Product();
+            p.setSlug((String) r[0]);
+            p.setName((String) r[1]);
+            p.setFrameCategoryCode((String) r[2]);
+            p.setColour((String) r[3]);
+            p.setMaterial((String) r[4]);
+            p.setGender((String) r[5]);
+            p.setPriceMinor(((int) r[6]) * 100L);
+            p.setStockQty((int) r[7]);
+            p.setFeatured((boolean) r[8]);
+            p.setLensable(true);
+            p.setStatus("ACTIVE");
+            p.setDescription("Hand-finished " + r[4] + " frame. Fitted with your lenses and delivered across Zambia.");
+            products.save(p);
+            ProductImage img = new ProductImage();
+            img.setProductId(p.getId());
+            img.setUrl("https://picsum.photos/seed/" + r[0] + "/900/560");
+            img.setAlt((String) r[1]);
+            img.setSort(0);
+            images.save(img);
+        }
+
+        PromoCode welcome = new PromoCode();
+        welcome.setCode("FRAME10");
+        welcome.setDiscountType("PERCENT");
+        welcome.setDiscountValue(10);
+        welcome.setAutoIssue(true);
+        welcome.setActive(true);
+        promos.save(welcome);
+        log.info("seeded {} demo products + FRAME10 promo", products.count());
     }
 
     private boolean isDemo(Environment env) {

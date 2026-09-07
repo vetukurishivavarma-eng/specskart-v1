@@ -48,6 +48,12 @@ specskart:
     # {{1}} = lead first name, {{2}} = store name. Leave blank to disable the follow-up action.
     follow-up-template: ${WHATSAPP_FOLLOW_UP_TEMPLATE:}
     follow-up-template-lang: ${WHATSAPP_FOLLOW_UP_TEMPLATE_LANG:en}
+  payments:
+    provider: ${PAYMENTS_PROVIDER:mock}   # mock | flutterwave
+    flutterwave:
+      secret-key: ${FLW_SECRET_KEY:}
+      secret-hash: ${FLW_SECRET_HASH:}
+      base-url: ${FLW_BASE_URL:https://api.flutterwave.com}
 
 ---
 spring:
