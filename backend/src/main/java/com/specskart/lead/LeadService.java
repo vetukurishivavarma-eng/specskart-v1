@@ -164,6 +164,17 @@ public class LeadService {
         return leads.findById(id).orElseThrow(() -> ApiException.notFound("LEAD_NOT_FOUND", "Lead not found."));
     }
 
+    /** Save the optional style-quiz answers on a lead (any arg may be null). */
+    @Transactional
+    public Lead saveStyleProfile(UUID leadId, String vibe, String colour, String budget, String screenHours) {
+        Lead lead = get(leadId);
+        if (vibe != null) lead.setStyleVibe(vibe);
+        if (colour != null) lead.setStyleColour(colour);
+        if (budget != null) lead.setStyleBudget(budget);
+        if (screenHours != null) lead.setStyleScreenHours(screenHours);
+        return leads.save(lead);
+    }
+
     @Transactional
     public Lead setArchived(UUID leadId, boolean archived) {
         Lead lead = get(leadId);

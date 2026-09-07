@@ -9,6 +9,8 @@ import com.specskart.faceanalysis.FaceAnalysis;
 import com.specskart.faceanalysis.FaceAnalysisService;
 import com.specskart.lead.Lead;
 import com.specskart.lead.LeadService;
+import com.specskart.recommendation.RecommendationDtos;
+import com.specskart.recommendation.RecommendationService;
 import com.specskart.shared.ApiException;
 import com.specskart.whatsapp.WhatsAppBotService;
 import jakarta.validation.Valid;
@@ -27,10 +29,12 @@ public class FrameFinderController {
     private final AnalyticsService analytics;
     private final AppProperties props;
     private final PromoIssuer promoIssuer;
+    private final RecommendationService recommendations;
 
     public FrameFinderController(FrameFinderService sessions, FaceAnalysisService faceAnalysis,
                                  LeadService leadService, WhatsAppBotService bot,
-                                 AnalyticsService analytics, AppProperties props, PromoIssuer promoIssuer) {
+                                 AnalyticsService analytics, AppProperties props, PromoIssuer promoIssuer,
+                                 RecommendationService recommendations) {
         this.sessions = sessions;
         this.faceAnalysis = faceAnalysis;
         this.leadService = leadService;
@@ -38,6 +42,7 @@ public class FrameFinderController {
         this.analytics = analytics;
         this.props = props;
         this.promoIssuer = promoIssuer;
+        this.recommendations = recommendations;
     }
 
     @GetMapping
@@ -96,6 +101,32 @@ public class FrameFinderController {
                 rec.faceShape(), rec.faceShapeDisplay(), outcome.classification().confidence(),
                 "We think your face is closest to " + rec.faceShapeDisplay() + ".",
                 rec.recommended(), rec.avoidOrUseCarefully(), outcome.classification().rulesUsed(),
+                promo.getCode(), promo.getDiscountValue(), promo.getExpiresAt());
+    }
+
+    @PostMapping("/style-quiz")
+    public FrameFinderDtos.AnalysisResult styleQuiz(@PathVariable String token,
+                                                    @RequestBody FrameFinderDtos.StyleQuizRequest req) {
+        FrameFinderSession s = sessions.resolve(token);
+        Lead lead = leadService.saveStyleProfile(s.getLeadId(), req.vibe(), req.colour(), req.budget(), req.screenHours());
+
+        FaceAnalysis fa = faceAnalysis.latestForSession(s.getId())
+                .orElseThrow(() -> ApiException.badRequest("NO_ANALYSIS", "Take the face analysis first."));
+
+        var style = new RecommendationDtos.StyleProfile(lead.getStyleVibe(), lead.getStyleColour(),
+                lead.getStyleBudget(), lead.getStyleScreenHours());
+        var rec = recommendations.forFaceShapeWithStyle(fa.getPredictedFaceShape(), style);
+        PromoCode promo = promoIssuer.forFaceAnalysis(lead.getId());
+
+        String message = "Refined to match your style — closest to " + rec.faceShapeDisplay() + "."
+                + ("high".equalsIgnoreCase(lead.getStyleScreenHours())
+                    ? " Given your screen time, a blue-light lens is worth adding." : "");
+        Object rulesUsed = fa.getGeometryData() == null ? null : fa.getGeometryData().get("rulesUsed");
+
+        return new FrameFinderDtos.AnalysisResult(
+                rec.faceShape(), rec.faceShapeDisplay(), fa.getConfidenceScore(),
+                message, rec.recommended(), rec.avoidOrUseCarefully(),
+                rulesUsed == null ? "" : rulesUsed.toString(),
                 promo.getCode(), promo.getDiscountValue(), promo.getExpiresAt());
     }
 

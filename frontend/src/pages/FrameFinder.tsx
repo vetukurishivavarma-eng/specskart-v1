@@ -11,6 +11,17 @@ function hoursTo(iso: string) {
   return Math.max(1, Math.round((new Date(iso).getTime() - Date.now()) / 3_600_000))
 }
 
+const QUIZ = [
+  { key: 'vibe', label: 'Overall vibe', options: [
+    { value: 'classic', label: 'Classic' }, { value: 'bold', label: 'Bold' }, { value: 'minimal', label: 'Minimal' } ] },
+  { key: 'colour', label: 'Colour tones', options: [
+    { value: 'warm', label: 'Warm' }, { value: 'cool', label: 'Cool' }, { value: 'neutral', label: 'Neutral' } ] },
+  { key: 'budget', label: 'Budget', options: [
+    { value: 'low', label: 'Under K700' }, { value: 'mid', label: 'K700–1000' }, { value: 'high', label: 'K1000+' } ] },
+  { key: 'screenHours', label: 'Screen time', options: [
+    { value: 'high', label: 'A lot' }, { value: 'some', label: 'Some' }, { value: 'low', label: 'Not much' } ] },
+] as const
+
 type SessionView = {
   status: string; storeName: string; leadFirstName: string | null
   expired: boolean; consentPolicyVersion: string
@@ -32,6 +43,10 @@ export default function FrameFinder() {
   const [err, setErr] = useState<string | null>(null)
   const [result, setResult] = useState<Result | null>(null)
   const [sentToWa, setSentToWa] = useState(false)
+  const [quizOpen, setQuizOpen] = useState(false)
+  const [refined, setRefined] = useState(false)
+  const [quiz, setQuiz] = useState<Record<string, string>>({})
+  const [quizBusy, setQuizBusy] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const { analyse, loading: modelLoading } = useFaceLandmarker()
@@ -123,6 +138,22 @@ export default function FrameFinder() {
     setSentToWa(true)
   }
 
+  async function submitQuiz() {
+    setQuizBusy(true)
+    try {
+      const r = await api<Result>(`/frame-finder/session/${token}/style-quiz`, {
+        method: 'POST', body: JSON.stringify(quiz),
+      })
+      setResult(r)
+      setRefined(true)
+      setQuizOpen(false)
+    } catch (e) {
+      setErr((e as ApiError).message)
+    } finally {
+      setQuizBusy(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-ink text-bone">
       <div className="mx-auto max-w-md px-5 py-10">
@@ -184,6 +215,7 @@ export default function FrameFinder() {
             <p className="label !text-bone/50">Your face match</p>
             <h1 className="mt-1 text-5xl">{result.faceShapeDisplay}</h1>
             <p className="mt-1 text-bone/60">{Math.round(result.confidence * 100)}% match confidence · {result.message}</p>
+            {refined && <p className="mt-2 text-sm text-bone/60">Refined for your style ✨</p>}
 
             <p className="mt-8 label !text-bone/50">Recommended styles</p>
             <div className="mt-3 space-y-2">
@@ -198,6 +230,49 @@ export default function FrameFinder() {
               <p className="mt-4 text-sm text-bone/45">
                 Use carefully: {result.avoidOrUseCarefully.map((f) => f.displayName).join(', ')}
               </p>
+            )}
+
+            {!refined && !quizOpen && (
+              <button
+                className="mt-6 w-full rounded-xl border border-bone/20 bg-bone/5 p-3 text-left text-sm text-bone/70"
+                onClick={() => setQuizOpen(true)}
+              >
+                ✨ Refine with a 30-second style quiz →
+              </button>
+            )}
+
+            {quizOpen && (
+              <div className="mt-6 rounded-xl border border-bone/20 bg-bone/5 p-4">
+                <div className="font-display text-lg">Your style</div>
+                {QUIZ.map((q) => (
+                  <div key={q.key} className="mt-3">
+                    <div className="text-sm text-bone/60">{q.label}</div>
+                    <div className="mt-1.5 flex flex-wrap gap-2">
+                      {q.options.map((o) => (
+                        <button
+                          key={o.value}
+                          onClick={() => setQuiz((s) => ({ ...s, [q.key]: o.value }))}
+                          className={`rounded-full border px-3 py-1 text-xs ${
+                            quiz[q.key] === o.value ? 'border-bone bg-bone text-ink' : 'border-bone/25 text-bone/70'
+                          }`}
+                        >
+                          {o.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <button
+                  className="btn-primary mt-4 w-full !bg-bone !text-ink"
+                  disabled={quizBusy || Object.keys(quiz).length === 0}
+                  onClick={submitQuiz}
+                >
+                  {quizBusy ? 'Refining…' : 'See my refined picks'}
+                </button>
+                <button className="mt-2 block w-full text-center text-xs text-bone/45" onClick={() => setQuizOpen(false)}>
+                  Skip
+                </button>
+              </div>
             )}
 
             {result.promoCode && (

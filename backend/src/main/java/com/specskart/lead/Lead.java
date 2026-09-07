@@ -63,6 +63,13 @@ public class Lead extends BaseEntity {
     private String faceShape;
     private Double faceConfidence;
 
+    /** Optional style-quiz answers (canonical: vibe classic/bold/minimal, colour warm/cool/neutral,
+     *  budget low/mid/high, screenHours high/some/low). Null until the quiz is taken. */
+    private String styleVibe;
+    private String styleColour;
+    private String styleBudget;
+    private String styleScreenHours;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "text")
     private java.util.List<String> recommendedFrameCategories = new java.util.ArrayList<>();

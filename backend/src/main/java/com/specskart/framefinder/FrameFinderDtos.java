@@ -23,4 +23,7 @@ public class FrameFinderDtos {
                                  String promoCode, int promoPercent, java.time.Instant promoExpiresAt) {}
 
     public record EventRequest(@NotNull String event, java.util.Map<String, Object> metadata) {}
+
+    /** Optional style-quiz answers (canonical values, any may be null). */
+    public record StyleQuizRequest(String vibe, String colour, String budget, String screenHours) {}
 }
