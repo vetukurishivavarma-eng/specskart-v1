@@ -11,16 +11,20 @@ public final class OrderDtos {
     // ---- cart ----
     public record CartLine(UUID productId, String slug, String name, String imageUrl,
                            int qty, long unitPriceMinor, long lineTotalMinor, boolean inStock, int stockQty,
-                           java.time.Instant heldUntil) {}
+                           java.time.Instant heldUntil, boolean lensable) {}
+
+    public record Suggestion(UUID productId, String slug, String name, long priceMinor, String imageUrl) {}
 
     public record CartView(String token, List<CartLine> lines, String promoCode,
                            long subtotalMinor, long discountMinor, long shippingMinor, long totalMinor,
                            String currency, String deliveryEta, java.time.Instant holdExpiresAt,
-                           int pointsAvailable, int pointValueMinor) {}
+                           int pointsAvailable, int pointValueMinor,
+                           String lensType, long lensAddMinor, List<Suggestion> suggestions) {}
 
     public record AddItem(UUID productId, Integer qty) {}
     public record SetQty(int qty) {}
     public record ApplyPromo(String code) {}
+    public record SetLens(String lensType, String rxJson) {}
 
     // ---- checkout ----
     public record CheckoutRequest(String customerName, String customerPhone, String customerEmail,
@@ -37,7 +41,8 @@ public final class OrderDtos {
                             long subtotalMinor, long discountMinor, long shippingMinor, long totalMinor,
                             String currency, String promoCode, Instant paidAt, Instant createdAt,
                             List<OrderLine> lines, List<StatusEvent> timeline,
-                            int pointsEarned, int pointsRedeemed, int pointsBalance, String referralCode) {}
+                            int pointsEarned, int pointsRedeemed, int pointsBalance, String referralCode,
+                            String lensType, long lensAddMinor, String rxJson) {}
 
     public record StatusEvent(String status, String note, Instant at) {}
 

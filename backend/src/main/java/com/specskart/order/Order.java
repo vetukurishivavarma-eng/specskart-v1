@@ -61,4 +61,10 @@ public class Order extends BaseEntity {
     private int pointsRedeemed = 0;
     @Column(nullable = false)
     private boolean referralCredited = false;
+
+    private String lensType;
+    @Column(nullable = false)
+    private long lensAddMinor = 0;
+    @Column(columnDefinition = "text")
+    private String rxJson;
 }

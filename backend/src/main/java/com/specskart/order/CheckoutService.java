@@ -107,12 +107,13 @@ public class CheckoutService {
 
         // referral discount + points redemption (both eat into subtotal-minus-promo; points
         // are decremented now and restored if the order is cancelled)
-        long afterPromo = Math.max(0, subtotal - view.discountMinor());
+        long goods = subtotal + view.lensAddMinor();
+        long afterPromo = Math.max(0, goods - view.discountMinor());
         LoyaltyService.CheckoutOutcome lo = leadId == null
                 ? new LoyaltyService.CheckoutOutcome(0, 0, null, null)
                 : loyalty.applyAtCheckout(leadId, afterPromo, req.redeemPoints(), req.referralCode());
         long discountMinor = view.discountMinor() + lo.discountMinor();
-        long total = Math.max(0, subtotal - discountMinor) + view.shippingMinor();
+        long total = Math.max(0, goods - discountMinor) + view.shippingMinor();
 
         Order order = new Order();
         order.setOrderNo(freshOrderNo());
@@ -132,6 +133,9 @@ public class CheckoutService {
         order.setPaymentProvider(payments.name());
         order.setReferredByLeadId(lo.referrerLeadId());
         order.setPointsRedeemed(lo.pointsRedeemed());
+        order.setLensType(cart.getLensType());
+        order.setLensAddMinor(view.lensAddMinor());
+        order.setRxJson(cart.getRxJson());
         orders.save(order);
 
         for (CartItem ci : lines) {

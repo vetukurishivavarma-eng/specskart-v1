@@ -86,14 +86,17 @@ export type ProductDetail = ProductCard & {
 export type CartLine = {
   productId: string; slug: string; name: string; imageUrl: string | null
   qty: number; unitPriceMinor: number; lineTotalMinor: number; inStock: boolean; stockQty: number
-  heldUntil: string | null
+  heldUntil: string | null; lensable: boolean
 }
+
+export type Suggestion = { productId: string; slug: string; name: string; priceMinor: number; imageUrl: string | null }
 
 export type CartView = {
   token: string; lines: CartLine[]; promoCode: string | null
   subtotalMinor: number; discountMinor: number; shippingMinor: number; totalMinor: number
   currency: string; deliveryEta: string; holdExpiresAt: string | null
   pointsAvailable: number; pointValueMinor: number
+  lensType: string | null; lensAddMinor: number; suggestions: Suggestion[]
 }
 
 export type OrderView = {
@@ -104,6 +107,7 @@ export type OrderView = {
   lines: { productName: string; productSlug: string | null; qty: number; unitPriceMinor: number; lineTotalMinor: number }[]
   timeline: { status: string; note: string | null; at: string }[]
   pointsEarned: number; pointsRedeemed: number; pointsBalance: number; referralCode: string | null
+  lensType: string | null; lensAddMinor: number; rxJson: string | null
 }
 
 async function cartCall<T = CartView>(path: string, opts: RequestInit = {}): Promise<T> {
@@ -130,6 +134,8 @@ export const shop = {
     cartCall(`/public/cart/items/${productId}`, { method: 'PATCH', body: JSON.stringify({ qty }) }),
   applyPromo: (code: string) =>
     cartCall('/public/cart/promo', { method: 'POST', body: JSON.stringify({ code }) }),
+  setLens: (lensType: string | null, rxJson?: string | null) =>
+    cartCall('/public/cart/lens', { method: 'POST', body: JSON.stringify({ lensType, rxJson: rxJson ?? null }) }),
 
   checkout: (body: Record<string, string | number | undefined>) =>
     cartCall<{ orderNo: string; checkoutUrl: string; totalMinor: number; currency: string }>(

@@ -60,6 +60,7 @@ public class OrderQueryService {
                 o.getCustomerEmail(), o.getShipAddress(), o.getShipCity(),
                 o.getSubtotalMinor(), o.getDiscountMinor(), o.getShippingMinor(), o.getTotalMinor(),
                 o.getCurrency(), o.getPromoCode(), o.getPaidAt(), o.getCreatedAt(), lines, timeline,
-                o.getPointsEarned(), o.getPointsRedeemed(), balance, referralCode);
+                o.getPointsEarned(), o.getPointsRedeemed(), balance, referralCode,
+                o.getLensType(), o.getLensAddMinor(), o.getRxJson());
     }
 }

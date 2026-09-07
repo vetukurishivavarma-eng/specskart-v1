@@ -12,13 +12,13 @@ type Form = {
   material: string; colour: string; gender: string
   priceKwacha: string; compareAtKwacha: string; stockQty: string
   lensable: boolean; featured: boolean; status: string
-  dropsAt: string; limitedEdition: boolean
+  dropsAt: string; limitedEdition: boolean; kind: string
 }
 
 const EMPTY: Form = {
   name: '', slug: '', description: '', frameCategoryCode: '', material: '', colour: '', gender: 'UNISEX',
   priceKwacha: '', compareAtKwacha: '', stockQty: '0', lensable: true, featured: false, status: 'ACTIVE',
-  dropsAt: '', limitedEdition: false,
+  dropsAt: '', limitedEdition: false, kind: 'FRAME',
 }
 
 // ISO instant <-> value for <input type="datetime-local"> (local time, no seconds/zone)
@@ -52,6 +52,7 @@ export default function ProductEditor() {
       compareAtKwacha: product.compareAtMinor ? String(product.compareAtMinor / 100) : '',
       stockQty: String(product.stockQty), lensable: product.lensable, featured: product.featured, status: product.status,
       dropsAt: toLocalInput(product.dropsAt ?? null), limitedEdition: !!product.limitedEdition,
+      kind: product.kind ?? 'FRAME',
     })
   }, [product])
 
@@ -63,7 +64,7 @@ export default function ProductEditor() {
         priceMinor: Math.round(Number(f.priceKwacha) * 100),
         compareAtMinor: f.compareAtKwacha ? Math.round(Number(f.compareAtKwacha) * 100) : null,
         stockQty: Number(f.stockQty), lensable: f.lensable, featured: f.featured, status: f.status,
-        dropsAt: fromLocalInput(f.dropsAt), limitedEdition: f.limitedEdition,
+        dropsAt: fromLocalInput(f.dropsAt), limitedEdition: f.limitedEdition, kind: f.kind,
       }
       return isNew
         ? api<any>('/admin/catalog/products', { method: 'POST', auth: true, body: JSON.stringify(body) })
@@ -145,6 +146,11 @@ export default function ProductEditor() {
           <label className="flex items-center gap-2"><input type="checkbox" checked={f.featured} onChange={(e) => s('featured', e.target.checked)} /> Featured</label>
           <label className="flex items-center gap-2"><input type="checkbox" checked={f.lensable} onChange={(e) => s('lensable', e.target.checked)} /> Prescription-ready</label>
           <label className="flex items-center gap-2"><input type="checkbox" checked={f.limitedEdition} onChange={(e) => s('limitedEdition', e.target.checked)} /> Limited edition</label>
+          <label className="flex items-center gap-2">Type
+            <select value={f.kind} onChange={(e) => s('kind', e.target.value)} className="rounded border border-ink/20 px-1 py-0.5 text-sm">
+              <option value="FRAME">Frame</option><option value="ACCESSORY">Accessory</option>
+            </select>
+          </label>
         </div>
         <label className="block">
           <span className="lbl">Drops at (leave blank for immediate)</span>

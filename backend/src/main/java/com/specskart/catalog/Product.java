@@ -59,6 +59,14 @@ public class Product extends BaseEntity {
     /** Serving path of a transparent-PNG render used for virtual try-on; null if none. */
     private String tryOnImageUrl;
 
+    /** FRAME (default) or ACCESSORY (case, cleaning kit, chain…) — drives "complete the look". */
+    @Column(nullable = false)
+    private String kind = "FRAME";
+
+    public boolean isAccessory() {
+        return "ACCESSORY".equals(kind);
+    }
+
     public boolean isActive() {
         return "ACTIVE".equals(status);
     }

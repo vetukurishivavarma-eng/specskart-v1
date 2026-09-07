@@ -46,6 +46,8 @@ export default function Cart() {
   const setQty = useMutation({ mutationFn: (v: { id: string; qty: number }) => shop.setQty(v.id, v.qty), onSuccess: refresh })
   const applyPromo = useMutation({ mutationFn: () => shop.applyPromo(promo), onSuccess: () => { setPromo(''); refresh() } })
   const clearPromo = useMutation({ mutationFn: () => shop.applyPromo(''), onSuccess: refresh })
+  const setLens = useMutation({ mutationFn: (t: string | null) => shop.setLens(t), onSuccess: refresh })
+  const addSuggestion = useMutation({ mutationFn: (id: string) => shop.addItem(id, 1), onSuccess: refresh })
 
   if (isLoading) return <div className="container-x py-16 text-ink/50">Loading your bag…</div>
 
@@ -90,13 +92,57 @@ export default function Cart() {
             </li>
           ))}
         </ul>
+
+        {cart.lines.some((l) => l.lensable) && (
+          <div className="mt-6 card p-4">
+            <h3 className="text-base">Prescription lenses</h3>
+            <p className="text-xs text-ink/50">Applied to each prescription-ready frame in your bag.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {[
+                ['', 'No lenses / frame only'],
+                ['NON_PRESCRIPTION', 'Non-prescription'],
+                ['BLUE_LIGHT', 'Blue-light'],
+                ['SINGLE_VISION', 'Single vision'],
+                ['PROGRESSIVE', 'Progressive'],
+              ].map(([v, label]) => (
+                <button key={v} onClick={() => setLens.mutate(v || null)}
+                  className={`rounded-full border px-3 py-1 text-sm ${(cart.lensType ?? '') === v ? 'border-ink bg-ink text-bone' : 'border-ink/20'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {cart.lensAddMinor > 0 && (
+              <p className="mt-2 text-xs text-ink/60">+ {money(cart.lensAddMinor, cart.currency)} for lenses. We’ll confirm your prescription by WhatsApp after you order.</p>
+            )}
+          </div>
+        )}
+
+        {cart.suggestions.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-base">Complete the look</h3>
+            <div className="mt-3 grid grid-cols-3 gap-3">
+              {cart.suggestions.map((s) => (
+                <div key={s.productId} className="card p-2 text-center">
+                  <div className="aspect-square overflow-hidden rounded-lg bg-white">
+                    {s.imageUrl && <img src={assetUrl(s.imageUrl)} alt={s.name} className="h-full w-full object-cover" />}
+                  </div>
+                  <div className="mt-1 text-xs">{s.name}</div>
+                  <div className="text-xs text-ink/50">{money(s.priceMinor, cart.currency)}</div>
+                  <button className="btn-ghost mt-1 !px-2 !py-1 text-[11px]" disabled={addSuggestion.isPending}
+                    onClick={() => addSuggestion.mutate(s.productId)}>Add</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <aside className="h-fit card p-5">
         <h2 className="text-lg">Summary</h2>
         <dl className="mt-4 space-y-2 text-sm">
           <Row k="Subtotal" v={money(cart.subtotalMinor, cart.currency)} />
-          {cart.discountMinor > 0 && <Row k={`Discount (${cart.promoCode})`} v={`− ${money(cart.discountMinor, cart.currency)}`} accent />}
+          {cart.lensAddMinor > 0 && <Row k="Prescription lenses" v={`+ ${money(cart.lensAddMinor, cart.currency)}`} />}
+          {cart.discountMinor > 0 && <Row k={cart.promoCode ? `Discount (${cart.promoCode})` : 'Discount'} v={`− ${money(cart.discountMinor, cart.currency)}`} accent />}
           <Row k="Delivery" v={cart.shippingMinor === 0 ? 'Free' : money(cart.shippingMinor, cart.currency)} />
           <div className="flex justify-between border-t border-ink/10 pt-2 text-base font-medium">
             <span>Total</span><span>{money(cart.totalMinor, cart.currency)}</span>

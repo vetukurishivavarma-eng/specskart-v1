@@ -29,4 +29,11 @@ public class Cart extends BaseEntity {
 
     /** set when this cart became an order */
     private Instant orderedAt;
+
+    /** Prescription-lens choice for lensable frames in this cart. NON_PRESCRIPTION | SINGLE_VISION | PROGRESSIVE | BLUE_LIGHT */
+    private String lensType;
+    @Column(nullable = false)
+    private long lensAddMinor = 0;
+    @Column(columnDefinition = "text")
+    private String rxJson;
 }

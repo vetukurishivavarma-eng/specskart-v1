@@ -50,6 +50,12 @@ public class StorefrontController {
         return cart.applyPromo(token, body.code());
     }
 
+    @PostMapping("/cart/lens")
+    public OrderDtos.CartView lens(@RequestHeader(value = "X-Cart-Token", required = false) String token,
+                                   @RequestBody OrderDtos.SetLens body) {
+        return cart.setLens(token, body.lensType(), body.rxJson());
+    }
+
     @PostMapping("/checkout")
     public OrderDtos.CheckoutResult checkout(@RequestHeader(value = "X-Cart-Token", required = false) String token,
                                              @RequestParam(value = "s", required = false) String frameFinderToken,

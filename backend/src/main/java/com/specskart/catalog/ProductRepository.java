@@ -31,4 +31,6 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
     List<Product> findByStatusAndFeaturedTrueOrderByCreatedAtDesc(String status);
 
     List<Product> findByStatusAndFrameCategoryCodeInOrderByStockQtyDesc(String status, List<String> codes);
+
+    List<Product> findByStatusAndKindOrderByCreatedAtDesc(String status, String kind);
 }

@@ -34,13 +34,13 @@ public final class CatalogDtos {
                                String frameCategoryCode, String material, String colour, String gender,
                                long priceMinor, Long compareAtMinor, String currency, int stockQty,
                                boolean lensable, String status, boolean featured, List<ImageDto> images,
-                               java.time.Instant dropsAt, boolean limitedEdition, String tryOnImageUrl) {}
+                               java.time.Instant dropsAt, boolean limitedEdition, String tryOnImageUrl, String kind) {}
 
     public record ProductUpsert(String slug, String name, String description, String frameCategoryCode,
                                 String material, String colour, String gender, Long priceMinor,
                                 Long compareAtMinor, Integer stockQty, Boolean lensable, String status,
                                 Boolean featured, List<ImageInput> images,
-                                java.time.Instant dropsAt, Boolean limitedEdition, String tryOnImageUrl) {}
+                                java.time.Instant dropsAt, Boolean limitedEdition, String tryOnImageUrl, String kind) {}
 
     public record ImageInput(String url, String alt) {}
 

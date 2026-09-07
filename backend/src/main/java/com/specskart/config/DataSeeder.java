@@ -76,6 +76,29 @@ public class DataSeeder {
             images.save(img);
         }
 
+        Object[][] accessories = {
+                {"hard-case", "Hard Shell Case", "Black", 12000},
+                {"lens-cloth", "Microfibre Lens Cloth", "Grey", 3500},
+                {"cleaning-kit", "Lens Cleaning Kit", "Clear", 6000},
+        };
+        for (Object[] a : accessories) {
+            Product p = new Product();
+            p.setSlug((String) a[0]);
+            p.setName((String) a[1]);
+            p.setColour((String) a[2]);
+            p.setPriceMinor(((int) a[3]) * 100L);
+            p.setStockQty(200);
+            p.setStatus("ACTIVE");
+            p.setKind("ACCESSORY");
+            p.setDescription("Care accessory for your eyewear.");
+            products.save(p);
+            ProductImage img = new ProductImage();
+            img.setProductId(p.getId());
+            img.setUrl("https://picsum.photos/seed/" + a[0] + "/700/500");
+            img.setAlt((String) a[1]);
+            images.save(img);
+        }
+
         PromoCode welcome = new PromoCode();
         welcome.setCode("FRAME10");
         welcome.setDiscountType("PERCENT");

@@ -15,8 +15,21 @@ public record AppProperties(
         WhatsApp whatsapp,
         Payments payments,
         Promo promo,
-        Loyalty loyalty
+        Loyalty loyalty,
+        Lenses lenses
 ) {
+    /** Per-pair price add-on (minor units) for each prescription-lens option. Non-prescription = 0. */
+    public record Lenses(long singleVisionAddMinor, long progressiveAddMinor, long blueLightAddMinor) {
+        public long addFor(String lensType) {
+            if (lensType == null) return 0;
+            return switch (lensType.toUpperCase(java.util.Locale.ROOT)) {
+                case "SINGLE_VISION" -> singleVisionAddMinor;
+                case "PROGRESSIVE" -> progressiveAddMinor;
+                case "BLUE_LIGHT" -> blueLightAddMinor;
+                default -> 0;
+            };
+        }
+    }
     public record Session(int expiryHours) {}
     public record Promo(int faceAnalysisPercent, int faceAnalysisHours) {}
 

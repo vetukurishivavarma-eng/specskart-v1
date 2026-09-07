@@ -242,6 +242,7 @@ public class AdminCatalogService {
         p.setDropsAt(in.dropsAt());
         if (in.limitedEdition() != null) p.setLimitedEdition(in.limitedEdition());
         if (in.tryOnImageUrl() != null) p.setTryOnImageUrl(in.tryOnImageUrl().isBlank() ? null : in.tryOnImageUrl().trim());
+        if (in.kind() != null) p.setKind("ACCESSORY".equalsIgnoreCase(in.kind()) ? "ACCESSORY" : "FRAME");
     }
 
     /** Replace the external-URL images. Uploaded photos are managed via add/deleteImage, not here. */
@@ -270,7 +271,7 @@ public class AdminCatalogService {
                 p.getFrameCategoryCode(), p.getMaterial(), p.getColour(), p.getGender(),
                 p.getPriceMinor(), p.getCompareAtMinor(), p.getCurrency(), p.getStockQty(),
                 p.isLensable(), p.getStatus(), p.isFeatured(), imgs,
-                p.getDropsAt(), p.isLimitedEdition(), p.getTryOnImageUrl());
+                p.getDropsAt(), p.isLimitedEdition(), p.getTryOnImageUrl(), p.getKind());
     }
 
     // ---- promos ----

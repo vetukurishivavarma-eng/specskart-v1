@@ -50,6 +50,10 @@ specskart:
     referral-friend-percent: ${LOYALTY_REFERRAL_FRIEND_PERCENT:10}
     referral-reward-points: ${LOYALTY_REFERRAL_REWARD_POINTS:200}
     min-redeem-points: ${LOYALTY_MIN_REDEEM_POINTS:100}
+  lenses:
+    single-vision-add-minor: ${LENS_SINGLE_VISION_MINOR:15000}   # +K150
+    progressive-add-minor: ${LENS_PROGRESSIVE_MINOR:45000}       # +K450
+    blue-light-add-minor: ${LENS_BLUE_LIGHT_MINOR:8000}          # +K80
   whatsapp:
     provider: ${WHATSAPP_PROVIDER:mock}
     phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}

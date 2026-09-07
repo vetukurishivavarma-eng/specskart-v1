@@ -65,10 +65,14 @@ export default function OrderTracking() {
         </ul>
         <dl className="mt-4 space-y-1 border-t border-ink/10 pt-3 text-sm">
           <div className="flex justify-between"><dt className="text-ink/55">Subtotal</dt><dd>{money(order.subtotalMinor, order.currency)}</dd></div>
+          {order.lensAddMinor > 0 && <div className="flex justify-between"><dt className="text-ink/55">Prescription lenses{order.lensType ? ` (${order.lensType.replace('_', ' ').toLowerCase()})` : ''}</dt><dd>+ {money(order.lensAddMinor, order.currency)}</dd></div>}
           {order.discountMinor > 0 && <div className="flex justify-between text-moss"><dt>Discount</dt><dd>− {money(order.discountMinor, order.currency)}</dd></div>}
           <div className="flex justify-between"><dt className="text-ink/55">Delivery</dt><dd>{order.shippingMinor === 0 ? 'Free' : money(order.shippingMinor, order.currency)}</dd></div>
           <div className="flex justify-between pt-1 font-medium"><dt>Total</dt><dd>{money(order.totalMinor, order.currency)}</dd></div>
         </dl>
+        {order.lensType && order.lensType !== 'NON_PRESCRIPTION' && !order.rxJson && (
+          <p className="mt-3 text-xs text-ink/50">We’ll message you on WhatsApp to collect your prescription details.</p>
+        )}
       </div>
 
       <div className="card mt-4 p-5 text-sm">

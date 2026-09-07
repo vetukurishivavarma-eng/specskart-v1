@@ -177,18 +177,26 @@ public class CartService {
 
         List<OrderDtos.CartLine> out = new ArrayList<>();
         long subtotal = 0;
+        int lensablePairs = 0;
+        boolean hasFrame = false, hasAccessory = false;
         Instant earliestHold = null;
         for (CartItem ci : lines) {
             Product p = byId.get(ci.getProductId());
             if (p == null) { items.delete(ci); continue; }
             subtotal += ci.lineTotalMinor();
+            if (p.isLensable()) lensablePairs += ci.getQty();
+            if (p.isAccessory()) hasAccessory = true; else hasFrame = true;
             if (ci.getHeldUntil() != null && (earliestHold == null || ci.getHeldUntil().isBefore(earliestHold))) {
                 earliestHold = ci.getHeldUntil();
             }
             out.add(new OrderDtos.CartLine(p.getId(), p.getSlug(), p.getName(), imageByProduct.get(p.getId()),
                     ci.getQty(), ci.getUnitPriceMinor(), ci.lineTotalMinor(), p.inStock(), p.getStockQty(),
-                    ci.getHeldUntil()));
+                    ci.getHeldUntil(), p.isLensable()));
         }
+
+        // prescription lenses: a per-pair add-on applied to every lensable frame in the bag
+        long lensAdd = cart.getLensType() == null ? 0
+                : props.lenses().addFor(cart.getLensType()) * lensablePairs;
 
         final long sub = subtotal;
         long discount = 0;
@@ -199,13 +207,36 @@ public class CartService {
             else promoCode = null;
         }
         StoreConfig sc = storeConfig.current();
-        long shipping = out.isEmpty() ? 0 : sc.shippingFor(subtotal - discount);
-        long total = Math.max(0, subtotal - discount) + shipping;
+        long goods = subtotal + lensAdd;
+        long shipping = out.isEmpty() ? 0 : sc.shippingFor(goods - discount);
+        long total = Math.max(0, goods - discount) + shipping;
         int points = cart.getLeadId() == null ? 0
                 : leads.findById(cart.getLeadId()).map(com.specskart.lead.Lead::getPoints).orElse(0);
+
+        // "complete the look": suggest accessories once there's a frame and none added yet
+        List<OrderDtos.Suggestion> suggestions = List.of();
+        if (hasFrame && !hasAccessory) {
+            suggestions = products.findByStatusAndKindOrderByCreatedAtDesc("ACTIVE", "ACCESSORY").stream()
+                    .limit(3)
+                    .map(a -> new OrderDtos.Suggestion(a.getId(), a.getSlug(), a.getName(),
+                            a.getPriceMinor(), imageByProduct.get(a.getId())))
+                    .toList();
+        }
+
         return new OrderDtos.CartView(cart.getToken(), out, promoCode, subtotal, discount, shipping, total,
                 sc.getCurrency(), sc.getDeliveryEta(), earliestHold,
-                points, props.loyalty().pointValueMinor());
+                points, props.loyalty().pointValueMinor(),
+                cart.getLensType(), lensAdd, suggestions);
+    }
+
+    /** Set the prescription-lens choice + optional Rx for the lensable frames in this cart. */
+    @Transactional
+    public OrderDtos.CartView setLens(String token, String lensType, String rxJson) {
+        Cart cart = getOrCreate(token);
+        cart.setLensType(lensType == null || lensType.isBlank() ? null : lensType.trim().toUpperCase(java.util.Locale.ROOT));
+        cart.setRxJson(rxJson);
+        carts.save(cart);
+        return view(cart);
     }
 
     long subtotal(Cart cart) {

@@ -52,6 +52,12 @@ export default function OrderDetail() {
               <li key={i} className="flex justify-between"><span>{l.qty} × {l.productName}</span><span>{money(l.lineTotalMinor, o.currency)}</span></li>
             ))}
           </ul>
+          {o.lensType && (
+            <p className="mt-3 rounded bg-ink/5 p-2 text-xs">
+              Lenses: <strong>{o.lensType.replace('_', ' ')}</strong>{o.lensAddMinor > 0 ? ` (+${money(o.lensAddMinor, o.currency)})` : ''}
+              {o.rxJson ? <><br />Rx: {o.rxJson}</> : <><br /><span className="text-clay">Prescription not yet collected — contact the customer on WhatsApp.</span></>}
+            </p>
+          )}
           <dl className="mt-3 space-y-1 border-t border-ink/10 pt-3 text-sm">
             <div className="flex justify-between"><dt className="text-ink/55">Subtotal</dt><dd>{money(o.subtotalMinor, o.currency)}</dd></div>
             {o.discountMinor > 0 && <div className="flex justify-between"><dt className="text-ink/55">Discount {o.promoCode ? `(${o.promoCode})` : ''}</dt><dd>− {money(o.discountMinor, o.currency)}</dd></div>}
