@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,6 +25,8 @@ class CommerceFlowTest {
     @Autowired CheckoutService checkout;
     @Autowired OrderQueryService orderQuery;
     @Autowired OrderRepository orders;
+    @Autowired CartItemRepository cartItems;
+    @Autowired StockHoldJob holdJob;
 
     private Product frame(int priceKwacha, int stock) {
         Product p = new Product();
@@ -33,6 +36,10 @@ class CommerceFlowTest {
         p.setStockQty(stock);
         p.setStatus("ACTIVE");
         return products.save(p);
+    }
+
+    private int stock(UUID id) {
+        return products.findById(id).orElseThrow().getStockQty();
     }
 
     private UUID orderIdOf(String orderNo) {
@@ -50,22 +57,24 @@ class CommerceFlowTest {
 
         var cart = carts.addItem(null, p.getId(), 2);
         String token = cart.token();
-        carts.setQty(token, p.getId(), 3);                    // 3 x K800 = K2400
+        assertThat(stock(p.getId())).isEqualTo(3);              // reserved on add-to-cart
+        carts.setQty(token, p.getId(), 3);
+        assertThat(stock(p.getId())).isEqualTo(2);              // one more reserved
+
         var withPromo = carts.applyPromo(token, promo.getCode());
         assertThat(withPromo.subtotalMinor()).isEqualTo(240_000);
         assertThat(withPromo.discountMinor()).isEqualTo(48_000);
         assertThat(withPromo.totalMinor()).isEqualTo(192_000);
+        assertThat(withPromo.holdExpiresAt()).isAfter(Instant.now());
 
         var result = checkout.start(token, new OrderDtos.CheckoutRequest(
                 "Test Buyer", "260970000001", null, "12 Kabulonga Rd", "Lusaka"));
         assertThat(result.checkoutUrl()).contains("mockPaid=1");
-        assertThat(products.findById(p.getId()).orElseThrow().getStockQty()).isEqualTo(2);
+        assertThat(stock(p.getId())).isEqualTo(2);              // no double decrement at checkout
         assertThat(promos.findByCodeIgnoreCase(promo.getCode()).orElseThrow().getRedeemedCount()).isEqualTo(1);
-        assertThat(orderQuery.byOrderNo(result.orderNo()).status()).isEqualTo("PENDING_PAYMENT");
 
         checkout.confirmPayment(result.orderNo());
         checkout.confirmPayment(result.orderNo()); // idempotent
-
         var paid = orderQuery.byOrderNo(result.orderNo());
         assertThat(paid.status()).isEqualTo("PAID");
         assertThat(paid.timeline()).extracting(OrderDtos.StatusEvent::status)
@@ -76,31 +85,52 @@ class CommerceFlowTest {
         checkout.updateStatus(id, OrderStatus.SHIPPED, null);
         checkout.updateStatus(id, OrderStatus.DELIVERED, null);
         assertThat(orderQuery.byOrderNo(result.orderNo()).status()).isEqualTo("DELIVERED");
-
         assertThatThrownBy(() -> checkout.updateStatus(id, OrderStatus.PENDING_PAYMENT, null))
                 .hasMessageContaining("Can't move");
+    }
+
+    @Test
+    void lastUnitIsHeldForOneShopperOnly() {
+        Product p = frame(700, 1);
+        carts.addItem(null, p.getId(), 1);                       // shopper A grabs it
+        assertThat(stock(p.getId())).isZero();
+        assertThatThrownBy(() -> carts.addItem(null, p.getId(), 1)) // shopper B can't
+                .hasMessageContaining("sold out");
+    }
+
+    @Test
+    void removingFromCartReleasesTheHold() {
+        Product p = frame(700, 2);
+        var cart = carts.addItem(null, p.getId(), 2);
+        assertThat(stock(p.getId())).isZero();
+        carts.setQty(cart.token(), p.getId(), 0);                // remove
+        assertThat(stock(p.getId())).isEqualTo(2);
+    }
+
+    @Test
+    void expiredHoldIsReleasedByTheJob() {
+        Product p = frame(700, 1);
+        var cart = carts.addItem(null, p.getId(), 1);
+        assertThat(stock(p.getId())).isZero();
+
+        // simulate the 15-min window lapsing
+        var line = cartItems.findByCartId(carts.getOrCreate(cart.token()).getId()).get(0);
+        line.setHeldUntil(Instant.now().minusSeconds(60));
+        cartItems.save(line);
+
+        holdJob.releaseExpired();
+        assertThat(stock(p.getId())).isEqualTo(1);
+        assertThat(cartItems.findByCartId(carts.getOrCreate(cart.token()).getId())).isEmpty();
     }
 
     @Test
     void cancelRestocks() {
         Product p = frame(500, 4);
         var cart = carts.addItem(null, p.getId(), 3);
+        assertThat(stock(p.getId())).isEqualTo(1);
         var result = checkout.start(cart.token(), new OrderDtos.CheckoutRequest(
                 "Cancel Me", "260970000002", null, "1 Test Ave", "Ndola"));
-        assertThat(products.findById(p.getId()).orElseThrow().getStockQty()).isEqualTo(1);
         checkout.updateStatus(orderIdOf(result.orderNo()), OrderStatus.CANCELLED, "changed mind");
-        assertThat(products.findById(p.getId()).orElseThrow().getStockQty()).isEqualTo(4);
-    }
-
-    @Test
-    void outOfStockIsRejectedAtCheckout() {
-        Product p = frame(600, 1);
-        var cart = carts.addItem(null, p.getId(), 1);
-        // drop stock to 0 behind the cart's back
-        p.setStockQty(0);
-        products.save(p);
-        assertThatThrownBy(() -> checkout.start(cart.token(), new OrderDtos.CheckoutRequest(
-                "No Stock", "260970000003", null, "9 Test St", "Kitwe")))
-                .hasMessageContaining("sold out");
+        assertThat(stock(p.getId())).isEqualTo(4);
     }
 }

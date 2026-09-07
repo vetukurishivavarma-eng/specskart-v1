@@ -76,6 +76,12 @@ carts, cart_items, orders, order_items, order_events, store_config). Money = min
   `FLW_SECRET_HASH`). Webhook `/api/webhooks/payment` (verif-hash checked, then API-verified).
 - **Order lifecycle**: PENDING_PAYMENT→PAID→PACKED→SHIPPED→DELIVERED (+CANCELLED/REFUNDED);
   every transition emits an OrderEvent + an automatic WhatsApp message. CANCELLED restocks.
+- **Inventory holds (movie-ticket model, V4__stock_holds.sql):** `products.stock_qty` = "available
+  right now". Add-to-cart does an **atomic** `UPDATE ... WHERE stock_qty >= :n` (`ProductRepository.reserve`,
+  returns rows-affected) and stamps `cart_items.held_until = now + 15min`. Cart view/edit renews the
+  hold; `StockHoldJob` (@Scheduled 2min) releases lapsed holds on un-ordered carts; removing a line or
+  cancelling an order calls `release`. Checkout no longer decrements — it re-grabs only if the hold
+  lapsed, rolling the whole checkout back if the unit is gone. No stock read-modify-write anywhere.
 - **WhatsApp bot**: "Show Me Frames" now sends the 3 matched products w/ prices + a shop
   link on a cart pre-linked to the lead. "Explore Frames" → shop link. New events
   PRODUCTS_SHOWN / ORDER_PLACED / ORDER_PAID / ORDER_DELIVERED.

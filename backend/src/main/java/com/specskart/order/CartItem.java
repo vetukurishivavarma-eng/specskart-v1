@@ -7,6 +7,7 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -26,6 +27,9 @@ public class CartItem extends BaseEntity {
 
     @Column(nullable = false)
     private long unitPriceMinor;
+
+    /** Stock is reserved until this moment; past it the units are released back. */
+    private Instant heldUntil;
 
     public long lineTotalMinor() {
         return unitPriceMinor * qty;

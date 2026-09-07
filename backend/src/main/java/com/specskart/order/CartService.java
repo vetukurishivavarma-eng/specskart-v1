@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -24,6 +26,9 @@ import java.util.stream.Collectors;
 public class CartService {
 
     private static final SecureRandom RNG = new SecureRandom();
+
+    /** How long a frame stays reserved for a shopper once it's in their bag. */
+    public static final Duration HOLD = Duration.ofMinutes(15);
 
     private final CartRepository carts;
     private final CartItemRepository items;
@@ -76,7 +81,6 @@ public class CartService {
         Cart cart = getOrCreate(token);
         Product p = products.findById(productId).filter(Product::isActive)
                 .orElseThrow(() -> ApiException.notFound("PRODUCT_NOT_FOUND", "That frame is no longer available."));
-        int q = Math.max(1, qty);
         CartItem item = items.findByCartIdAndProductId(cart.getId(), productId).orElseGet(() -> {
             CartItem ci = new CartItem();
             ci.setCartId(cart.getId());
@@ -84,8 +88,13 @@ public class CartService {
             ci.setQty(0);
             return ci;
         });
-        item.setQty(Math.min(item.getQty() + q, Math.max(1, p.getStockQty())));
+        int want = Math.min(Math.max(1, qty), p.getStockQty()); // stock_qty is what's still available
+        if (want <= 0 || products.reserve(productId, want) == 0) {
+            throw ApiException.badRequest("OUT_OF_STOCK", "\"" + p.getName() + "\" just sold out.");
+        }
+        item.setQty(item.getQty() + want);
         item.setUnitPriceMinor(p.getPriceMinor());
+        item.setHeldUntil(Instant.now().plus(HOLD));
         items.save(item);
         touch(cart);
         return view(cart);
@@ -96,15 +105,38 @@ public class CartService {
         Cart cart = getOrCreate(token);
         CartItem item = items.findByCartIdAndProductId(cart.getId(), productId)
                 .orElseThrow(() -> ApiException.notFound("NOT_IN_CART", "That frame isn't in your bag."));
-        if (qty <= 0) {
+        int target = Math.max(0, qty);
+        int delta = target - item.getQty();
+        if (delta > 0) {
+            Product p = products.findById(productId).orElseThrow();
+            int grab = Math.min(delta, p.getStockQty());
+            if (grab <= 0 || products.reserve(productId, grab) == 0) {
+                throw ApiException.badRequest("OUT_OF_STOCK", "No more of \"" + p.getName() + "\" available.");
+            }
+            item.setQty(item.getQty() + grab);
+        } else if (delta < 0) {
+            products.release(productId, -delta);
+            item.setQty(target);
+        }
+        if (item.getQty() <= 0) {
             items.delete(item);
         } else {
-            Product p = products.findById(productId).orElseThrow();
-            item.setQty(Math.min(qty, Math.max(1, p.getStockQty())));
+            item.setHeldUntil(Instant.now().plus(HOLD));
             items.save(item);
         }
         touch(cart);
         return view(cart);
+    }
+
+    /** Keep an active shopper's holds from expiring while they browse / sit on the cart page. */
+    @Transactional
+    public void refreshHolds(Cart cart) {
+        if (cart.getOrderedAt() != null) return;
+        Instant until = Instant.now().plus(HOLD);
+        for (CartItem ci : items.findByCartId(cart.getId())) {
+            ci.setHeldUntil(until);
+            items.save(ci);
+        }
     }
 
     @Transactional
@@ -126,7 +158,7 @@ public class CartService {
         return view(cart);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public OrderDtos.CartView view(String token) {
         return view(getOrCreate(token));
     }
@@ -140,12 +172,17 @@ public class CartService {
 
         List<OrderDtos.CartLine> out = new ArrayList<>();
         long subtotal = 0;
+        Instant earliestHold = null;
         for (CartItem ci : lines) {
             Product p = byId.get(ci.getProductId());
             if (p == null) { items.delete(ci); continue; }
             subtotal += ci.lineTotalMinor();
+            if (ci.getHeldUntil() != null && (earliestHold == null || ci.getHeldUntil().isBefore(earliestHold))) {
+                earliestHold = ci.getHeldUntil();
+            }
             out.add(new OrderDtos.CartLine(p.getId(), p.getSlug(), p.getName(), imageByProduct.get(p.getId()),
-                    ci.getQty(), ci.getUnitPriceMinor(), ci.lineTotalMinor(), p.inStock(), p.getStockQty()));
+                    ci.getQty(), ci.getUnitPriceMinor(), ci.lineTotalMinor(), p.inStock(), p.getStockQty(),
+                    ci.getHeldUntil()));
         }
 
         final long sub = subtotal;
@@ -160,7 +197,7 @@ public class CartService {
         long shipping = out.isEmpty() ? 0 : sc.shippingFor(subtotal - discount);
         long total = Math.max(0, subtotal - discount) + shipping;
         return new OrderDtos.CartView(cart.getToken(), out, promoCode, subtotal, discount, shipping, total,
-                sc.getCurrency(), sc.getDeliveryEta());
+                sc.getCurrency(), sc.getDeliveryEta(), earliestHold);
     }
 
     long subtotal(Cart cart) {

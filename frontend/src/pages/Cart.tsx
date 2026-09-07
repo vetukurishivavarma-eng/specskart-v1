@@ -3,13 +3,33 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { shop, money, adoptCartFromUrl } from '../lib/shop'
 
+function HoldTimer({ until, onExpire }: { until: string; onExpire: () => void }) {
+  const [left, setLeft] = useState(() => Math.max(0, new Date(until).getTime() - Date.now()))
+  useEffect(() => {
+    const id = setInterval(() => {
+      const ms = Math.max(0, new Date(until).getTime() - Date.now())
+      setLeft(ms)
+      if (ms === 0) onExpire()
+    }, 1000)
+    return () => clearInterval(id)
+  }, [until, onExpire])
+  const m = Math.floor(left / 60000)
+  const s = Math.floor((left % 60000) / 1000)
+  return (
+    <div className="mt-4 rounded-lg bg-moss/10 px-3 py-2 text-sm">
+      Your frames are held for <strong>{m}:{String(s).padStart(2, '0')}</strong>. Check out before then to keep them.
+    </div>
+  )
+}
+
 export default function Cart() {
   const qc = useQueryClient()
   const nav = useNavigate()
   const [promo, setPromo] = useState('')
   useEffect(() => { adoptCartFromUrl() }, [])
 
-  const { data: cart, isLoading } = useQuery({ queryKey: ['cart'], queryFn: shop.cart })
+  // refetch every minute — the GET renews the server-side hold while the shopper sits here
+  const { data: cart, isLoading } = useQuery({ queryKey: ['cart'], queryFn: shop.cart, refetchInterval: 60_000 })
   const refresh = () => qc.invalidateQueries({ queryKey: ['cart'] })
 
   const setQty = useMutation({ mutationFn: (v: { id: string; qty: number }) => shop.setQty(v.id, v.qty), onSuccess: refresh })
@@ -29,6 +49,7 @@ export default function Cart() {
     <div className="container-x grid gap-10 py-12 lg:grid-cols-3">
       <div className="lg:col-span-2">
         <h1 className="text-3xl">Your bag</h1>
+        {cart.holdExpiresAt && <HoldTimer until={cart.holdExpiresAt} onExpire={refresh} />}
         <ul className="mt-6 divide-y divide-ink/10">
           {cart.lines.map((l) => (
             <li key={l.productId} className="flex gap-4 py-4">

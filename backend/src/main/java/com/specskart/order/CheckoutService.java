@@ -80,11 +80,17 @@ public class CheckoutService {
 
         long subtotal = 0;
         var view = cartService.view(cart); // reuse pricing / promo logic
+        Instant now = Instant.now();
         for (CartItem ci : lines) {
             Product p = products.findById(ci.getProductId())
                     .orElseThrow(() -> ApiException.badRequest("PRODUCT_GONE", "A frame in your bag is no longer available."));
-            if (!p.isActive() || p.getStockQty() < ci.getQty()) {
-                throw ApiException.badRequest("OUT_OF_STOCK", "\"" + p.getName() + "\" just sold out — please adjust your bag.");
+            // Units were reserved when they went in the bag. If the hold lapsed (shopper idle
+            // past the 15-min window), try to grab them again — someone else may have taken the
+            // last one. Failure here rolls the whole checkout back.
+            boolean held = ci.getHeldUntil() != null && ci.getHeldUntil().isAfter(now);
+            if (!held && products.reserve(p.getId(), ci.getQty()) == 0) {
+                throw ApiException.badRequest("OUT_OF_STOCK",
+                        "\"" + p.getName() + "\" sold out while you were away — please adjust your bag.");
             }
             subtotal += ci.lineTotalMinor();
         }
@@ -117,10 +123,8 @@ public class CheckoutService {
             oi.setQty(ci.getQty());
             oi.setUnitPriceMinor(ci.getUnitPriceMinor());
             orderItems.save(oi);
-            // ponytail: stock is reserved now and released only on CANCELLED. A PENDING_PAYMENT
-            // order that is never paid holds its units — add a timeout sweeper if that bites.
-            p.setStockQty(p.getStockQty() - ci.getQty());
-            products.save(p);
+            // stock is already off the shelf (reserved at add-to-cart / re-grabbed above); the
+            // reservation becomes permanent once the cart is marked ordered. Released on CANCELLED.
         }
         if (view.promoCode() != null) {
             promos.findByCodeIgnoreCase(view.promoCode()).ifPresent(pc -> {
@@ -195,11 +199,7 @@ public class CheckoutService {
 
     private void restock(Order order) {
         for (OrderItem oi : orderItems.findByOrderId(order.getId())) {
-            if (oi.getProductId() == null) continue;
-            products.findById(oi.getProductId()).ifPresent(p -> {
-                p.setStockQty(p.getStockQty() + oi.getQty());
-                products.save(p);
-            });
+            if (oi.getProductId() != null) products.release(oi.getProductId(), oi.getQty());
         }
     }
 

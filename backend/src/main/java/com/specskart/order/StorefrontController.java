@@ -26,9 +26,10 @@ public class StorefrontController {
     @GetMapping("/cart")
     public OrderDtos.CartView getCart(@RequestHeader(value = "X-Cart-Token", required = false) String token,
                                      @RequestParam(value = "s", required = false) String frameFinderToken) {
-        var view = cart.view(token);
-        linkLeadFromSession(view.token(), frameFinderToken);
-        return view;
+        var c = cart.getOrCreate(token);
+        cart.refreshHolds(c);                       // an active shopper keeps their reservations
+        linkLeadFromSession(c.getToken(), frameFinderToken);
+        return cart.view(c);
     }
 
     @PostMapping("/cart/items")

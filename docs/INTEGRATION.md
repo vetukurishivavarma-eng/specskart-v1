@@ -389,6 +389,10 @@ fully automated, with automatic WhatsApp order‑status updates and an abandoned
 Admin manages it under `/admin` (Products, Orders, Promo codes, Storefront settings) — no
 code deploy needed to add products or change prices/copy. Prod starts with an empty catalog.
 
+Stock is held movie-ticket style: adding a frame to a bag reserves the unit for **15 minutes**
+(renewed while the shopper is active), so the last unit can't be double-sold. An abandoned
+bag's hold auto-releases. All stock changes are atomic — no overselling under load.
+
 **Flutterwave setup:** Dashboard → Settings → **API** for the secret key; Settings →
 **Webhooks** → URL `https://specskart-api.onrender.com/api/webhooks/payment`, set a "Secret
 hash" and put the same string in `FLW_SECRET_HASH`. Then `PAYMENTS_PROVIDER=flutterwave`

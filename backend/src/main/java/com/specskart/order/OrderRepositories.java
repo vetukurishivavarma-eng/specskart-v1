@@ -19,6 +19,8 @@ interface CartItemRepository extends JpaRepository<CartItem, UUID> {
     Optional<CartItem> findByCartIdAndProductId(UUID cartId, UUID productId);
 
     void deleteByCartId(UUID cartId);
+
+    List<CartItem> findByHeldUntilBefore(Instant cutoff);
 }
 
 interface OrderRepository extends JpaRepository<Order, UUID> {

@@ -50,12 +50,13 @@ export type ProductDetail = ProductCard & {
 export type CartLine = {
   productId: string; slug: string; name: string; imageUrl: string | null
   qty: number; unitPriceMinor: number; lineTotalMinor: number; inStock: boolean; stockQty: number
+  heldUntil: string | null
 }
 
 export type CartView = {
   token: string; lines: CartLine[]; promoCode: string | null
   subtotalMinor: number; discountMinor: number; shippingMinor: number; totalMinor: number
-  currency: string; deliveryEta: string
+  currency: string; deliveryEta: string; holdExpiresAt: string | null
 }
 
 export type OrderView = {

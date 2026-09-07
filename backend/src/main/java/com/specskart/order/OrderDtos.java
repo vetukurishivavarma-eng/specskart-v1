@@ -10,11 +10,12 @@ public final class OrderDtos {
 
     // ---- cart ----
     public record CartLine(UUID productId, String slug, String name, String imageUrl,
-                           int qty, long unitPriceMinor, long lineTotalMinor, boolean inStock, int stockQty) {}
+                           int qty, long unitPriceMinor, long lineTotalMinor, boolean inStock, int stockQty,
+                           java.time.Instant heldUntil) {}
 
     public record CartView(String token, List<CartLine> lines, String promoCode,
                            long subtotalMinor, long discountMinor, long shippingMinor, long totalMinor,
-                           String currency, String deliveryEta) {}
+                           String currency, String deliveryEta, java.time.Instant holdExpiresAt) {}
 
     public record AddItem(UUID productId, Integer qty) {}
     public record SetQty(int qty) {}
