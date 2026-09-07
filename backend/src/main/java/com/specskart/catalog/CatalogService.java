@@ -20,14 +20,17 @@ public class CatalogService {
     private final PromoCodeRepository promos;
     private final StoreConfigRepository storeConfig;
     private final RecommendationService recommendations;
+    private final StockAlertRepository stockAlerts;
 
     public CatalogService(ProductRepository products, ProductImageRepository images, PromoCodeRepository promos,
-                          StoreConfigRepository storeConfig, RecommendationService recommendations) {
+                          StoreConfigRepository storeConfig, RecommendationService recommendations,
+                          StockAlertRepository stockAlerts) {
         this.products = products;
         this.images = images;
         this.promos = promos;
         this.storeConfig = storeConfig;
         this.recommendations = recommendations;
+        this.stockAlerts = stockAlerts;
     }
 
     @Transactional(readOnly = true)
@@ -38,6 +41,7 @@ public class CatalogService {
                 : recommendedCategoryCodes(faceShape);
 
         var stream = list.stream().filter(p -> {
+            if (p.isUpcoming()) return false; // scheduled drop — not yet on sale
             if (category != null && !category.isBlank() && !category.equalsIgnoreCase(p.getFrameCategoryCode())) return false;
             if (gender != null && !gender.isBlank() && !gender.equalsIgnoreCase(p.getGender())
                     && !"UNISEX".equalsIgnoreCase(p.getGender())) return false;
@@ -63,6 +67,7 @@ public class CatalogService {
     public List<CatalogDtos.ProductCard> featured() {
         Map<java.util.UUID, String> firstImage = firstImageByProduct();
         return products.findByStatusAndFeaturedTrueOrderByCreatedAtDesc("ACTIVE").stream()
+                .filter(p -> !p.isUpcoming())
                 .map(p -> card(p, firstImage.get(p.getId()))).toList();
     }
 
@@ -73,6 +78,7 @@ public class CatalogService {
         if (codes.isEmpty()) return List.of();
         return products.findByStatusAndFrameCategoryCodeInOrderByStockQtyDesc("ACTIVE", codes).stream()
                 .filter(Product::inStock)
+                .filter(p -> !p.isUpcoming())
                 .limit(limit)
                 .toList();
     }
@@ -87,7 +93,23 @@ public class CatalogService {
         return new CatalogDtos.ProductDetail(p.getId(), p.getSlug(), p.getName(), p.getDescription(),
                 p.getFrameCategoryCode(), p.getColour(), p.getMaterial(), p.getGender(),
                 p.getPriceMinor(), p.getCompareAtMinor(), p.getCurrency(),
-                p.getStockQty(), p.inStock(), p.isLensable(), p.isFeatured(), imgs);
+                p.getStockQty(), p.inStock(), p.isLensable(), p.isFeatured(), imgs,
+                p.getDropsAt(), p.isLimitedEdition());
+    }
+
+    /** Register a "notify me" request for a product (sold out, or a scheduled drop). Idempotent. */
+    @Transactional
+    public void registerStockAlert(String slug, String whatsapp) {
+        Product p = products.findBySlug(slug)
+                .orElseThrow(() -> ApiException.notFound("PRODUCT_NOT_FOUND", "No such product: " + slug));
+        String waId = whatsapp == null ? "" : whatsapp.replaceAll("\\D", "");
+        if (waId.length() < 8) throw ApiException.badRequest("BAD_NUMBER", "Enter a valid WhatsApp number.");
+        stockAlerts.findByProductIdAndWaId(p.getId(), waId).orElseGet(() -> {
+            StockAlert a = new StockAlert();
+            a.setProductId(p.getId());
+            a.setWaId(waId);
+            return stockAlerts.save(a);
+        });
     }
 
     @Transactional(readOnly = true)
@@ -136,6 +158,7 @@ public class CatalogService {
         return new CatalogDtos.ProductCard(p.getId(), p.getSlug(), p.getName(), p.getFrameCategoryCode(),
                 p.getColour(), p.getMaterial(), p.getGender(),
                 p.getPriceMinor(), p.getCompareAtMinor(), p.getCurrency(),
-                p.inStock(), p.isFeatured(), imageUrl);
+                p.inStock(), p.isFeatured(), imageUrl,
+                p.getDropsAt(), p.isLimitedEdition());
     }
 }

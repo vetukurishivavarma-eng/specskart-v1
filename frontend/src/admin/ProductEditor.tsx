@@ -12,12 +12,18 @@ type Form = {
   material: string; colour: string; gender: string
   priceKwacha: string; compareAtKwacha: string; stockQty: string
   lensable: boolean; featured: boolean; status: string
+  dropsAt: string; limitedEdition: boolean
 }
 
 const EMPTY: Form = {
   name: '', slug: '', description: '', frameCategoryCode: '', material: '', colour: '', gender: 'UNISEX',
   priceKwacha: '', compareAtKwacha: '', stockQty: '0', lensable: true, featured: false, status: 'ACTIVE',
+  dropsAt: '', limitedEdition: false,
 }
+
+// ISO instant <-> value for <input type="datetime-local"> (local time, no seconds/zone)
+const toLocalInput = (iso: string | null) => iso ? new Date(iso).toISOString().slice(0, 16) : ''
+const fromLocalInput = (v: string) => v ? new Date(v).toISOString() : null
 
 export default function ProductEditor() {
   const { id } = useParams()
@@ -44,6 +50,7 @@ export default function ProductEditor() {
       priceKwacha: String(product.priceMinor / 100),
       compareAtKwacha: product.compareAtMinor ? String(product.compareAtMinor / 100) : '',
       stockQty: String(product.stockQty), lensable: product.lensable, featured: product.featured, status: product.status,
+      dropsAt: toLocalInput(product.dropsAt ?? null), limitedEdition: !!product.limitedEdition,
     })
   }, [product])
 
@@ -55,6 +62,7 @@ export default function ProductEditor() {
         priceMinor: Math.round(Number(f.priceKwacha) * 100),
         compareAtMinor: f.compareAtKwacha ? Math.round(Number(f.compareAtKwacha) * 100) : null,
         stockQty: Number(f.stockQty), lensable: f.lensable, featured: f.featured, status: f.status,
+        dropsAt: fromLocalInput(f.dropsAt), limitedEdition: f.limitedEdition,
       }
       return isNew
         ? api<any>('/admin/catalog/products', { method: 'POST', auth: true, body: JSON.stringify(body) })
@@ -113,10 +121,15 @@ export default function ProductEditor() {
           <Text label="Stock" value={f.stockQty} onChange={(v) => s('stockQty', v)} />
           <Select label="Status" value={f.status} onChange={(v) => s('status', v)} options={['ACTIVE', 'DRAFT', 'ARCHIVED']} />
         </div>
-        <div className="flex gap-6 text-sm">
+        <div className="flex flex-wrap gap-6 text-sm">
           <label className="flex items-center gap-2"><input type="checkbox" checked={f.featured} onChange={(e) => s('featured', e.target.checked)} /> Featured</label>
           <label className="flex items-center gap-2"><input type="checkbox" checked={f.lensable} onChange={(e) => s('lensable', e.target.checked)} /> Prescription-ready</label>
+          <label className="flex items-center gap-2"><input type="checkbox" checked={f.limitedEdition} onChange={(e) => s('limitedEdition', e.target.checked)} /> Limited edition</label>
         </div>
+        <label className="block">
+          <span className="lbl">Drops at (leave blank for immediate)</span>
+          <input type="datetime-local" value={f.dropsAt} onChange={(e) => s('dropsAt', e.target.value)} className="fld" />
+        </label>
 
         <div className="flex items-center gap-3 pt-2">
           <button className="btn-primary" disabled={save.isPending || !f.name || !f.priceKwacha}>{save.isPending ? 'Saving…' : 'Save'}</button>

@@ -74,6 +74,7 @@ export type ProductCard = {
   colour: string | null; material: string | null; gender: string
   priceMinor: number; compareAtMinor: number | null; currency: string
   inStock: boolean; featured: boolean; imageUrl: string | null
+  dropsAt: string | null; limitedEdition: boolean
 }
 
 export type ProductDetail = ProductCard & {
@@ -135,4 +136,6 @@ export const shop = {
   order: (orderNo: string) => api<OrderView>(`/public/orders/${orderNo}`),
   confirmOrder: (orderNo: string) =>
     api<OrderView>(`/public/orders/${orderNo}/confirm`, { method: 'POST' }),
+  notifyMe: (slug: string, whatsapp: string) =>
+    api<{ ok: boolean }>(`/public/products/${slug}/notify-me`, { method: 'POST', body: JSON.stringify({ whatsapp }) }),
 }

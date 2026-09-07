@@ -168,6 +168,8 @@ public class AdminCatalogService {
         if (in.lensable() != null) p.setLensable(in.lensable());
         if (in.status() != null) p.setStatus(in.status().toUpperCase(Locale.ROOT));
         if (in.featured() != null) p.setFeatured(in.featured());
+        p.setDropsAt(in.dropsAt());
+        if (in.limitedEdition() != null) p.setLimitedEdition(in.limitedEdition());
     }
 
     /** Replace the external-URL images. Uploaded photos are managed via add/deleteImage, not here. */
@@ -195,7 +197,8 @@ public class AdminCatalogService {
         return new CatalogDtos.AdminProduct(p.getId(), p.getSlug(), p.getName(), p.getDescription(),
                 p.getFrameCategoryCode(), p.getMaterial(), p.getColour(), p.getGender(),
                 p.getPriceMinor(), p.getCompareAtMinor(), p.getCurrency(), p.getStockQty(),
-                p.isLensable(), p.getStatus(), p.isFeatured(), imgs);
+                p.isLensable(), p.getStatus(), p.isFeatured(), imgs,
+                p.getDropsAt(), p.isLimitedEdition());
     }
 
     // ---- promos ----
