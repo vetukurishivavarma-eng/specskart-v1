@@ -1,8 +1,48 @@
 # Specskart v1 — build progress
 
-_Last updated: 2026-09-03 (session 2 — browser walkthrough). Session: session_01NXPW5vtn6ZsgH2XDQA96hE_
+_Last updated: 2026-09-08 (Phase 2 complete). Session: session_01Tne6a6brsdoue2fDNsWxqQ_
 
-## Status: Phase 1 COMPLETE + walked in Chrome + **deployed to Render + REAL WhatsApp funnel proven (2026-09-03)**. A real "Hi" to the Meta test number drove lead → bot welcome buttons → "Find Frames" tap → Frame Finder link, all confirmed in prod logs.
+## Status: PHASE 1 + PHASE 2 COMPLETE. Real WhatsApp funnel live on +260 97 2809599. Automated
+online shop live (mock payments until Flutterwave keys added). HEAD `59f2c76`.
+
+### Phase 2 — all 12 engagement features shipped (2026-09-08), migrations V7–V13
+Built partly by 3 parallel worktree subagents (style quiz, back-in-stock+drops, AR try-on),
+merged + full-suite-tested one at a time. Backend 45 tests green, frontend 12 green.
+
+1. **Expiring discount after face analysis** (`V7`, `PromoIssuer`) — a personal `FIT-XXXXX` code,
+   one live per lead, 10% / 48h, shown on the result page + in the WhatsApp follow-up; `?promo=`
+   auto-applies to the cart.
+2. **Personalised store/home** — face shape remembered (localStorage) after Frame Finder; store
+   pre-filters, home shows a "picked for your face" row.
+3. **Shareable result** — "Share my result" → WhatsApp share (`wa.me/?text=`).
+4. **Social-proof ticker** (`GET /api/public/social-proof`) — rotating "Grace in Lusaka got a
+   Wayfarer · 2h ago" / weekly counts; renders nothing until real activity.
+5. **Loyalty points** (`V12`, `LoyaltyService`) — 1 pt/K1 on paid orders; redeem at checkout
+   (100 pts = K10, `specskart.loyalty.*`); reversed on cancel/refund.
+6. **Referrals** (`V12`) — `SPECS-XXXXX` per lead; friend gets 10% off, referrer gets 200 pts once
+   the friend's order is paid. Shown in WhatsApp + on the order tracker (share button).
+7. **Style quiz** (`V8`, subagent) — 4 taps after analysis → `RecommendationService.forFaceShapeWithStyle`
+   re-ranks (transparent additive boost); answers persist on `leads.style_*`.
+8. **Back-in-stock alerts** (`V10`, subagent, `StockAlertJob` @5min) — "notify me" on a sold-out
+   / upcoming product; WhatsApp when stock returns. `// ponytail:` outside-24h needs a template.
+9. **Countdown drops / limited editions** (`V11`, subagent) — `products.drops_at` hides a product
+   from the store until the time passes; PDP shows a live countdown + notify-me; `limited_edition` badge.
+10. **AR virtual try-on** (`V9`, subagent) — `products.try_on_image_url` (transparent PNG, admin
+    uploads, alpha kept); `frontend/src/lib/tryOn.ts` composites the frame onto the captured selfie
+    aligned to MediaPipe eye landmarks; swipe between recommended frames. **Tuning knobs in
+    `tryOn.ts` `TRY_ON_TUNING` — needs real-device calibration.**
+11. **Prescription lenses** (`V13`) — pick Non-prescription / Blue-light / Single-vision /
+    Progressive in the bag; per-pair add-on (`specskart.lenses.*`) on every lensable frame; choice
+    + optional Rx JSON copy to the order, shown on the tracker + admin ("Rx not yet collected").
+12. **"Complete the look" bundles** (`V13`) — `products.kind` FRAME|ACCESSORY; cart suggests up to
+    3 accessories once a frame is in the bag and none added. DataSeeder seeds 3 demo accessories.
+
+New env vars (all optional / have defaults): `PROMO_FACE_ANALYSIS_*`, `LOYALTY_*`, `LENS_*`,
+`WHATSAPP_POST_PURCHASE_TEMPLATE`.
+
+---
+
+## (earlier) Status: Phase 1 COMPLETE + walked in Chrome + **deployed to Render + REAL WhatsApp funnel proven (2026-09-03)**. A real "Hi" to the Meta test number drove lead → bot welcome buttons → "Find Frames" tap → Frame Finder link, all confirmed in prod logs.
 
 ## Live deployment (2026-09-03)
 - API https://specskart-api.onrender.com (Render Docker, prod profile, Frankfurt, svc `srv-dacpjcjl550s73d6g2eg`)
