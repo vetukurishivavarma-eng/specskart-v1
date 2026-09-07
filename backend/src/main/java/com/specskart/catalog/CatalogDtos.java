@@ -13,14 +13,14 @@ public final class CatalogDtos {
                               String colour, String material, String gender,
                               long priceMinor, Long compareAtMinor, String currency,
                               boolean inStock, boolean featured, String imageUrl,
-                              java.time.Instant dropsAt, boolean limitedEdition) {}
+                              java.time.Instant dropsAt, boolean limitedEdition, String tryOnImageUrl) {}
 
     public record ProductDetail(UUID id, String slug, String name, String description,
                                 String frameCategoryCode, String colour, String material, String gender,
                                 long priceMinor, Long compareAtMinor, String currency,
                                 int stockQty, boolean inStock, boolean lensable, boolean featured,
                                 List<ImageDto> images,
-                                java.time.Instant dropsAt, boolean limitedEdition) {}
+                                java.time.Instant dropsAt, boolean limitedEdition, String tryOnImageUrl) {}
 
     public record StoreConfigDto(String heroTitle, String heroSubtitle, String heroImageUrl,
                                  long shippingFeeMinor, Long freeShippingOverMinor,
@@ -34,13 +34,13 @@ public final class CatalogDtos {
                                String frameCategoryCode, String material, String colour, String gender,
                                long priceMinor, Long compareAtMinor, String currency, int stockQty,
                                boolean lensable, String status, boolean featured, List<ImageDto> images,
-                               java.time.Instant dropsAt, boolean limitedEdition) {}
+                               java.time.Instant dropsAt, boolean limitedEdition, String tryOnImageUrl) {}
 
     public record ProductUpsert(String slug, String name, String description, String frameCategoryCode,
                                 String material, String colour, String gender, Long priceMinor,
                                 Long compareAtMinor, Integer stockQty, Boolean lensable, String status,
                                 Boolean featured, List<ImageInput> images,
-                                java.time.Instant dropsAt, Boolean limitedEdition) {}
+                                java.time.Instant dropsAt, Boolean limitedEdition, String tryOnImageUrl) {}
 
     public record ImageInput(String url, String alt) {}
 

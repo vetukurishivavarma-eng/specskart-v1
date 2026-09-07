@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../lib/api'
 import { useFaceLandmarker } from '../lib/useFaceLandmarker'
 import { syntheticGeometry, type Geometry } from '../lib/faceGeometry'
-import { rememberFace } from '../lib/shop'
+import { rememberFace, shop } from '../lib/shop'
+import TryOn, { type TryOnFrame } from '../components/TryOn'
 
 const WA = import.meta.env.VITE_WA_LINK ?? 'https://wa.me/260000000000'
 
@@ -47,6 +48,8 @@ export default function FrameFinder() {
   const [refined, setRefined] = useState(false)
   const [quiz, setQuiz] = useState<Record<string, string>>({})
   const [quizBusy, setQuizBusy] = useState(false)
+  const [tryOnFrames, setTryOnFrames] = useState<TryOnFrame[] | null>(null)
+  const [tryOnLoading, setTryOnLoading] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const { analyse, loading: modelLoading } = useFaceLandmarker()
@@ -151,6 +154,19 @@ export default function FrameFinder() {
       setErr((e as ApiError).message)
     } finally {
       setQuizBusy(false)
+    }
+  }
+
+  async function openTryOn() {
+    if (!result) return
+    setTryOnLoading(true)
+    try {
+      const products = await shop.products({ faceShape: result.faceShape })
+      setTryOnFrames(products.map((p) => ({ slug: p.slug, name: p.name, tryOnImageUrl: p.tryOnImageUrl })))
+    } catch {
+      setTryOnFrames([]) // component shows the "no frames" fallback
+    } finally {
+      setTryOnLoading(false)
     }
   }
 
@@ -286,8 +302,12 @@ export default function FrameFinder() {
             )}
 
             <div className="mt-8 space-y-3">
+              <button className="btn-primary block w-full !bg-bone !text-ink text-center disabled:opacity-60"
+                disabled={tryOnLoading} onClick={openTryOn}>
+                {tryOnLoading ? 'Loading try-on…' : 'Try them on 👓'}
+              </button>
               <a href={`/store?face=${result.faceShape}${result.promoCode ? `&promo=${result.promoCode}` : ''}`}
-                 className="btn-primary block w-full !bg-bone !text-ink text-center">Shop my frames</a>
+                 className="btn-ghost block w-full !border-bone/25 !text-bone text-center">Shop my frames</a>
               <button className="btn-ghost w-full !border-bone/25 !text-bone" onClick={sendToWhatsApp} disabled={sentToWa}>
                 {sentToWa ? 'Sent to WhatsApp ✓' : 'Send results to WhatsApp'}
               </button>
@@ -303,6 +323,8 @@ export default function FrameFinder() {
           </div>
         )}
       </div>
+
+      {tryOnFrames && <TryOn frames={tryOnFrames} onClose={() => setTryOnFrames(null)} />}
     </div>
   )
 }

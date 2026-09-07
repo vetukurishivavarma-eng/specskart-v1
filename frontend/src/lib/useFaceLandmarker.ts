@@ -29,7 +29,7 @@ export function useFaceLandmarker() {
     }
   }, [])
 
-  const analyse = useCallback(async (source: HTMLVideoElement | HTMLImageElement): Promise<{ geometry: Geometry; faces: number }> => {
+  const analyse = useCallback(async (source: HTMLVideoElement | HTMLImageElement): Promise<{ geometry: Geometry; faces: number; landmarks: { x: number; y: number; z: number }[] }> => {
     const fl = await ensure()
     const res = fl.detect(source)
     const faces = res.faceLandmarks?.length ?? 0
@@ -44,7 +44,8 @@ export function useFaceLandmarker() {
     const dims = source instanceof HTMLVideoElement
       ? { width: source.videoWidth, height: source.videoHeight }
       : { width: source.naturalWidth, height: source.naturalHeight }
-    return { geometry: geometryFromLandmarks(res.faceLandmarks[0] as any, dims), faces }
+    const landmarks = res.faceLandmarks[0] as { x: number; y: number; z: number }[]
+    return { geometry: geometryFromLandmarks(landmarks as any, dims), faces, landmarks }
   }, [ensure])
 
   return { analyse, loading, error }

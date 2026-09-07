@@ -14,11 +14,15 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class AdminCatalogService {
 
     private static final int MAX_DIM = 1400;
+    private static final int TRY_ON_MAX_W = 900;
+    private static final Pattern FILE_ID_IN_URL = Pattern.compile("product-images/([0-9a-fA-F-]{36})");
 
     private final ProductRepository products;
     private final ProductImageRepository images;
@@ -69,6 +73,72 @@ public class AdminCatalogService {
             if (img.getFileId() != null) imageFiles.deleteById(img.getFileId());
             images.delete(img);
         });
+    }
+
+    // ---- virtual try-on image (transparent PNG, kept whole with its alpha) ----
+
+    @Transactional
+    public CatalogDtos.AdminProduct setTryOnImage(UUID productId, MultipartFile file) {
+        Product p = products.findById(productId)
+                .orElseThrow(() -> ApiException.notFound("PRODUCT_NOT_FOUND", "Save the product before adding a try-on image."));
+        if (file == null || file.isEmpty()) throw ApiException.badRequest("NO_FILE", "Choose a PNG to upload.");
+
+        deleteTryOnBlob(p);
+        ProductImageFile blob = new ProductImageFile();
+        blob.setContentType("image/png");
+        blob.setBytes(toTransparentPng(file));
+        imageFiles.save(blob);
+        p.setTryOnImageUrl("/api/public/product-images/" + blob.getId());
+        products.save(p);
+        return toAdmin(p);
+    }
+
+    @Transactional
+    public CatalogDtos.AdminProduct clearTryOnImage(UUID productId) {
+        Product p = products.findById(productId)
+                .orElseThrow(() -> ApiException.notFound("PRODUCT_NOT_FOUND", "No such product."));
+        deleteTryOnBlob(p);
+        p.setTryOnImageUrl(null);
+        products.save(p);
+        return toAdmin(p);
+    }
+
+    private void deleteTryOnBlob(Product p) {
+        if (p.getTryOnImageUrl() == null) return;
+        Matcher m = FILE_ID_IN_URL.matcher(p.getTryOnImageUrl());
+        if (m.find()) {
+            try { imageFiles.deleteById(UUID.fromString(m.group(1))); } catch (Exception ignored) { }
+        }
+    }
+
+    /** Downscale to {@value #TRY_ON_MAX_W}px wide and re-encode as PNG, PRESERVING alpha. */
+    private byte[] toTransparentPng(MultipartFile file) {
+        BufferedImage src;
+        try {
+            src = ImageIO.read(file.getInputStream());
+        } catch (IOException e) {
+            throw ApiException.badRequest("BAD_IMAGE", "Couldn't read that file.");
+        }
+        if (src == null) throw ApiException.badRequest("BAD_IMAGE", "That doesn't look like an image.");
+
+        int w = src.getWidth(), h = src.getHeight();
+        double scale = Math.min(1.0, (double) TRY_ON_MAX_W / w);
+        int tw = Math.max(1, (int) Math.round(w * scale));
+        int th = Math.max(1, (int) Math.round(h * scale));
+
+        BufferedImage out = new BufferedImage(tw, th, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = out.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g.drawImage(src, 0, 0, tw, th, null);
+        g.dispose();
+
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            ImageIO.write(out, "png", baos);
+            return baos.toByteArray();
+        } catch (IOException e) {
+            throw ApiException.badRequest("BAD_IMAGE", "Couldn't process that image.");
+        }
     }
 
     /** Downscale to {@value #MAX_DIM}px on the long edge and re-encode as JPEG (flattening any alpha). */
@@ -140,6 +210,7 @@ public class AdminCatalogService {
         for (ProductImage img : images.findByProductIdOrderBySortAsc(id)) {
             if (img.getFileId() != null) imageFiles.deleteById(img.getFileId());
         }
+        products.findById(id).ifPresent(this::deleteTryOnBlob);
         images.deleteByProductId(id);
         products.deleteById(id);
     }
@@ -170,6 +241,7 @@ public class AdminCatalogService {
         if (in.featured() != null) p.setFeatured(in.featured());
         p.setDropsAt(in.dropsAt());
         if (in.limitedEdition() != null) p.setLimitedEdition(in.limitedEdition());
+        if (in.tryOnImageUrl() != null) p.setTryOnImageUrl(in.tryOnImageUrl().isBlank() ? null : in.tryOnImageUrl().trim());
     }
 
     /** Replace the external-URL images. Uploaded photos are managed via add/deleteImage, not here. */
@@ -198,7 +270,7 @@ public class AdminCatalogService {
                 p.getFrameCategoryCode(), p.getMaterial(), p.getColour(), p.getGender(),
                 p.getPriceMinor(), p.getCompareAtMinor(), p.getCurrency(), p.getStockQty(),
                 p.isLensable(), p.getStatus(), p.isFeatured(), imgs,
-                p.getDropsAt(), p.isLimitedEdition());
+                p.getDropsAt(), p.isLimitedEdition(), p.getTryOnImageUrl());
     }
 
     // ---- promos ----

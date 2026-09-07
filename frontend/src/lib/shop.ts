@@ -75,6 +75,7 @@ export type ProductCard = {
   priceMinor: number; compareAtMinor: number | null; currency: string
   inStock: boolean; featured: boolean; imageUrl: string | null
   dropsAt: string | null; limitedEdition: boolean
+  tryOnImageUrl: string | null
 }
 
 export type ProductDetail = ProductCard & {

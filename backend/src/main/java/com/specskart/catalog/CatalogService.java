@@ -94,7 +94,7 @@ public class CatalogService {
                 p.getFrameCategoryCode(), p.getColour(), p.getMaterial(), p.getGender(),
                 p.getPriceMinor(), p.getCompareAtMinor(), p.getCurrency(),
                 p.getStockQty(), p.inStock(), p.isLensable(), p.isFeatured(), imgs,
-                p.getDropsAt(), p.isLimitedEdition());
+                p.getDropsAt(), p.isLimitedEdition(), p.getTryOnImageUrl());
     }
 
     /** Register a "notify me" request for a product (sold out, or a scheduled drop). Idempotent. */
@@ -159,6 +159,6 @@ public class CatalogService {
                 p.getColour(), p.getMaterial(), p.getGender(),
                 p.getPriceMinor(), p.getCompareAtMinor(), p.getCurrency(),
                 p.inStock(), p.isFeatured(), imageUrl,
-                p.getDropsAt(), p.isLimitedEdition());
+                p.getDropsAt(), p.isLimitedEdition(), p.getTryOnImageUrl());
     }
 }
