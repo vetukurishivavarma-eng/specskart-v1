@@ -19,7 +19,8 @@ public class FrameFinderDtos {
     public record AnalysisResult(String faceShape, String faceShapeDisplay, double confidence,
                                  String message, List<RecommendationDtos.FrameDto> recommended,
                                  List<RecommendationDtos.FrameDto> avoidOrUseCarefully,
-                                 String rulesUsed) {}
+                                 String rulesUsed,
+                                 String promoCode, int promoPercent, java.time.Instant promoExpiresAt) {}
 
     public record EventRequest(@NotNull String event, java.util.Map<String, Object> metadata) {}
 }

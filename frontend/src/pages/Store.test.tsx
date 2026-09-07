@@ -11,14 +11,13 @@ const products = [
 ]
 
 beforeEach(() => {
-  vi.stubGlobal('fetch', vi.fn((url: string) =>
-    Promise.resolve({
-      ok: true,
-      status: 200,
-      statusText: 'OK',
-      text: () => Promise.resolve(JSON.stringify(String(url).includes('store-config') ? cfg : products)),
-    } as Response),
-  ))
+  vi.stubGlobal('fetch', vi.fn((url: string) => {
+    const u = String(url)
+    const body = u.includes('store-config') ? cfg
+      : u.includes('social-proof') ? { analysesThisWeek: 0, ordersThisWeek: 0, recent: [] }
+      : products
+    return Promise.resolve({ ok: true, status: 200, statusText: 'OK', text: () => Promise.resolve(JSON.stringify(body)) } as Response)
+  }))
 })
 
 function renderStore() {

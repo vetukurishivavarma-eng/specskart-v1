@@ -19,6 +19,32 @@ export function adoptCartFromUrl() {
   if (c) setCartToken(c)
 }
 
+const FACE_KEY = 'specskart_face'
+const NAME_KEY = 'specskart_name'
+
+/** Remember the shopper's face shape after Frame Finder so the store personalises itself. */
+export function rememberFace(shape: string, name?: string | null) {
+  try {
+    if (shape) localStorage.setItem(FACE_KEY, shape)
+    if (name) localStorage.setItem(NAME_KEY, name)
+  } catch { /* private mode */ }
+}
+export function rememberedFace(): string | null {
+  try { return localStorage.getItem(FACE_KEY) } catch { return null }
+}
+export function rememberedName(): string | null {
+  try { return localStorage.getItem(NAME_KEY) } catch { return null }
+}
+export function forgetFace() {
+  try { localStorage.removeItem(FACE_KEY) } catch { /* */ }
+}
+
+export type SocialProof = {
+  analysesThisWeek: number
+  ordersThisWeek: number
+  recent: { name: string; city: string; item: string; ago: string }[]
+}
+
 /** Frame Finder session token from the URL (?s=…) — lets a purchase attribute back to the lead. */
 function sParam(): string {
   const s = new URLSearchParams(window.location.search).get('s')
@@ -91,6 +117,7 @@ export const shop = {
   featured: () => api<ProductCard[]>('/public/products/featured'),
   product: (slug: string) => api<ProductDetail>(`/public/products/${slug}`),
   storeConfig: () => api<{ heroTitle: string; heroSubtitle: string; heroImageUrl: string | null; deliveryEta: string; currency: string; shippingFeeMinor: number; freeShippingOverMinor: number | null }>('/public/store-config'),
+  socialProof: () => api<SocialProof>('/public/social-proof'),
 
   cart: () => cartCall(`/public/cart${sParam()}`),
   addItem: (productId: string, qty = 1) =>

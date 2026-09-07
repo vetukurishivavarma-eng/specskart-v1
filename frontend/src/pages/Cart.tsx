@@ -32,6 +32,17 @@ export default function Cart() {
   const { data: cart, isLoading } = useQuery({ queryKey: ['cart'], queryFn: shop.cart, refetchInterval: 60_000 })
   const refresh = () => qc.invalidateQueries({ queryKey: ['cart'] })
 
+  // auto-apply a code carried from the Frame Finder result, once
+  useEffect(() => {
+    if (!cart || cart.promoCode || !cart.lines.length) return
+    let pending: string | null = null
+    try { pending = localStorage.getItem('specskart_pending_promo') } catch { /* */ }
+    if (pending) {
+      try { localStorage.removeItem('specskart_pending_promo') } catch { /* */ }
+      shop.applyPromo(pending).then(refresh).catch(() => {})
+    }
+  }, [cart]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const setQty = useMutation({ mutationFn: (v: { id: string; qty: number }) => shop.setQty(v.id, v.qty), onSuccess: refresh })
   const applyPromo = useMutation({ mutationFn: () => shop.applyPromo(promo), onSuccess: () => { setPromo(''); refresh() } })
   const clearPromo = useMutation({ mutationFn: () => shop.applyPromo(''), onSuccess: refresh })

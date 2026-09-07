@@ -42,6 +42,9 @@ public class PromoCode extends BaseEntity {
     @Column(nullable = false)
     private boolean active = true;
 
+    /** Non-null = a personal code issued to one lead (e.g. after face analysis). */
+    private java.util.UUID leadId;
+
     public boolean usable(long subtotalMinor) {
         if (!active) return false;
         if (expiresAt != null && expiresAt.isBefore(Instant.now())) return false;

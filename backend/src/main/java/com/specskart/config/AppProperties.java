@@ -13,9 +13,11 @@ public record AppProperties(
         Session session,
         Face face,
         WhatsApp whatsapp,
-        Payments payments
+        Payments payments,
+        Promo promo
 ) {
     public record Session(int expiryHours) {}
+    public record Promo(int faceAnalysisPercent, int faceAnalysisHours) {}
     public record Payments(String provider, Flutterwave flutterwave) {}
     public record Flutterwave(String secretKey, String secretHash, String baseUrl) {}
     public record Face(boolean retainImages) {}

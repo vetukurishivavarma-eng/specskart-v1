@@ -9,4 +9,6 @@ public interface FaceAnalysisRepository extends JpaRepository<FaceAnalysis, UUID
     List<FaceAnalysis> findByLeadIdOrderByCreatedAtDesc(UUID leadId);
     Optional<FaceAnalysis> findFirstBySessionIdOrderByCreatedAtDesc(UUID sessionId);
     long countByConsentGivenTrue();
+
+    long countByCreatedAtAfter(java.time.Instant since);
 }

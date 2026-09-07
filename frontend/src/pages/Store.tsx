@@ -1,7 +1,8 @@
 import { useEffect, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { shop, money, assetUrl, adoptCartFromUrl, type ProductCard } from '../lib/shop'
+import { shop, money, assetUrl, adoptCartFromUrl, rememberedFace, type ProductCard } from '../lib/shop'
+import SocialProof from '../components/SocialProof'
 
 const CATEGORIES = [
   ['', 'All frames'], ['WAYFARER', 'Wayfarer'], ['AVIATOR', 'Aviator'], ['ROUND_FRAME', 'Round'],
@@ -11,7 +12,17 @@ const CATEGORIES = [
 
 export default function Store() {
   const [params, setParams] = useSearchParams()
-  useEffect(() => { adoptCartFromUrl() }, [])
+
+  useEffect(() => {
+    adoptCartFromUrl()
+    const promo = params.get('promo')
+    if (promo) { try { localStorage.setItem('specskart_pending_promo', promo) } catch { /* */ } }
+    // personalise: if the shopper has done Frame Finder and hasn't picked a filter, use their shape
+    if (!params.get('face') && !params.get('category')) {
+      const f = rememberedFace()
+      if (f) { const n = new URLSearchParams(params); n.set('face', f); setParams(n, { replace: true }) }
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const face = params.get('face') ?? ''
   const category = params.get('category') ?? ''
@@ -34,7 +45,10 @@ export default function Store() {
 
   return (
     <div className="container-x py-12">
-      <p className="label">Online store</p>
+      <div className="flex items-baseline justify-between gap-4">
+        <p className="label">Online store</p>
+        <SocialProof />
+      </div>
       <h1 className="mt-2 text-4xl">{cfg?.heroTitle ?? 'Frames matched to your face.'}</h1>
       <p className="mt-3 max-w-xl text-ink/65">{cfg?.heroSubtitle}</p>
 

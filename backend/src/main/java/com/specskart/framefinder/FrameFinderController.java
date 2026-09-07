@@ -2,6 +2,8 @@ package com.specskart.framefinder;
 
 import com.specskart.analytics.AnalyticsService;
 import com.specskart.analytics.LeadEventType;
+import com.specskart.catalog.PromoCode;
+import com.specskart.catalog.PromoIssuer;
 import com.specskart.config.AppProperties;
 import com.specskart.faceanalysis.FaceAnalysis;
 import com.specskart.faceanalysis.FaceAnalysisService;
@@ -24,16 +26,18 @@ public class FrameFinderController {
     private final WhatsAppBotService bot;
     private final AnalyticsService analytics;
     private final AppProperties props;
+    private final PromoIssuer promoIssuer;
 
     public FrameFinderController(FrameFinderService sessions, FaceAnalysisService faceAnalysis,
                                  LeadService leadService, WhatsAppBotService bot,
-                                 AnalyticsService analytics, AppProperties props) {
+                                 AnalyticsService analytics, AppProperties props, PromoIssuer promoIssuer) {
         this.sessions = sessions;
         this.faceAnalysis = faceAnalysis;
         this.leadService = leadService;
         this.bot = bot;
         this.analytics = analytics;
         this.props = props;
+        this.promoIssuer = promoIssuer;
     }
 
     @GetMapping
@@ -83,14 +87,16 @@ public class FrameFinderController {
         sessions.markStatus(s, FrameFinderSessionStatus.COMPLETED);
 
         Lead lead = leadService.get(s.getLeadId());
+        PromoCode promo = promoIssuer.forFaceAnalysis(lead.getId());
         bot.sendAnalysisFollowUp(lead, outcome.recommendation().faceShapeDisplay(),
-                outcome.analysis().getRecommendedFrameCategories());
+                outcome.analysis().getRecommendedFrameCategories(), promo);
 
         var rec = outcome.recommendation();
         return new FrameFinderDtos.AnalysisResult(
                 rec.faceShape(), rec.faceShapeDisplay(), outcome.classification().confidence(),
                 "We think your face is closest to " + rec.faceShapeDisplay() + ".",
-                rec.recommended(), rec.avoidOrUseCarefully(), outcome.classification().rulesUsed());
+                rec.recommended(), rec.avoidOrUseCarefully(), outcome.classification().rulesUsed(),
+                promo.getCode(), promo.getDiscountValue(), promo.getExpiresAt());
     }
 
     @PostMapping("/send-to-whatsapp")
@@ -99,7 +105,8 @@ public class FrameFinderController {
         FaceAnalysis fa = faceAnalysis.latestForSession(s.getId())
                 .orElseThrow(() -> ApiException.badRequest("NO_ANALYSIS", "No analysis found for this session yet."));
         Lead lead = leadService.get(s.getLeadId());
-        bot.sendAnalysisFollowUp(lead, fa.getPredictedFaceShape(), fa.getRecommendedFrameCategories());
+        bot.sendAnalysisFollowUp(lead, fa.getPredictedFaceShape(), fa.getRecommendedFrameCategories(),
+                promoIssuer.forFaceAnalysis(lead.getId()));
         analytics.record(LeadEventType.WHATSAPP_RESULTS_REQUESTED, lead.getId(), s.getId().toString());
     }
 }

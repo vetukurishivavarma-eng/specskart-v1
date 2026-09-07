@@ -41,6 +41,9 @@ specskart:
   security:
     jwt-secret: ${SESSION_SECRET:dev-only-insecure-secret-change-me-please-32bytes-minimum!!}
     jwt-ttl-minutes: ${JWT_TTL_MINUTES:720}
+  promo:
+    face-analysis-percent: ${PROMO_FACE_ANALYSIS_PERCENT:10}
+    face-analysis-hours: ${PROMO_FACE_ANALYSIS_HOURS:48}
   whatsapp:
     provider: ${WHATSAPP_PROVIDER:mock}
     phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}

@@ -101,18 +101,28 @@ public class WhatsAppBotService {
         analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
     }
 
-    /** Called after face analysis completes. */
+    /** Called after face analysis completes. Includes the lead's personal, time-limited discount. */
     @Transactional
-    public void sendAnalysisFollowUp(Lead lead, String faceShapeDisplay, List<String> recommended) {
+    public void sendAnalysisFollowUp(Lead lead, String faceShapeDisplay, List<String> recommended,
+                                     com.specskart.catalog.PromoCode promo) {
+        String offer = promo == null ? "" : "\n\n🎁 " + promo.getDiscountValue() + "% off your first pair — code *"
+                + promo.getCode() + "*"
+                + (promo.getExpiresAt() != null ? " (next " + hoursLeft(promo) + "h only)" : "");
         String body = "Your frame analysis is ready 🎯\n\nFace match: " + faceShapeDisplay
                 + "\n\nFrames we recommend:\n"
                 + recommended.stream().map(r -> "• " + r).reduce((a, b) -> a + "\n" + b).orElse("")
+                + offer
                 + "\n\nWould you like to see matching frames?";
         provider.sendButtons(waId(lead), body,
                 List.of(new WhatsAppProvider.Button(BTN_RESULTS_FRAMES, "Show Me Frames"),
                         new WhatsAppProvider.Button(BTN_RESULTS_NOT_NOW, "Not Now")));
         logOutbound(lead.getId(), "interactive", "analysis-follow-up");
         analytics.record(LeadEventType.WHATSAPP_RESULTS_REQUESTED, lead.getId(), null);
+    }
+
+    private static long hoursLeft(com.specskart.catalog.PromoCode promo) {
+        long h = java.time.Duration.between(java.time.Instant.now(), promo.getExpiresAt()).toHours();
+        return Math.max(1, h);
     }
 
     /**

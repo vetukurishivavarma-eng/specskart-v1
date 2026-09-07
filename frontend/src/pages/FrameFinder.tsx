@@ -3,6 +3,13 @@ import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../lib/api'
 import { useFaceLandmarker } from '../lib/useFaceLandmarker'
 import { syntheticGeometry, type Geometry } from '../lib/faceGeometry'
+import { rememberFace } from '../lib/shop'
+
+const WA = import.meta.env.VITE_WA_LINK ?? 'https://wa.me/260000000000'
+
+function hoursTo(iso: string) {
+  return Math.max(1, Math.round((new Date(iso).getTime() - Date.now()) / 3_600_000))
+}
 
 type SessionView = {
   status: string; storeName: string; leadFirstName: string | null
@@ -12,6 +19,7 @@ type Frame = { code: string; displayName: string; description: string; reason: s
 type Result = {
   faceShape: string; faceShapeDisplay: string; confidence: number; message: string
   recommended: Frame[]; avoidOrUseCarefully: Frame[]
+  promoCode: string | null; promoPercent: number; promoExpiresAt: string | null
 }
 
 type Stage = 'loading' | 'invalid' | 'intro' | 'consent' | 'capture' | 'analysing' | 'result'
@@ -79,6 +87,7 @@ export default function FrameFinder() {
         method: 'POST', body: JSON.stringify({ geometry }),
       })
       setResult(r)
+      rememberFace(r.faceShape, session?.leadFirstName)
       stopCamera()
       setStage('result')
     } catch (e) {
@@ -191,11 +200,27 @@ export default function FrameFinder() {
               </p>
             )}
 
+            {result.promoCode && (
+              <div className="mt-6 rounded-xl border border-bone/20 bg-bone/5 p-4 text-center">
+                <div className="text-sm text-bone/60">🎁 {result.promoPercent}% off your first pair</div>
+                <div className="mt-1 font-display text-2xl tracking-wide">{result.promoCode}</div>
+                {result.promoExpiresAt && (
+                  <div className="mt-1 text-xs text-bone/45">Ends {hoursTo(result.promoExpiresAt)}h from now</div>
+                )}
+              </div>
+            )}
+
             <div className="mt-8 space-y-3">
-              <button className="btn-primary w-full !bg-bone !text-ink" onClick={sendToWhatsApp} disabled={sentToWa}>
+              <a href={`/store?face=${result.faceShape}${result.promoCode ? `&promo=${result.promoCode}` : ''}`}
+                 className="btn-primary block w-full !bg-bone !text-ink text-center">Shop my frames</a>
+              <button className="btn-ghost w-full !border-bone/25 !text-bone" onClick={sendToWhatsApp} disabled={sentToWa}>
                 {sentToWa ? 'Sent to WhatsApp ✓' : 'Send results to WhatsApp'}
               </button>
-              <a href="/store" className="btn-ghost w-full !border-bone/25 !text-bone">View recommended frames</a>
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(
+                  `I did the Specskart Frame Finder — my face shape is ${result.faceShapeDisplay}! 👓 Find yours: ${WA}`)}`}
+                target="_blank" rel="noreferrer"
+                className="block w-full text-center text-sm text-bone/60 underline">Share my result</a>
               <button className="block w-full text-center text-sm text-bone/50" onClick={() => { setResult(null); setStage('capture'); startCamera() }}>
                 Try another photo
               </button>
