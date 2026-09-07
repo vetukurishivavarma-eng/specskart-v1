@@ -54,6 +54,16 @@ public class AdminCatalogController {
         return Map.of("deleted", imageId);
     }
 
+    @PostMapping(value = "/products/{id}/try-on-image", consumes = "multipart/form-data")
+    public CatalogDtos.AdminProduct uploadTryOn(@PathVariable UUID id, @RequestParam("file") MultipartFile file) {
+        return admin.setTryOnImage(id, file);
+    }
+
+    @DeleteMapping("/products/{id}/try-on-image")
+    public CatalogDtos.AdminProduct deleteTryOn(@PathVariable UUID id) {
+        return admin.clearTryOnImage(id);
+    }
+
     @GetMapping("/promos")
     public List<CatalogDtos.AdminPromo> promos() {
         return admin.listPromos();

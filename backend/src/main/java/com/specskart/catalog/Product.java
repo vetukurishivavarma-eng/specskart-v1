@@ -50,6 +50,9 @@ public class Product extends BaseEntity {
     @Column(nullable = false)
     private boolean featured = false;
 
+    /** Serving path of a transparent-PNG render used for virtual try-on; null if none. */
+    private String tryOnImageUrl;
+
     public boolean isActive() {
         return "ACTIVE".equals(status);
     }

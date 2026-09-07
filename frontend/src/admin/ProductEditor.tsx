@@ -34,6 +34,7 @@ export default function ProductEditor() {
   })
   const product = existing.data
   const photos: { id: string; url: string; alt: string | null }[] = product?.images ?? []
+  const tryOnRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!product) return
@@ -87,6 +88,25 @@ export default function ProductEditor() {
 
   const removePhoto = useMutation({
     mutationFn: (imageId: string) => api(`/admin/catalog/products/${id}/images/${imageId}`, { method: 'DELETE', auth: true }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-product', id] }),
+  })
+
+  const uploadTryOn = useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch(`${API}/admin/catalog/products/${id}/try-on-image`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${localStorage.getItem('specskart_token')}` },
+        body: fd,
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message ?? 'Upload failed')
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-product', id] }); if (tryOnRef.current) tryOnRef.current.value = '' },
+  })
+
+  const removeTryOn = useMutation({
+    mutationFn: () => api(`/admin/catalog/products/${id}/try-on-image`, { method: 'DELETE', auth: true }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-product', id] }),
   })
 
@@ -158,6 +178,31 @@ export default function ProductEditor() {
             {upload.isPending && <p className="mt-1 text-xs text-ink/50">Uploading…</p>}
             {upload.isError && <p className="mt-1 text-xs text-clay">{(upload.error as Error).message}</p>}
             <p className="mt-1 text-xs text-ink/40">JPG or PNG, up to 10 MB. Resized and optimised automatically.</p>
+
+            <div className="mt-6">
+              <span className="lbl">Try-on image (transparent PNG)</span>
+              {product?.tryOnImageUrl ? (
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="h-24 w-32 overflow-hidden rounded-lg border border-ink/15 bg-[repeating-conic-gradient(#e5e5e5_0_25%,#fff_0_50%)] bg-[length:16px_16px]">
+                    <img src={assetUrl(product.tryOnImageUrl)} alt="" className="h-full w-full object-contain" />
+                  </div>
+                  <button type="button" className="text-xs text-clay underline" onClick={() => removeTryOn.mutate()}>Remove</button>
+                </div>
+              ) : (
+                <p className="mt-1 text-xs text-ink/40">None yet.</p>
+              )}
+              <input
+                ref={tryOnRef}
+                type="file"
+                accept="image/png"
+                className="mt-2 text-sm"
+                disabled={uploadTryOn.isPending}
+                onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadTryOn.mutate(file) }}
+              />
+              {uploadTryOn.isPending && <p className="mt-1 text-xs text-ink/50">Uploading…</p>}
+              {uploadTryOn.isError && <p className="mt-1 text-xs text-clay">{(uploadTryOn.error as Error).message}</p>}
+              <p className="mt-1 text-xs text-ink/40">Front-on glasses on a transparent background. Alpha is kept; resized to 900px wide.</p>
+            </div>
           </>
         )}
       </div>

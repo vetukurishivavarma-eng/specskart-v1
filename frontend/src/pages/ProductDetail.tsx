@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { shop, money, assetUrl } from '../lib/shop'
+import TryOn from '../components/TryOn'
 
 export default function ProductDetail() {
   const { slug } = useParams()
   const nav = useNavigate()
   const qc = useQueryClient()
   const [img, setImg] = useState(0)
+  const [tryOn, setTryOn] = useState(false)
 
   const { data: p, isLoading, isError } = useQuery({
     queryKey: ['product', slug],
@@ -73,9 +75,19 @@ export default function ProductDetail() {
         >
           {p.inStock ? (add.isPending ? 'Adding…' : 'Add to bag') : 'Sold out'}
         </button>
+        {p.tryOnImageUrl && (
+          <button onClick={() => setTryOn(true)} className="btn-ghost mt-3 w-full">Try it on 👓</button>
+        )}
         {add.isError && <p className="mt-2 text-sm text-clay">{(add.error as Error).message}</p>}
         <p className="mt-3 text-xs text-ink/45">Fitted with your lenses and delivered across Zambia. Pay by card or mobile money.</p>
       </div>
+
+      {tryOn && (
+        <TryOn
+          frames={[{ slug: p.slug, name: p.name, tryOnImageUrl: p.tryOnImageUrl }]}
+          onClose={() => setTryOn(false)}
+        />
+      )}
     </div>
   )
 }

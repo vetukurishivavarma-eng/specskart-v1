@@ -12,13 +12,13 @@ public final class CatalogDtos {
     public record ProductCard(UUID id, String slug, String name, String frameCategoryCode,
                               String colour, String material, String gender,
                               long priceMinor, Long compareAtMinor, String currency,
-                              boolean inStock, boolean featured, String imageUrl) {}
+                              boolean inStock, boolean featured, String imageUrl, String tryOnImageUrl) {}
 
     public record ProductDetail(UUID id, String slug, String name, String description,
                                 String frameCategoryCode, String colour, String material, String gender,
                                 long priceMinor, Long compareAtMinor, String currency,
                                 int stockQty, boolean inStock, boolean lensable, boolean featured,
-                                List<ImageDto> images) {}
+                                List<ImageDto> images, String tryOnImageUrl) {}
 
     public record StoreConfigDto(String heroTitle, String heroSubtitle, String heroImageUrl,
                                  long shippingFeeMinor, Long freeShippingOverMinor,
@@ -31,12 +31,13 @@ public final class CatalogDtos {
     public record AdminProduct(UUID id, String slug, String name, String description,
                                String frameCategoryCode, String material, String colour, String gender,
                                long priceMinor, Long compareAtMinor, String currency, int stockQty,
-                               boolean lensable, String status, boolean featured, List<ImageDto> images) {}
+                               boolean lensable, String status, boolean featured, List<ImageDto> images,
+                               String tryOnImageUrl) {}
 
     public record ProductUpsert(String slug, String name, String description, String frameCategoryCode,
                                 String material, String colour, String gender, Long priceMinor,
                                 Long compareAtMinor, Integer stockQty, Boolean lensable, String status,
-                                Boolean featured, List<ImageInput> images) {}
+                                Boolean featured, List<ImageInput> images, String tryOnImageUrl) {}
 
     public record ImageInput(String url, String alt) {}
 

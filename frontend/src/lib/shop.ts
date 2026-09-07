@@ -74,6 +74,7 @@ export type ProductCard = {
   colour: string | null; material: string | null; gender: string
   priceMinor: number; compareAtMinor: number | null; currency: string
   inStock: boolean; featured: boolean; imageUrl: string | null
+  tryOnImageUrl: string | null
 }
 
 export type ProductDetail = ProductCard & {
