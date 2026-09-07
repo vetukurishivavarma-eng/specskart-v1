@@ -124,3 +124,6 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    # Phase 2 migrations (V8–V11) were authored after V12 was already applied to prod;
+    # they're all independent additive DDL, so applying them out of order is safe.
+    out-of-order: true
