@@ -87,7 +87,7 @@ public class CatalogService {
         return new CatalogDtos.ProductDetail(p.getId(), p.getSlug(), p.getName(), p.getDescription(),
                 p.getFrameCategoryCode(), p.getColour(), p.getMaterial(), p.getGender(),
                 p.getPriceMinor(), p.getCompareAtMinor(), p.getCurrency(),
-                p.getStockQty(), p.isLensable(), p.isFeatured(), imgs);
+                p.getStockQty(), p.inStock(), p.isLensable(), p.isFeatured(), imgs);
     }
 
     @Transactional(readOnly = true)

@@ -17,7 +17,7 @@ public final class CatalogDtos {
     public record ProductDetail(UUID id, String slug, String name, String description,
                                 String frameCategoryCode, String colour, String material, String gender,
                                 long priceMinor, Long compareAtMinor, String currency,
-                                int stockQty, boolean lensable, boolean featured,
+                                int stockQty, boolean inStock, boolean lensable, boolean featured,
                                 List<ImageDto> images) {}
 
     public record StoreConfigDto(String heroTitle, String heroSubtitle, String heroImageUrl,
