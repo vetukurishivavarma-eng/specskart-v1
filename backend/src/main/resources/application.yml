@@ -44,6 +44,10 @@ specskart:
     webhook-verify-token: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:dev-verify-token}
     app-secret: ${WHATSAPP_APP_SECRET:}
     graph-base-url: ${WHATSAPP_GRAPH_BASE_URL:https://graph.facebook.com/v21.0}
+    # Approved template used for agent-initiated re-engagement outside the 24h window.
+    # {{1}} = lead first name, {{2}} = store name. Leave blank to disable the follow-up action.
+    follow-up-template: ${WHATSAPP_FOLLOW_UP_TEMPLATE:}
+    follow-up-template-lang: ${WHATSAPP_FOLLOW_UP_TEMPLATE_LANG:en}
 
 ---
 spring:

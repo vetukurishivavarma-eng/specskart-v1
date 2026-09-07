@@ -41,6 +41,10 @@ export default function LeadDetail() {
     mutationFn: (archived: boolean) => api(`/admin/leads/${id}/${archived ? 'archive' : 'unarchive'}`, { method: 'POST', auth: true }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['lead', id] }); qc.invalidateQueries({ queryKey: ['leads'] }) },
   })
+  const followUp = useMutation({
+    mutationFn: () => api(`/admin/leads/${id}/whatsapp/follow-up`, { method: 'POST', auth: true }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['lead', id] }),
+  })
   const del = useMutation({
     mutationFn: () => api(`/admin/leads/${id}`, { method: 'DELETE', auth: true }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['leads'] }); nav('/admin/leads') },
@@ -121,6 +125,20 @@ export default function LeadDetail() {
               </div>
             ))}
           </div>
+          <button
+            className="btn-ghost mt-3 w-full !py-2 text-xs"
+            disabled={followUp.isPending}
+            onClick={() => { if (confirm('Send the approved re-engagement template to this lead?')) followUp.mutate() }}>
+            {followUp.isPending ? 'Sending…' : 'Send WhatsApp follow-up'}
+          </button>
+          {followUp.isError && (
+            <p className="mt-1 text-[10px] text-clay">
+              {(followUp.error as Error).message.includes('FOLLOW_UP_TEMPLATE_NOT_CONFIGURED')
+                ? 'No re-engagement template configured (WHATSAPP_FOLLOW_UP_TEMPLATE).'
+                : (followUp.error as Error).message}
+            </p>
+          )}
+          {followUp.isSuccess && <p className="mt-1 text-[10px] text-moss">Follow-up template sent.</p>}
         </section>
       </div>
 

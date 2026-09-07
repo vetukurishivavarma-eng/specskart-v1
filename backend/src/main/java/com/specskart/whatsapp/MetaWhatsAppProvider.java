@@ -89,6 +89,24 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
                         "action", Map.of("buttons", rows))));
     }
 
+    @Override
+    public void sendTemplate(String toWaId, String templateName, String languageCode, List<String> bodyParams) {
+        var template = new java.util.LinkedHashMap<String, Object>();
+        template.put("name", templateName);
+        template.put("language", Map.of("code", languageCode));
+        if (bodyParams != null && !bodyParams.isEmpty()) {
+            var params = bodyParams.stream()
+                    .map(p -> Map.of("type", "text", "text", p == null ? "" : p))
+                    .toList();
+            template.put("components", List.of(Map.of("type", "body", "parameters", params)));
+        }
+        post(Map.of(
+                "messaging_product", "whatsapp",
+                "to", toWaId,
+                "type", "template",
+                "template", template));
+    }
+
     private static String cap(String s) {
         return s.length() > 20 ? s.substring(0, 20) : s;
     }

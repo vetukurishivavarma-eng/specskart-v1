@@ -207,6 +207,30 @@ check the deploy logs say the app started and
 
 ---
 
+## 5a. (optional) Re‑engagement template for cold leads
+
+The bot's replies all happen inside the 24‑hour window a customer opens by
+messaging first. To let an agent re‑contact a lead who went quiet **after** that
+window, Meta requires an **approved message template**.
+
+1. business.facebook.com → WhatsApp Manager → **Message templates** → Create.
+   - Category: **Marketing** (or Utility if it's purely transactional).
+   - Body, two variables: e.g.
+     `Hi {{1}}, it's {{2}}. Your frame recommendations are still saved — reply here whenever you'd like our optician to help you choose. 👓`
+   - Submit; approval is usually minutes.
+2. On Render set and redeploy:
+   ```
+   WHATSAPP_FOLLOW_UP_TEMPLATE=<the template name>
+   WHATSAPP_FOLLOW_UP_TEMPLATE_LANG=en        # must match the template's language
+   ```
+   `{{1}}` is filled with the lead's first name, `{{2}}` with the store name.
+3. In the CRM, the lead detail page's **Send follow‑up** action now calls
+   `POST /api/admin/leads/{id}/whatsapp/follow-up`, sends the template, moves the
+   lead to `FOLLOW_UP`, and logs it in the WhatsApp thread + timeline
+   (`WHATSAPP_FOLLOW_UP_SENT`).
+
+---
+
 ## 6. Smoke test WITHOUT an ad (do this first)
 
 1. From your **personal** WhatsApp, send `Hi` to the business number.
@@ -314,7 +338,7 @@ retroactively link it in Phase 1.
 | CORS error in the browser on `/admin` | `SPECSKART_CORS_ORIGINS` doesn't include the frontend origin. |
 | Lead has no campaign | Campaign's External ID ≠ the Ad ID, or campaign created after the first message. |
 | App won't boot on `prod` | `Schema validation failed` → `V1__init.sql` drift; fix and redeploy (see 1a). |
-| "Re‑engagement" follow‑up (outside 24 h) never sends | Expected — free‑form messages are blocked outside the 24‑h window; that path needs an approved WhatsApp **message template**, not built yet. |
+| "Re‑engagement" follow‑up (outside 24 h) never sends | Set `WHATSAPP_FOLLOW_UP_TEMPLATE` to an **approved** template name (see §5a). Without it the CRM's "Send follow‑up" returns `FOLLOW_UP_TEMPLATE_NOT_CONFIGURED`. If it's set but still fails, the template isn't approved yet, or its language ≠ `WHATSAPP_FOLLOW_UP_TEMPLATE_LANG`. |
 
 ---
 
@@ -351,3 +375,5 @@ retroactively link it in Phase 1.
 | `WHATSAPP_APP_SECRET` | — | App → Settings → Basic |
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | `dev-verify-token` | must match Meta |
 | `WHATSAPP_GRAPH_BASE_URL` | `https://graph.facebook.com/v21.0` | Graph API version |
+| `WHATSAPP_FOLLOW_UP_TEMPLATE` | — (disabled) | approved template for agent re‑engagement outside 24 h (§5a) |
+| `WHATSAPP_FOLLOW_UP_TEMPLATE_LANG` | `en` | that template's language code |

@@ -34,6 +34,20 @@ _Last updated: 2026-09-03 (session 2 — browser walkthrough). Session: session_
   Leads page has an "Archived" toggle. **The prod deploy runs V2 automatically on boot.**
 - vitest pool threads→forks (threads hangs on this box with vitest 4). 26 backend + 8 frontend green.
 
+### 2026-09-07 — WhatsApp re-engagement templates (committed, NOT deployed)
+- `WhatsAppProvider.sendTemplate(to, name, lang, bodyParams)` — third transport method.
+  Mock records it in the outbox; `MetaWhatsAppProvider` POSTs `type:template` with a body
+  component. This is the only message type Meta accepts outside the 24h window.
+- Config: `WHATSAPP_FOLLOW_UP_TEMPLATE` (+ `_LANG`, default `en`). Blank = feature off.
+  {{1}} = lead first name, {{2}} = store name.
+- `WhatsAppBotService.sendManualFollowUp(lead)` → sends the template, moves lead to
+  FOLLOW_UP, logs it in the WA thread (`type=template`) + timeline (`WHATSAPP_FOLLOW_UP_SENT`,
+  new LeadEventType). 400 `FOLLOW_UP_TEMPLATE_NOT_CONFIGURED` if unset.
+- `POST /api/admin/leads/{id}/whatsapp/follow-up` + a "Send WhatsApp follow-up" button on
+  the CRM lead-detail WhatsApp panel.
+- No DB migration (`lead_events.event_type` is `varchar(60)`). Backend 27 tests green
+  (+1), frontend 8 green, `npm run build` clean. Docs: INTEGRATION.md §5a + appendix.
+
 ### Still open for the actual ad
 - The WhatsApp access token in Render is a **24-hour temp token** — replace with the permanent
   system-user token (Business Settings → System users → Generate, no expiry).

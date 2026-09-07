@@ -17,5 +17,12 @@ public record AppProperties(
     public record Session(int expiryHours) {}
     public record Face(boolean retainImages) {}
     public record WhatsApp(String provider, String phoneNumberId, String businessAccountId,
-                           String accessToken, String webhookVerifyToken, String appSecret, String graphBaseUrl) {}
+                           String accessToken, String webhookVerifyToken, String appSecret, String graphBaseUrl,
+                           String followUpTemplate, String followUpTemplateLang) {
+
+        /** True when a re-engagement template is configured for agent-initiated follow-ups. */
+        public boolean followUpConfigured() {
+            return followUpTemplate != null && !followUpTemplate.isBlank();
+        }
+    }
 }

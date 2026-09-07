@@ -10,6 +10,7 @@ import com.specskart.lead.*;
 import com.specskart.shared.ApiException;
 import com.specskart.shared.ConsentRecord;
 import com.specskart.shared.ConsentRecordRepository;
+import com.specskart.whatsapp.WhatsAppBotService;
 import com.specskart.whatsapp.WhatsAppMessage;
 import com.specskart.whatsapp.WhatsAppMessageRepository;
 import org.springframework.data.domain.PageRequest;
@@ -34,11 +35,12 @@ public class AdminLeadController {
     private final WhatsAppMessageRepository waMessages;
     private final FaceAnalysisService faceAnalysis;
     private final ConsentRecordRepository consents;
+    private final WhatsAppBotService bot;
 
     public AdminLeadController(LeadRepository leads, LeadService leadService, LeadNoteRepository notes,
                               CampaignRepository campaigns, LeadEventRepository events,
                               WhatsAppMessageRepository waMessages, FaceAnalysisService faceAnalysis,
-                              ConsentRecordRepository consents) {
+                              ConsentRecordRepository consents, WhatsAppBotService bot) {
         this.leads = leads;
         this.leadService = leadService;
         this.notes = notes;
@@ -47,6 +49,7 @@ public class AdminLeadController {
         this.waMessages = waMessages;
         this.faceAnalysis = faceAnalysis;
         this.consents = consents;
+        this.bot = bot;
     }
 
     @GetMapping
@@ -145,6 +148,17 @@ public class AdminLeadController {
     public AdminDtos.LeadRow unarchive(@PathVariable UUID id) {
         Lead l = leadService.setArchived(id, false);
         return AdminMapper.row(l, campaignNames().get(l.getCampaignId()));
+    }
+
+    /**
+     * Send the approved re-engagement template to a cold lead (agent-initiated).
+     * 400 FOLLOW_UP_TEMPLATE_NOT_CONFIGURED if no template is set.
+     */
+    @PostMapping("/{id}/whatsapp/follow-up")
+    public AdminDtos.LeadRow sendFollowUp(@PathVariable UUID id) {
+        Lead l = leadService.get(id);
+        bot.sendManualFollowUp(l);
+        return AdminMapper.row(leadService.get(id), campaignNames().get(l.getCampaignId()));
     }
 
     /** Permanent erasure (lead + timeline + messages + analyses + consents). ADMIN only — see SecurityConfig. */

@@ -7,6 +7,7 @@ import com.specskart.framefinder.FrameFinderService;
 import com.specskart.lead.Lead;
 import com.specskart.lead.LeadService;
 import com.specskart.lead.LeadStatus;
+import com.specskart.shared.ApiException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -114,6 +115,26 @@ public class WhatsAppBotService {
                         new WhatsAppProvider.Button(BTN_RESULTS_NOT_NOW, "Not Now")));
         logOutbound(lead.getId(), "interactive", "analysis-follow-up");
         analytics.record(LeadEventType.WHATSAPP_RESULTS_REQUESTED, lead.getId(), null);
+    }
+
+    /**
+     * Agent-initiated re-engagement of a cold lead. Goes out as an approved template
+     * because that is the only message type Meta delivers outside the 24-hour window.
+     * Template params: {{1}} = lead first name, {{2}} = store name.
+     */
+    @Transactional
+    public void sendManualFollowUp(Lead lead) {
+        if (!props.whatsapp().followUpConfigured()) {
+            throw ApiException.badRequest("FOLLOW_UP_TEMPLATE_NOT_CONFIGURED",
+                    "No WhatsApp re-engagement template is configured (set WHATSAPP_FOLLOW_UP_TEMPLATE).");
+        }
+        String firstName = lead.getName() != null && !lead.getName().isBlank()
+                ? lead.getName().split(" ")[0] : "there";
+        provider.sendTemplate(waId(lead), props.whatsapp().followUpTemplate(),
+                props.whatsapp().followUpTemplateLang(), List.of(firstName, props.storeName()));
+        leadService.advanceStatusSoft(lead.getId(), LeadStatus.FOLLOW_UP);
+        logOutbound(lead.getId(), "template", props.whatsapp().followUpTemplate());
+        analytics.record(LeadEventType.WHATSAPP_FOLLOW_UP_SENT, lead.getId(), null);
     }
 
     BotIntent classify(String text, String buttonId) {

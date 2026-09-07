@@ -15,7 +15,12 @@ public class MockWhatsAppProvider implements WhatsAppProvider {
 
     private static final Logger log = LoggerFactory.getLogger(MockWhatsAppProvider.class);
 
-    public record Sent(String toWaId, String text, List<Button> buttons) {}
+    public record Sent(String toWaId, String text, List<Button> buttons,
+                       String templateName, List<String> templateParams) {
+        public Sent(String toWaId, String text, List<Button> buttons) {
+            this(toWaId, text, buttons, null, List.of());
+        }
+    }
 
     private final List<Sent> outbox = new ArrayList<>();
 
@@ -35,6 +40,12 @@ public class MockWhatsAppProvider implements WhatsAppProvider {
         outbox.add(new Sent(toWaId, bodyText, buttons));
         log.info("[MOCK-WA] -> {} : {} buttons={}", toWaId, bodyText,
                 buttons.stream().map(Button::title).toList());
+    }
+
+    @Override
+    public synchronized void sendTemplate(String toWaId, String templateName, String languageCode, List<String> bodyParams) {
+        outbox.add(new Sent(toWaId, null, List.of(), templateName, List.copyOf(bodyParams)));
+        log.info("[MOCK-WA] -> {} : template={} lang={} params={}", toWaId, templateName, languageCode, bodyParams);
     }
 
     public synchronized List<Sent> outbox() {
