@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
-import { money } from '../lib/shop'
+import { money, assetUrl } from '../lib/shop'
 
 type Row = {
   id: string; slug: string; name: string; status: string; priceMinor: number; currency: string
@@ -33,7 +33,7 @@ export default function Products() {
                 <td className="py-2">
                   <Link to={`/admin/products/${p.id}`} className="flex items-center gap-3 hover:underline">
                     <span className="h-9 w-11 overflow-hidden rounded bg-ink/5">
-                      {p.images[0] && <img src={p.images[0].url} alt="" className="h-full w-full object-cover" />}
+                      {p.images[0] && <img src={assetUrl(p.images[0].url)} alt="" className="h-full w-full object-cover" />}
                     </span>
                     <span>{p.name}{p.featured ? ' ★' : ''}</span>
                   </Link>

@@ -90,6 +90,14 @@ carts, cart_items, orders, order_items, order_events, store_config). Money = min
 - **Storefront** (`/store`, `/store/:slug`, `/cart`, `/checkout`, `/order/:orderNo`) +
   admin screens (Products/editor, Orders/detail w/ status buttons, Promo codes, Storefront
   settings) under `/admin`. `AdminLayout` nav extended.
+- **Photo upload (V5__product_image_files.sql):** admin uploads a JPG/PNG in the product
+  editor — no URL pasting. Bytes stored in Postgres (`product_image_files`, own table so
+  listings never load them; Render free tier has no disk/object storage), downscaled to
+  1400px + re-encoded JPEG via JDK `ImageIO` (no dependency). `product_images.url` holds a
+  relative `/api/public/product-images/{fileId}` path; the SPA resolves it against the API
+  origin (`shop.ts assetUrl`). `GET` is public + cached 1yr immutable. Editor redirects
+  new → edit after first save so photos can be added. External-URL images still supported
+  via the upsert API.
 - **Seed** (dev/mock only): 10 demo frames + `FRAME10`. Prod starts empty — admin adds real
   products. `SPRING_PROFILES_ACTIVE=prod` won't seed products.
 - Tests: backend 30 green (`CommerceFlowTest` = cart→promo→checkout→pay→status→cancel/restock,

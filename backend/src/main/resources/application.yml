@@ -7,11 +7,16 @@ spring:
     open-in-view: false
     properties:
       hibernate.format_sql: false
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
 
 server:
   port: ${SERVER_PORT:8080}
   error:
     include-message: always
+  forward-headers-strategy: framework   # Render terminates TLS; trust X-Forwarded-* for absolute URLs
 
 management:
   endpoints:

@@ -25,6 +25,14 @@ function sParam(): string {
   return s ? `?s=${encodeURIComponent(s)}` : ''
 }
 
+/** Resolve an image URL: uploaded photos come back as "/api/..." and must hit the API origin. */
+export function assetUrl(url: string | null | undefined): string {
+  if (!url) return ''
+  if (!url.startsWith('/api/')) return url
+  const base = (import.meta.env.VITE_API_BASE as string) ?? '/api'
+  return base.replace(/\/api\/?$/, '') + url
+}
+
 export function money(minor: number, currency = 'ZMW'): string {
   const n = (minor / 100).toLocaleString(undefined, { minimumFractionDigits: 2 })
   return currency === 'ZMW' ? `K${n}` : `${currency} ${n}`
@@ -44,7 +52,7 @@ export type ProductCard = {
 
 export type ProductDetail = ProductCard & {
   description: string | null; stockQty: number; lensable: boolean
-  images: { url: string; alt: string | null }[]
+  images: { id: string; url: string; alt: string | null }[]
 }
 
 export type CartLine = {

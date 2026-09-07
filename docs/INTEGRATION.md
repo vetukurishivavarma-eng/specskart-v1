@@ -389,6 +389,10 @@ fully automated, with automatic WhatsApp order‑status updates and an abandoned
 Admin manages it under `/admin` (Products, Orders, Promo codes, Storefront settings) — no
 code deploy needed to add products or change prices/copy. Prod starts with an empty catalog.
 
+Product photos are **uploaded** in the editor (JPG/PNG, up to 10 MB) — no image hosting to
+set up. They're stored in Postgres, auto-resized, and served from `/api/public/product-images/…`.
+Save a new product first, then the photo uploader appears.
+
 Stock is held movie-ticket style: adding a frame to a bag reserves the unit for **15 minutes**
 (renewed while the shopper is active), so the last unit can't be double-sold. An abandoned
 bag's hold auto-releases. All stock changes are atomic — no overselling under load.

@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { shop, money, adoptCartFromUrl, type ProductCard } from '../lib/shop'
+import { shop, money, assetUrl, adoptCartFromUrl, type ProductCard } from '../lib/shop'
 
 const CATEGORIES = [
   ['', 'All frames'], ['WAYFARER', 'Wayfarer'], ['AVIATOR', 'Aviator'], ['ROUND_FRAME', 'Round'],
@@ -79,7 +79,7 @@ function Tile({ p }: { p: ProductCard }) {
     <Link to={`/store/${p.slug}`} className="group block">
       <div className="aspect-[4/3] overflow-hidden rounded-2xl border border-ink/10 bg-white">
         {p.imageUrl
-          ? <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover transition group-hover:scale-105" />
+          ? <img src={assetUrl(p.imageUrl)} alt={p.name} className="h-full w-full object-cover transition group-hover:scale-105" />
           : <div className="flex h-full items-center justify-center text-ink/30">No image</div>}
       </div>
       <div className="mt-3">

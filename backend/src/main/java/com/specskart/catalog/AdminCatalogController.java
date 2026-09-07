@@ -1,6 +1,7 @@
 package com.specskart.catalog;
 
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,17 @@ public class AdminCatalogController {
     public Map<String, Object> delete(@PathVariable UUID id) {
         admin.deleteProduct(id);
         return Map.of("deleted", id);
+    }
+
+    @PostMapping(value = "/products/{id}/images", consumes = "multipart/form-data")
+    public CatalogDtos.AdminProduct uploadImage(@PathVariable UUID id, @RequestParam("file") MultipartFile file) {
+        return admin.addImage(id, file);
+    }
+
+    @DeleteMapping("/products/{id}/images/{imageId}")
+    public Map<String, Object> deleteImage(@PathVariable UUID id, @PathVariable UUID imageId) {
+        admin.deleteImage(imageId);
+        return Map.of("deleted", imageId);
     }
 
     @GetMapping("/promos")

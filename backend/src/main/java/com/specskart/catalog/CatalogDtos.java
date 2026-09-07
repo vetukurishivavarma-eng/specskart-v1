@@ -7,7 +7,7 @@ public final class CatalogDtos {
 
     private CatalogDtos() {}
 
-    public record ImageDto(String url, String alt) {}
+    public record ImageDto(UUID id, String url, String alt) {}
 
     public record ProductCard(UUID id, String slug, String name, String frameCategoryCode,
                               String colour, String material, String gender,

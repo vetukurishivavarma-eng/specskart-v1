@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { shop, money } from '../lib/shop'
+import { shop, money, assetUrl } from '../lib/shop'
 
 export default function ProductDetail() {
   const { slug } = useParams()
@@ -34,7 +34,7 @@ export default function ProductDetail() {
       <div>
         <div className="aspect-[4/3] overflow-hidden rounded-2xl border border-ink/10 bg-white">
           {gallery[img]
-            ? <img src={gallery[img].url} alt={gallery[img].alt ?? p.name} className="h-full w-full object-cover" />
+            ? <img src={assetUrl(gallery[img].url)} alt={gallery[img].alt ?? p.name} className="h-full w-full object-cover" />
             : <div className="flex h-full items-center justify-center text-ink/30">No image</div>}
         </div>
         {gallery.length > 1 && (
@@ -42,7 +42,7 @@ export default function ProductDetail() {
             {gallery.map((g, i) => (
               <button key={i} onClick={() => setImg(i)}
                 className={`h-16 w-16 overflow-hidden rounded-lg border ${i === img ? 'border-ink' : 'border-ink/15'}`}>
-                <img src={g.url} alt="" className="h-full w-full object-cover" />
+                <img src={assetUrl(g.url)} alt="" className="h-full w-full object-cover" />
               </button>
             ))}
           </div>

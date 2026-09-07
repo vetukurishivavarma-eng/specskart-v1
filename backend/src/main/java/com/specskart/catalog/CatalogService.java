@@ -83,7 +83,7 @@ public class CatalogService {
                 .filter(Product::isActive)
                 .orElseThrow(() -> ApiException.notFound("PRODUCT_NOT_FOUND", "No such product: " + slug));
         var imgs = images.findByProductIdOrderBySortAsc(p.getId()).stream()
-                .map(i -> new CatalogDtos.ImageDto(i.getUrl(), i.getAlt())).toList();
+                .map(i -> new CatalogDtos.ImageDto(i.getId(), i.getUrl(), i.getAlt())).toList();
         return new CatalogDtos.ProductDetail(p.getId(), p.getSlug(), p.getName(), p.getDescription(),
                 p.getFrameCategoryCode(), p.getColour(), p.getMaterial(), p.getGender(),
                 p.getPriceMinor(), p.getCompareAtMinor(), p.getCurrency(),

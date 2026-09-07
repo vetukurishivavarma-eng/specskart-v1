@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { shop, money, adoptCartFromUrl } from '../lib/shop'
+import { shop, money, assetUrl, adoptCartFromUrl } from '../lib/shop'
 
 function HoldTimer({ until, onExpire }: { until: string; onExpire: () => void }) {
   const [left, setLeft] = useState(() => Math.max(0, new Date(until).getTime() - Date.now()))
@@ -54,7 +54,7 @@ export default function Cart() {
           {cart.lines.map((l) => (
             <li key={l.productId} className="flex gap-4 py-4">
               <Link to={`/store/${l.slug}`} className="h-20 w-24 shrink-0 overflow-hidden rounded-xl border border-ink/10 bg-white">
-                {l.imageUrl && <img src={l.imageUrl} alt={l.name} className="h-full w-full object-cover" />}
+                {l.imageUrl && <img src={assetUrl(l.imageUrl)} alt={l.name} className="h-full w-full object-cover" />}
               </Link>
               <div className="flex flex-1 flex-col">
                 <div className="flex justify-between gap-3">

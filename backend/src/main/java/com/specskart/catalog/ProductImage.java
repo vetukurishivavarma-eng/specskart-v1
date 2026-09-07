@@ -23,4 +23,8 @@ public class ProductImage extends BaseEntity {
 
     @Column(nullable = false)
     private int sort = 0;
+
+    /** Set when the photo was uploaded (bytes in product_image_files); null for an external URL. */
+    @Column(name = "file_id")
+    private java.util.UUID fileId;
 }
