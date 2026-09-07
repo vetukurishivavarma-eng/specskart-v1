@@ -48,11 +48,21 @@ _Last updated: 2026-09-03 (session 2 — browser walkthrough). Session: session_
 - No DB migration (`lead_events.event_type` is `varchar(60)`). Backend 27 tests green
   (+1), frontend 8 green, `npm run build` clean. Docs: INTEGRATION.md §5a + appendix.
 
+### 2026-09-07 — REAL NUMBER LIVE
+- Registered **+260 97 2809599** on the existing (published) Meta app. New WABA `2285018372331628`,
+  phone-number-id `1326122450579129`. Permanent system-user token + app secret in Render.
+- Set on `specskart-api`: `WHATSAPP_PROVIDER=meta`, `WHATSAPP_PHONE_NUMBER_ID`,
+  `WHATSAPP_BUSINESS_ACCOUNT_ID`, `WHATSAPP_APP_SECRET`, `WHATSAPP_ACCESS_TOKEN`,
+  `SPECSKART_BUSINESS_WA_NUMBER=+260972809599`.
+- Backend auto-subscribed the new WABA on boot (log: `subscribed app to WABA 2285018372331628`).
+- **Smoke test PASSED**: a real "Hi" → webhook → lead `6b63c639…` → bot GREETING → welcome sent, no errors.
+- Commit `34b9ee5` (templates) pushed + auto-deployed.
+- ⚠️ Token + app secret went through the chat — rotate after ad testing.
+
 ### Still open for the actual ad
-- The WhatsApp access token in Render is a **24-hour temp token** — replace with the permanent
-  system-user token (Business Settings → System users → Generate, no expiry).
-- Register a **real phone number** (test number can't be a CTWA ad destination) — §5 of INTEGRATION.md.
-- Create the ad + a CRM Campaign whose **External ID = the FB Ad ID** — §6.
+- FB Page (Ads Manager needs one).
+- Create the CTWA ad + a CRM Campaign whose **External ID = the FB Ad ID** — §7–§8.
+- (optional) approved re-engagement template → set `WHATSAPP_FOLLOW_UP_TEMPLATE` (§5a).
 - MediaPipe real-webcam path: exercised for the first time when the user opens the Frame Finder link
   on a phone during the live test.
 
