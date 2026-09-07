@@ -5,8 +5,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -50,5 +52,36 @@ public class RecommendationService {
     public List<String> recommendedCodes(String faceShapeCode) {
         return forFaceShape(faceShapeCode).recommended().stream()
                 .map(RecommendationDtos.FrameDto::displayName).toList();
+    }
+
+    // Transparent additive re-ranking: a matching vibe shaves BOOST off a category's priority
+    // (lower priority = higher rank). No ML, fully deterministic.
+    private static final int BOOST = 25;
+    private static final Map<String, Set<String>> VIBE_FAVOURS = Map.of(
+            "classic", Set.of("WAYFARER", "OVAL_FRAME", "ROUND_FRAME"),
+            "bold", Set.of("GEOMETRIC", "CATEYE", "BROWLINE", "OVERSIZED"),
+            "minimal", Set.of("THIN_RIM", "OVAL_FRAME"));
+
+    /** Face-shape recommendations re-weighted by an optional style profile. */
+    @Transactional(readOnly = true)
+    public RecommendationDtos.RecommendationResult forFaceShapeWithStyle(String faceShapeCode,
+                                                                        RecommendationDtos.StyleProfile style) {
+        RecommendationDtos.RecommendationResult base = forFaceShape(faceShapeCode);
+        if (style == null || style.isEmpty()) return base;
+
+        Set<String> favoured = style.vibe() == null ? Set.of()
+                : VIBE_FAVOURS.getOrDefault(style.vibe().toLowerCase(), Set.of());
+        // ponytail: colour is only a tie-break here — it needs per-product colour data to matter more.
+        int colourNudge = style.colour() == null ? 0 : 1;
+
+        List<RecommendationDtos.FrameDto> ranked = base.recommended().stream()
+                .map(f -> new RecommendationDtos.FrameDto(f.code(), f.displayName(), f.description(), f.imageUrl(),
+                        f.priority() - (favoured.contains(f.code().toUpperCase()) ? BOOST : 0) - colourNudge,
+                        f.reason()))
+                .sorted(Comparator.comparingInt(RecommendationDtos.FrameDto::priority))
+                .toList();
+
+        return new RecommendationDtos.RecommendationResult(base.faceShape(), base.faceShapeDisplay(),
+                base.faceShapeDescription(), ranked, base.avoidOrUseCarefully());
     }
 }
