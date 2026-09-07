@@ -3,6 +3,7 @@ package com.specskart.catalog;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /** Storefront-facing catalog. No auth. */
 @RestController
@@ -31,6 +32,12 @@ public class PublicCatalogController {
     @GetMapping("/products/{slug}")
     public CatalogDtos.ProductDetail detail(@PathVariable String slug) {
         return catalog.detail(slug);
+    }
+
+    @PostMapping("/products/{slug}/notify-me")
+    public Map<String, Object> notifyMe(@PathVariable String slug, @RequestBody Map<String, String> body) {
+        catalog.registerStockAlert(slug, body.get("whatsapp"));
+        return Map.of("ok", true);
     }
 
     @GetMapping("/store-config")

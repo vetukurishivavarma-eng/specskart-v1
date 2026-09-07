@@ -50,11 +50,22 @@ public class Product extends BaseEntity {
     @Column(nullable = false)
     private boolean featured = false;
 
+    /** If set and in the future, the product is a scheduled drop — hidden from the store until then. */
+    private java.time.Instant dropsAt;
+
+    @Column(nullable = false)
+    private boolean limitedEdition = false;
+
     public boolean isActive() {
         return "ACTIVE".equals(status);
     }
 
     public boolean inStock() {
         return stockQty > 0;
+    }
+
+    /** True while a scheduled drop is still counting down. */
+    public boolean isUpcoming() {
+        return dropsAt != null && dropsAt.isAfter(java.time.Instant.now());
     }
 }

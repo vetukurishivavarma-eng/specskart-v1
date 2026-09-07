@@ -91,10 +91,13 @@ export default function Store() {
 function Tile({ p }: { p: ProductCard }) {
   return (
     <Link to={`/store/${p.slug}`} className="group block">
-      <div className="aspect-[4/3] overflow-hidden rounded-2xl border border-ink/10 bg-white">
+      <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-ink/10 bg-white">
         {p.imageUrl
           ? <img src={assetUrl(p.imageUrl)} alt={p.name} className="h-full w-full object-cover transition group-hover:scale-105" />
           : <div className="flex h-full items-center justify-center text-ink/30">No image</div>}
+        {p.limitedEdition && (
+          <span className="absolute left-2 top-2 rounded-full bg-clay px-2 py-0.5 text-[10px] font-medium text-bone">Limited</span>
+        )}
       </div>
       <div className="mt-3">
         <div className="flex items-baseline justify-between gap-2">
