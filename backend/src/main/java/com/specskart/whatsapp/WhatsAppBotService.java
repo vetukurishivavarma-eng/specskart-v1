@@ -28,7 +28,6 @@ public class WhatsAppBotService {
 
     static final String BTN_FIND = "FIND_FRAMES";
     static final String BTN_EXPLORE = "EXPLORE_FRAMES";
-    static final String BTN_EXPERT = "TALK_TO_EXPERT";
     static final String BTN_WEBSITE = "VISIT_WEBSITE";
     static final String BTN_RESULTS_FRAMES = "RESULTS_SHOW_FRAMES";
     static final String BTN_RESULTS_NOT_NOW = "RESULTS_NOT_NOW";
@@ -60,17 +59,11 @@ public class WhatsAppBotService {
             case FIND_FRAMES -> sendFrameFinderLink(lead);
             case EXPLORE_FRAMES -> sendText(lead, "Our latest collection is here: "
                     + props.frontendBaseUrl() + "/store  (online ordering is launching soon — reply here to reserve).");
-            case TALK_TO_EXPERT -> {
-                leadService.advanceStatusSoft(lead.getId(), LeadStatus.INTERESTED);
-                analytics.record(LeadEventType.EXPERT_CONTACT_REQUESTED, lead.getId(), null);
-                sendText(lead, "An eyewear expert from " + props.storeName()
-                        + " will message you shortly. Meanwhile, feel free to share what you're looking for.");
-            }
             case VISIT_WEBSITE -> sendText(lead, "Here's our website: " + props.frontendBaseUrl());
             case RESULTS_SHOW_FRAMES -> {
                 leadService.advanceStatusSoft(lead.getId(), LeadStatus.INTERESTED);
                 sendText(lead, "Great! Browse styles matched to your face here: "
-                        + props.frontendBaseUrl() + "/store  — or reply and our expert will curate a set for you.");
+                        + props.frontendBaseUrl() + "/store  — reply here and we'll help you choose.");
             }
             case RESULTS_NOT_NOW -> {
                 leadService.advanceStatusSoft(lead.getId(), LeadStatus.FOLLOW_UP);
@@ -86,8 +79,7 @@ public class WhatsAppBotService {
                 "Hi" + name + " 👋\nWelcome to " + props.storeName()
                         + ".\n\nI can help you find frames that complement your face. What would you like to do?",
                 List.of(new WhatsAppProvider.Button(BTN_FIND, "Find Frames For My Face"),
-                        new WhatsAppProvider.Button(BTN_EXPLORE, "Explore Frames"),
-                        new WhatsAppProvider.Button(BTN_EXPERT, "Talk To An Expert")));
+                        new WhatsAppProvider.Button(BTN_EXPLORE, "Explore Frames")));
         logOutbound(lead.getId(), "interactive", "welcome");
         analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
     }
@@ -108,10 +100,9 @@ public class WhatsAppBotService {
         String body = "Your frame analysis is ready 🎯\n\nFace match: " + faceShapeDisplay
                 + "\n\nFrames we recommend:\n"
                 + recommended.stream().map(r -> "• " + r).reduce((a, b) -> a + "\n" + b).orElse("")
-                + "\n\nWould you like our eyewear expert to show you matching frames?";
+                + "\n\nWould you like to see matching frames?";
         provider.sendButtons(waId(lead), body,
                 List.of(new WhatsAppProvider.Button(BTN_RESULTS_FRAMES, "Show Me Frames"),
-                        new WhatsAppProvider.Button(BTN_EXPERT, "Talk To Expert"),
                         new WhatsAppProvider.Button(BTN_RESULTS_NOT_NOW, "Not Now")));
         logOutbound(lead.getId(), "interactive", "analysis-follow-up");
         analytics.record(LeadEventType.WHATSAPP_RESULTS_REQUESTED, lead.getId(), null);
@@ -143,7 +134,6 @@ public class WhatsAppBotService {
                 return switch (buttonId) {
                     case BTN_FIND -> BotIntent.FIND_FRAMES;
                     case BTN_EXPLORE -> BotIntent.EXPLORE_FRAMES;
-                    case BTN_EXPERT -> BotIntent.TALK_TO_EXPERT;
                     case BTN_WEBSITE -> BotIntent.VISIT_WEBSITE;
                     case BTN_RESULTS_FRAMES -> BotIntent.RESULTS_SHOW_FRAMES;
                     case BTN_RESULTS_NOT_NOW -> BotIntent.RESULTS_NOT_NOW;
@@ -156,8 +146,7 @@ public class WhatsAppBotService {
         if (t.matches(".*(hi|hello|hey|start|namaste).*") && t.length() < 15) return BotIntent.GREETING;
         if (t.contains("face") || t.contains("suit") || t.contains("frame finder") || t.equals("1")) return BotIntent.FIND_FRAMES;
         if (t.contains("explore") || t.contains("latest") || t.contains("catalog") || t.equals("2")) return BotIntent.EXPLORE_FRAMES;
-        if (t.contains("expert") || t.contains("talk") || t.contains("call") || t.equals("3")) return BotIntent.TALK_TO_EXPERT;
-        if (t.contains("website") || t.contains("site") || t.equals("4")) return BotIntent.VISIT_WEBSITE;
+        if (t.contains("website") || t.contains("site") || t.equals("3")) return BotIntent.VISIT_WEBSITE;
         return BotIntent.UNKNOWN;
     }
 

@@ -235,15 +235,15 @@ window, Meta requires an **approved message template**.
 
 1. From your **personal** WhatsApp, send `Hi` to the business number.
 2. Expected within a few seconds (longer if the dyno was asleep):
-   - the bot replies with a welcome + 3 buttons
-     (*Find Frames For My Face* / *Explore Frames* / *Talk To An Expert*).
+   - the bot replies with a welcome + 2 buttons
+     (*Find Frames For My Face* / *Explore Frames*).
 3. Tap **Find Frames For My Face** → you get a link
    `https://<frontend>/frame-finder?s=<44-char token>`.
 4. Open it on the phone → consent → allow camera → take a selfie →
    it analyses in‑browser → result screen with your face shape + recommended
    styles → tap **Send results to WhatsApp**.
 5. Back in WhatsApp you get the analysis follow‑up with *Show Me Frames* /
-   *Talk To Expert* / *Not Now*.
+   *Not Now*.
 6. In the CRM (`/admin`):
    - Dashboard: Total leads +1, Face analyses +1, WhatsApp conversations +1,
      source **META**.

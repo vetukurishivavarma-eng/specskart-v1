@@ -15,7 +15,7 @@ public enum LeadEventType {
     FACE_ANALYSIS_FAILED,
     RECOMMENDATION_VIEWED,
     WHATSAPP_RESULTS_REQUESTED,
-    EXPERT_CONTACT_REQUESTED,
+    EXPERT_CONTACT_REQUESTED, // retired flow — kept so historical lead_events rows still deserialize
     WHATSAPP_FOLLOW_UP_SENT,
     LEAD_CONVERTED
 }

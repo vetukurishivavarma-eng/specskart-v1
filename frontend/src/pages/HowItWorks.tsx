@@ -19,7 +19,7 @@ export default function HowItWorks() {
           You get a shortlist — e.g. “closest to Oval → Rectangle, Wayfarer, Geometric”. It's an estimate, not a verdict.
         </Step>
         <Step n="5" t="Your results follow you to WhatsApp">
-          Ask us to send the results and an expert can pick up the conversation from there.
+          Ask us to send the results and we'll pick up the conversation from there.
         </Step>
       </div>
     </div>
