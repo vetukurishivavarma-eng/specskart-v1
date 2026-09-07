@@ -13,7 +13,8 @@ final class AdminMapper {
         return new AdminDtos.LeadRow(l.getId(), l.getName(), l.getWhatsappNumber(),
                 l.getAcquisitionSource().name(), l.getCampaignId(), campaignName, l.getFaceShape(),
                 l.getRecommendedFrameCategories(), l.getStatus().name(), l.getCreatedAt(),
-                l.getLastContactAt(), l.getAssignedToUserId(), l.getArchivedAt());
+                l.getLastContactAt(), l.getAssignedToUserId(), l.getArchivedAt(),
+                l.getPoints(), l.getReferralCode());
     }
 
     static Map<String, Object> attribution(Lead l) {

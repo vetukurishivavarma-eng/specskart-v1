@@ -60,7 +60,10 @@ export default function LeadDetail() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <h1 className="text-2xl">{l.name ?? 'Unknown'}</h1>
-              <p className="text-ink/55">{l.whatsappNumber} · {l.source}{l.campaignName ? ` · ${l.campaignName}` : ''}</p>
+              <p className="text-ink/55">
+                {l.whatsappNumber} · {l.source}{l.campaignName ? ` · ${l.campaignName}` : ''}
+                {l.points ? ` · ${l.points} pts` : ''}{l.referralCode ? ` · ref ${l.referralCode}` : ''}
+              </p>
             </div>
             <div className="flex shrink-0 items-center gap-2 text-xs">
               <button className="btn-ghost !px-3 !py-1"

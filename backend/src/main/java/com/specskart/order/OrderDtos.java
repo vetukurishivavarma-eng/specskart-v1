@@ -15,7 +15,8 @@ public final class OrderDtos {
 
     public record CartView(String token, List<CartLine> lines, String promoCode,
                            long subtotalMinor, long discountMinor, long shippingMinor, long totalMinor,
-                           String currency, String deliveryEta, java.time.Instant holdExpiresAt) {}
+                           String currency, String deliveryEta, java.time.Instant holdExpiresAt,
+                           int pointsAvailable, int pointValueMinor) {}
 
     public record AddItem(UUID productId, Integer qty) {}
     public record SetQty(int qty) {}
@@ -23,7 +24,8 @@ public final class OrderDtos {
 
     // ---- checkout ----
     public record CheckoutRequest(String customerName, String customerPhone, String customerEmail,
-                                  String shipAddress, String shipCity) {}
+                                  String shipAddress, String shipCity,
+                                  Integer redeemPoints, String referralCode) {}
 
     public record CheckoutResult(String orderNo, String checkoutUrl, long totalMinor, String currency) {}
 
@@ -34,7 +36,8 @@ public final class OrderDtos {
                             String customerEmail, String shipAddress, String shipCity,
                             long subtotalMinor, long discountMinor, long shippingMinor, long totalMinor,
                             String currency, String promoCode, Instant paidAt, Instant createdAt,
-                            List<OrderLine> lines, List<StatusEvent> timeline) {}
+                            List<OrderLine> lines, List<StatusEvent> timeline,
+                            int pointsEarned, int pointsRedeemed, int pointsBalance, String referralCode) {}
 
     public record StatusEvent(String status, String note, Instant at) {}
 

@@ -3,6 +3,8 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { shop, money, setCartToken } from '../lib/shop'
 
+const WA = import.meta.env.VITE_WA_LINK ?? 'https://wa.me/260000000000'
+
 const STEPS = ['PAID', 'PACKED', 'SHIPPED', 'DELIVERED']
 const LABEL: Record<string, string> = {
   PENDING_PAYMENT: 'Awaiting payment', PAID: 'Payment received', PACKED: 'Packed',
@@ -73,6 +75,27 @@ export default function OrderTracking() {
         <h2 className="text-lg">Delivery</h2>
         <p className="mt-2 text-ink/70">{order.customerName}<br />{order.shipAddress}, {order.shipCity}<br />{order.customerPhone}</p>
       </div>
+
+      {(order.pointsEarned > 0 || order.pointsBalance > 0 || order.referralCode) && (
+        <div className="card mt-4 p-5 text-sm">
+          <h2 className="text-lg">Rewards</h2>
+          {order.pointsEarned > 0 && <p className="mt-2 text-ink/70">You earned <strong>{order.pointsEarned} points</strong> on this order.</p>}
+          {order.pointsRedeemed > 0 && <p className="text-ink/70">You used {order.pointsRedeemed} points.</p>}
+          <p className="mt-1 text-ink/70">Points balance: <strong>{order.pointsBalance}</strong></p>
+          {order.referralCode && (
+            <div className="mt-3">
+              <p className="text-ink/70">Share your code — your friend gets a discount, you get points:</p>
+              <div className="mt-1 flex items-center gap-3">
+                <span className="font-display text-lg tracking-wide">{order.referralCode}</span>
+                <a className="text-xs underline" target="_blank" rel="noreferrer"
+                   href={`https://wa.me/?text=${encodeURIComponent(`Get a discount on your first Specskart frames with my code ${order.referralCode} 👓 ${WA}`)}`}>
+                  Share on WhatsApp
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <ol className="mt-6 space-y-2 text-sm">
         {order.timeline.map((e, i) => (

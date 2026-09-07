@@ -14,10 +14,21 @@ public record AppProperties(
         Face face,
         WhatsApp whatsapp,
         Payments payments,
-        Promo promo
+        Promo promo,
+        Loyalty loyalty
 ) {
     public record Session(int expiryHours) {}
     public record Promo(int faceAnalysisPercent, int faceAnalysisHours) {}
+
+    /**
+     * pointsPerKwacha: points earned per K1 of order subtotal.
+     * pointValueMinor: what one point is worth as a checkout discount (in ngwee).
+     * referralFriendPercent: discount a new customer gets when using a referral code.
+     * referralRewardPoints: points the referrer earns once the friend's order is paid.
+     * minRedeemPoints: smallest redemption allowed.
+     */
+    public record Loyalty(double pointsPerKwacha, int pointValueMinor, int referralFriendPercent,
+                          int referralRewardPoints, int minRedeemPoints) {}
     public record Payments(String provider, Flutterwave flutterwave) {}
     public record Flutterwave(String secretKey, String secretHash, String baseUrl) {}
     public record Face(boolean retainImages) {}

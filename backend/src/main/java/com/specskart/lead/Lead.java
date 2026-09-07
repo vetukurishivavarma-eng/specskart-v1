@@ -66,4 +66,11 @@ public class Lead extends BaseEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "text")
     private java.util.List<String> recommendedFrameCategories = new java.util.ArrayList<>();
+
+    /** Loyalty points balance. Earned on paid orders + referrals, redeemable at checkout. */
+    @Column(nullable = false)
+    private int points = 0;
+
+    /** This lead's shareable referral code (generated on first order). */
+    private String referralCode;
 }

@@ -14,6 +14,8 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
 
     Optional<Lead> findByWhatsappWaId(String waId);
     Optional<Lead> findByWhatsappNumber(String number);
+    Optional<Lead> findByReferralCode(String referralCode);
+    boolean existsByReferralCode(String referralCode);
 
     long countByCreatedAtAfter(Instant since);
     long countByStatus(LeadStatus status);

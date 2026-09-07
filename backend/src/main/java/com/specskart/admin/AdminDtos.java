@@ -11,7 +11,8 @@ public class AdminDtos {
 
     public record LeadRow(UUID id, String name, String whatsappNumber, String source, UUID campaignId,
                           String campaignName, String faceShape, List<String> recommendedFrames, String status,
-                          Instant createdAt, Instant lastContactAt, UUID assignedToUserId, Instant archivedAt) {}
+                          Instant createdAt, Instant lastContactAt, UUID assignedToUserId, Instant archivedAt,
+                          int points, String referralCode) {}
 
     public record Page<T>(List<T> content, int page, int size, long totalElements, int totalPages) {}
 

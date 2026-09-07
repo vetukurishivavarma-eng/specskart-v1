@@ -53,4 +53,12 @@ public class Order extends BaseEntity {
 
     /** When the post-purchase "thanks + come back" WhatsApp went out. */
     private Instant followedUpAt;
+
+    private UUID referredByLeadId;
+    @Column(nullable = false)
+    private int pointsEarned = 0;
+    @Column(nullable = false)
+    private int pointsRedeemed = 0;
+    @Column(nullable = false)
+    private boolean referralCredited = false;
 }

@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -83,6 +84,38 @@ public class LeadService {
         }
         analytics.record(LeadEventType.WHATSAPP_MESSAGE_RECEIVED, lead.getId(), null);
         return lead;
+    }
+
+    private static final java.security.SecureRandom RC_RNG = new java.security.SecureRandom();
+    private static final String RC_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
+    /** Give the lead a shareable referral code if they don't have one yet. */
+    @Transactional
+    public String ensureReferralCode(UUID leadId) {
+        Lead lead = get(leadId);
+        if (lead.getReferralCode() != null) return lead.getReferralCode();
+        String code;
+        do {
+            StringBuilder sb = new StringBuilder("SPECS-");
+            for (int i = 0; i < 5; i++) sb.append(RC_ALPHABET.charAt(RC_RNG.nextInt(RC_ALPHABET.length())));
+            code = sb.toString();
+        } while (leads.existsByReferralCode(code));
+        lead.setReferralCode(code);
+        leads.save(lead);
+        return code;
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Lead> byReferralCode(String code) {
+        return code == null || code.isBlank() ? Optional.empty()
+                : leads.findByReferralCode(code.trim().toUpperCase(java.util.Locale.ROOT));
+    }
+
+    @Transactional
+    public void addPoints(UUID leadId, int delta) {
+        Lead lead = get(leadId);
+        lead.setPoints(Math.max(0, lead.getPoints() + delta));
+        leads.save(lead);
     }
 
     /**

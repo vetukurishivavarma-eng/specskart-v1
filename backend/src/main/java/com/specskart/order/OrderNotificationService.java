@@ -48,9 +48,18 @@ public class OrderNotificationService {
         String track = props.frontendBaseUrl() + "/order/" + order.getOrderNo();
         String items = itemLine(order);
 
+        String rewards = "";
+        if (order.getPointsEarned() > 0) {
+            rewards = "\n\n⭐ You earned " + order.getPointsEarned() + " points (balance: " + lead.getPoints() + ").";
+        }
+        if (lead.getReferralCode() != null) {
+            rewards += "\nShare code *" + lead.getReferralCode() + "* — your friend gets a discount, you get points.";
+        }
+
         String msg = switch (status) {
             case PAID -> "Thanks" + hi + "! Payment received ✅\n\nOrder " + order.getOrderNo() + "\n" + items
                     + "\nTotal " + money(order.getTotalMinor(), order.getCurrency())
+                    + rewards
                     + "\n\nWe're preparing your frames. Track your order any time:\n" + track;
             case PACKED -> "Good news" + hi + " — order " + order.getOrderNo() + " is packed and ready for dispatch 📦\n" + track;
             case SHIPPED -> "On its way 🛵\nOrder " + order.getOrderNo() + " has been handed to the courier — "

@@ -36,15 +36,20 @@ public class CartService {
     private final ProductImageRepository images;
     private final PromoCodeRepository promos;
     private final StoreConfigRepository storeConfig;
+    private final com.specskart.lead.LeadRepository leads;
+    private final com.specskart.config.AppProperties props;
 
     public CartService(CartRepository carts, CartItemRepository items, ProductRepository products,
-                       ProductImageRepository images, PromoCodeRepository promos, StoreConfigRepository storeConfig) {
+                       ProductImageRepository images, PromoCodeRepository promos, StoreConfigRepository storeConfig,
+                       com.specskart.lead.LeadRepository leads, com.specskart.config.AppProperties props) {
         this.carts = carts;
         this.items = items;
         this.products = products;
         this.images = images;
         this.promos = promos;
         this.storeConfig = storeConfig;
+        this.leads = leads;
+        this.props = props;
     }
 
     @Transactional
@@ -196,8 +201,11 @@ public class CartService {
         StoreConfig sc = storeConfig.current();
         long shipping = out.isEmpty() ? 0 : sc.shippingFor(subtotal - discount);
         long total = Math.max(0, subtotal - discount) + shipping;
+        int points = cart.getLeadId() == null ? 0
+                : leads.findById(cart.getLeadId()).map(com.specskart.lead.Lead::getPoints).orElse(0);
         return new OrderDtos.CartView(cart.getToken(), out, promoCode, subtotal, discount, shipping, total,
-                sc.getCurrency(), sc.getDeliveryEta(), earliestHold);
+                sc.getCurrency(), sc.getDeliveryEta(), earliestHold,
+                points, props.loyalty().pointValueMinor());
     }
 
     long subtotal(Cart cart) {

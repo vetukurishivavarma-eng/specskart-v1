@@ -40,13 +40,14 @@ public class CheckoutService {
     private final OrderNotificationService notifications;
     private final AnalyticsService analytics;
     private final LeadService leadService;
+    private final LoyaltyService loyalty;
     private final AppProperties props;
 
     public CheckoutService(CartRepository carts, CartItemRepository cartItems, OrderRepository orders,
                            OrderItemRepository orderItems, OrderEventRepository orderEvents,
                            ProductRepository products, PromoCodeRepository promos, PaymentProvider payments,
                            CartService cartService, OrderNotificationService notifications,
-                           AnalyticsService analytics, LeadService leadService,
+                           AnalyticsService analytics, LeadService leadService, LoyaltyService loyalty,
                            AppProperties props) {
         this.carts = carts;
         this.cartItems = cartItems;
@@ -60,6 +61,7 @@ public class CheckoutService {
         this.notifications = notifications;
         this.analytics = analytics;
         this.leadService = leadService;
+        this.loyalty = loyalty;
         this.props = props;
     }
 
@@ -103,6 +105,15 @@ public class CheckoutService {
             leadId = l != null ? l.getId() : null;
         }
 
+        // referral discount + points redemption (both eat into subtotal-minus-promo; points
+        // are decremented now and restored if the order is cancelled)
+        long afterPromo = Math.max(0, subtotal - view.discountMinor());
+        LoyaltyService.CheckoutOutcome lo = leadId == null
+                ? new LoyaltyService.CheckoutOutcome(0, 0, null, null)
+                : loyalty.applyAtCheckout(leadId, afterPromo, req.redeemPoints(), req.referralCode());
+        long discountMinor = view.discountMinor() + lo.discountMinor();
+        long total = Math.max(0, subtotal - discountMinor) + view.shippingMinor();
+
         Order order = new Order();
         order.setOrderNo(freshOrderNo());
         order.setLeadId(leadId);
@@ -113,12 +124,14 @@ public class CheckoutService {
         order.setShipAddress(req.shipAddress().trim());
         order.setShipCity(req.shipCity().trim());
         order.setSubtotalMinor(subtotal);
-        order.setDiscountMinor(view.discountMinor());
+        order.setDiscountMinor(discountMinor);
         order.setShippingMinor(view.shippingMinor());
-        order.setTotalMinor(view.totalMinor());
+        order.setTotalMinor(total);
         order.setCurrency(view.currency());
         order.setPromoCode(view.promoCode());
         order.setPaymentProvider(payments.name());
+        order.setReferredByLeadId(lo.referrerLeadId());
+        order.setPointsRedeemed(lo.pointsRedeemed());
         orders.save(order);
 
         for (CartItem ci : lines) {
@@ -182,6 +195,8 @@ public class CheckoutService {
             analytics.record(LeadEventType.ORDER_PAID, order.getLeadId(), null);
             analytics.record(LeadEventType.LEAD_CONVERTED, order.getLeadId(), null);
             leadService.advanceStatusSoft(order.getLeadId(), LeadStatus.CONVERTED);
+            loyalty.onOrderPaid(order);
+            orders.save(order);
         }
         notifications.onStatus(order, OrderStatus.PAID);
     }
@@ -195,6 +210,7 @@ public class CheckoutService {
                     "Can't move " + order.getStatus() + " → " + target + ".");
         }
         if (target.releasesStock()) restock(order);
+        if (target == OrderStatus.CANCELLED || target == OrderStatus.REFUNDED) loyalty.onOrderReversed(order);
         order.setStatus(target);
         orders.save(order);
         event(order, target, note);

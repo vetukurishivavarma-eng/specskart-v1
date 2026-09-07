@@ -44,6 +44,12 @@ specskart:
   promo:
     face-analysis-percent: ${PROMO_FACE_ANALYSIS_PERCENT:10}
     face-analysis-hours: ${PROMO_FACE_ANALYSIS_HOURS:48}
+  loyalty:
+    points-per-kwacha: ${LOYALTY_POINTS_PER_KWACHA:1}   # 1 point per K1 spent
+    point-value-minor: ${LOYALTY_POINT_VALUE_MINOR:10}  # 1 point = K0.10 off
+    referral-friend-percent: ${LOYALTY_REFERRAL_FRIEND_PERCENT:10}
+    referral-reward-points: ${LOYALTY_REFERRAL_REWARD_POINTS:200}
+    min-redeem-points: ${LOYALTY_MIN_REDEEM_POINTS:100}
   whatsapp:
     provider: ${WHATSAPP_PROVIDER:mock}
     phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}

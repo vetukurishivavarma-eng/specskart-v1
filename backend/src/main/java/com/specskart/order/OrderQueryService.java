@@ -1,5 +1,7 @@
 package com.specskart.order;
 
+import com.specskart.lead.Lead;
+import com.specskart.lead.LeadRepository;
 import com.specskart.shared.ApiException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,11 +15,14 @@ public class OrderQueryService {
     private final OrderRepository orders;
     private final OrderItemRepository items;
     private final OrderEventRepository events;
+    private final LeadRepository leads;
 
-    public OrderQueryService(OrderRepository orders, OrderItemRepository items, OrderEventRepository events) {
+    public OrderQueryService(OrderRepository orders, OrderItemRepository items, OrderEventRepository events,
+                             LeadRepository leads) {
         this.orders = orders;
         this.items = items;
         this.events = events;
+        this.leads = leads;
     }
 
     @Transactional(readOnly = true)
@@ -48,9 +53,13 @@ public class OrderQueryService {
                         i.getUnitPriceMinor(), i.lineTotalMinor())).toList();
         List<OrderDtos.StatusEvent> timeline = events.findByOrderIdOrderByCreatedAtAsc(o.getId()).stream()
                 .map(e -> new OrderDtos.StatusEvent(e.getStatus().name(), e.getNote(), e.getCreatedAt())).toList();
+        Lead lead = o.getLeadId() == null ? null : leads.findById(o.getLeadId()).orElse(null);
+        int balance = lead == null ? 0 : lead.getPoints();
+        String referralCode = lead == null ? null : lead.getReferralCode();
         return new OrderDtos.OrderView(o.getOrderNo(), o.getStatus().name(), o.getCustomerName(), o.getCustomerPhone(),
                 o.getCustomerEmail(), o.getShipAddress(), o.getShipCity(),
                 o.getSubtotalMinor(), o.getDiscountMinor(), o.getShippingMinor(), o.getTotalMinor(),
-                o.getCurrency(), o.getPromoCode(), o.getPaidAt(), o.getCreatedAt(), lines, timeline);
+                o.getCurrency(), o.getPromoCode(), o.getPaidAt(), o.getCreatedAt(), lines, timeline,
+                o.getPointsEarned(), o.getPointsRedeemed(), balance, referralCode);
     }
 }

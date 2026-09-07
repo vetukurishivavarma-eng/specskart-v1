@@ -75,7 +75,7 @@ class CommerceFlowTest {
         assertThat(withPromo.holdExpiresAt()).isAfter(Instant.now());
 
         var result = checkout.start(token, new OrderDtos.CheckoutRequest(
-                "Test Buyer", "260970000001", null, "12 Kabulonga Rd", "Lusaka"));
+                "Test Buyer", "260970000001", null, "12 Kabulonga Rd", "Lusaka", null, null));
         assertThat(result.checkoutUrl()).contains("mockPaid=1");
         assertThat(stock(p.getId())).isEqualTo(2);              // no double decrement at checkout
         assertThat(promos.findByCodeIgnoreCase(promo.getCode()).orElseThrow().getRedeemedCount()).isEqualTo(1);
@@ -136,7 +136,7 @@ class CommerceFlowTest {
         Product p = frame(400, 3);
         var cart = carts.addItem(null, p.getId(), 1);
         var result = checkout.start(cart.token(), new OrderDtos.CheckoutRequest(
-                "Grace Banda", "260971234567", null, "5 Great East Rd", "Lusaka"));
+                "Grace Banda", "260971234567", null, "5 Great East Rd", "Lusaka", null, null));
 
         var lead = leads.findByWhatsappWaId("260971234567").orElseThrow();
         assertThat(lead.getName()).isEqualTo("Grace Banda");
@@ -174,7 +174,7 @@ class CommerceFlowTest {
         var cart = carts.addItem(null, p.getId(), 3);
         assertThat(stock(p.getId())).isEqualTo(1);
         var result = checkout.start(cart.token(), new OrderDtos.CheckoutRequest(
-                "Cancel Me", "260970000002", null, "1 Test Ave", "Ndola"));
+                "Cancel Me", "260970000002", null, "1 Test Ave", "Ndola", null, null));
         checkout.updateStatus(orderIdOf(result.orderNo()), OrderStatus.CANCELLED, "changed mind");
         assertThat(stock(p.getId())).isEqualTo(4);
     }

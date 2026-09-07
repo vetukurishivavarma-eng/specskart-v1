@@ -91,6 +91,7 @@ export type CartView = {
   token: string; lines: CartLine[]; promoCode: string | null
   subtotalMinor: number; discountMinor: number; shippingMinor: number; totalMinor: number
   currency: string; deliveryEta: string; holdExpiresAt: string | null
+  pointsAvailable: number; pointValueMinor: number
 }
 
 export type OrderView = {
@@ -100,6 +101,7 @@ export type OrderView = {
   promoCode: string | null; paidAt: string | null; createdAt: string
   lines: { productName: string; productSlug: string | null; qty: number; unitPriceMinor: number; lineTotalMinor: number }[]
   timeline: { status: string; note: string | null; at: string }[]
+  pointsEarned: number; pointsRedeemed: number; pointsBalance: number; referralCode: string | null
 }
 
 async function cartCall<T = CartView>(path: string, opts: RequestInit = {}): Promise<T> {
@@ -127,7 +129,7 @@ export const shop = {
   applyPromo: (code: string) =>
     cartCall('/public/cart/promo', { method: 'POST', body: JSON.stringify({ code }) }),
 
-  checkout: (body: Record<string, string>) =>
+  checkout: (body: Record<string, string | number | undefined>) =>
     cartCall<{ orderNo: string; checkoutUrl: string; totalMinor: number; currency: string }>(
       `/public/checkout${sParam()}`, { method: 'POST', body: JSON.stringify(body) }),
   order: (orderNo: string) => api<OrderView>(`/public/orders/${orderNo}`),
