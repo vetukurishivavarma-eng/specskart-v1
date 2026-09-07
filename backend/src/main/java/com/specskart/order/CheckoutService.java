@@ -95,9 +95,17 @@ public class CheckoutService {
             subtotal += ci.lineTotalMinor();
         }
 
+        // Every order gets a lead so confirmation + status WhatsApps have a recipient and the
+        // buyer shows in the CRM. A website buyer is matched/created by phone number.
+        UUID leadId = cart.getLeadId();
+        if (leadId == null) {
+            var l = leadService.onWebOrder(req.customerPhone(), req.customerName());
+            leadId = l != null ? l.getId() : null;
+        }
+
         Order order = new Order();
         order.setOrderNo(freshOrderNo());
-        order.setLeadId(cart.getLeadId());
+        order.setLeadId(leadId);
         order.setStatus(OrderStatus.PENDING_PAYMENT);
         order.setCustomerName(req.customerName().trim());
         order.setCustomerPhone(req.customerPhone().trim());

@@ -85,6 +85,32 @@ public class LeadService {
         return lead;
     }
 
+    /**
+     * Find-or-create a lead from a website checkout. Keys on the phone number (digits only,
+     * which is also the WhatsApp id shape) so a later "Hi" on WhatsApp and this order land on
+     * the same lead. Returns null only if the phone is unusable.
+     */
+    @Transactional
+    public Lead onWebOrder(String phone, String name) {
+        String digits = phone == null ? "" : phone.replaceAll("\\D", "");
+        if (digits.length() < 8) return null;
+        Lead lead = leads.findByWhatsappWaId(digits)
+                .or(() -> leads.findByWhatsappNumber(phone))
+                .or(() -> leads.findByWhatsappNumber(digits))
+                .orElse(null);
+        if (lead == null) {
+            lead = new Lead();
+            lead.setWhatsappWaId(digits);
+            lead.setWhatsappNumber(phone);
+            lead.setName(name);
+            lead.setAcquisitionSource(AcquisitionSource.WEBSITE);
+            lead.setFirstContactAt(Instant.now());
+        }
+        lead.setLastContactAt(Instant.now());
+        if ((lead.getName() == null || lead.getName().isBlank()) && name != null) lead.setName(name);
+        return leads.save(lead);
+    }
+
     private void applyAttribution(Lead lead, AttributionContext ctx) {
         lead.setAcquisitionSource(ctx.source);
         lead.setAdId(ctx.adId);

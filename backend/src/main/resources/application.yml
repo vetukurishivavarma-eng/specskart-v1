@@ -53,6 +53,9 @@ specskart:
     # {{1}} = lead first name, {{2}} = store name. Leave blank to disable the follow-up action.
     follow-up-template: ${WHATSAPP_FOLLOW_UP_TEMPLATE:}
     follow-up-template-lang: ${WHATSAPP_FOLLOW_UP_TEMPLATE_LANG:en}
+    # Approved marketing template for the post-delivery message; {{1}}=first name, {{2}}=promo code.
+    # Without it the job still sends a plain message (delivered only if the 24h window is open).
+    post-purchase-template: ${WHATSAPP_POST_PURCHASE_TEMPLATE:}
   payments:
     provider: ${PAYMENTS_PROVIDER:mock}   # mock | flutterwave
     flutterwave:

@@ -50,4 +50,7 @@ public class Order extends BaseEntity {
     private String paymentProvider;
     private String paymentRef;
     private Instant paidAt;
+
+    /** When the post-purchase "thanks + come back" WhatsApp went out. */
+    private Instant followedUpAt;
 }

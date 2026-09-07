@@ -75,7 +75,16 @@ carts, cart_items, orders, order_items, order_events, store_config). Money = min
   return page) + `FlutterwaveProvider` (`PAYMENTS_PROVIDER=flutterwave`, `FLW_SECRET_KEY`,
   `FLW_SECRET_HASH`). Webhook `/api/webhooks/payment` (verif-hash checked, then API-verified).
 - **Order lifecycle**: PENDING_PAYMENT→PAID→PACKED→SHIPPED→DELIVERED (+CANCELLED/REFUNDED);
-  every transition emits an OrderEvent + an automatic WhatsApp message. CANCELLED restocks.
+  every transition emits an OrderEvent + an automatic **personalised** WhatsApp message
+  (buyer's first name + item list on the PAID confirmation, tracker link on each). CANCELLED restocks.
+- **Every order is tied to a lead:** funnel buyers already are (cart `?s=`), a website buyer is
+  found-or-created by phone (`LeadService.onWebOrder`, digits = the WhatsApp-id shape so a later
+  "Hi" merges) — so confirmations always have a recipient and the buyer appears in the CRM.
+- **Post-purchase (`PostPurchaseJob`, @Scheduled hourly, V6__order_follow_up.sql):** 3 days after
+  DELIVERED, one message per order — thanks by name + tracker link + an auto-issue discount code
+  + a lead-linked shop link. Uses `WHATSAPP_POST_PURCHASE_TEMPLATE` if set (works outside the
+  24h window); else a plain message (delivered only while the service window is open).
+  `orders.followed_up_at` guards against repeats.
 - **Inventory holds (movie-ticket model, V4__stock_holds.sql):** `products.stock_qty` = "available
   right now". Add-to-cart does an **atomic** `UPDATE ... WHERE stock_qty >= :n` (`ProductRepository.reserve`,
   returns rows-affected) and stamps `cart_items.held_until = now + 15min`. Cart view/edit renews the

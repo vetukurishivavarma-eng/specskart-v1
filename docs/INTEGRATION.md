@@ -376,7 +376,8 @@ retroactively link it in Phase 1.
 | `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | `dev-verify-token` | must match Meta |
 | `WHATSAPP_GRAPH_BASE_URL` | `https://graph.facebook.com/v21.0` | Graph API version |
 | `WHATSAPP_FOLLOW_UP_TEMPLATE` | — (disabled) | approved template for agent re‑engagement outside 24 h (§5a) |
-| `WHATSAPP_FOLLOW_UP_TEMPLATE_LANG` | `en` | that template's language code |
+| `WHATSAPP_FOLLOW_UP_TEMPLATE_LANG` | `en` | template language code (shared by follow-up + post-purchase) |
+| `WHATSAPP_POST_PURCHASE_TEMPLATE` | — | approved marketing template for the 3-day-post-delivery message ({{1}}=name, {{2}}=promo code); without it a plain message is sent (delivered only inside the 24h window) |
 | `PAYMENTS_PROVIDER` | `mock` | `flutterwave` for real card + mobile‑money checkout |
 | `FLW_SECRET_KEY` | — | Flutterwave secret key (Dashboard → Settings → API) |
 | `FLW_SECRET_HASH` | — | Flutterwave webhook "secret hash" — set the same value in the FLW webhook settings |

@@ -4,6 +4,9 @@ import com.specskart.catalog.Product;
 import com.specskart.catalog.ProductRepository;
 import com.specskart.catalog.PromoCode;
 import com.specskart.catalog.PromoCodeRepository;
+import com.specskart.lead.LeadRepository;
+import com.specskart.whatsapp.MockWhatsAppProvider;
+import com.specskart.whatsapp.WhatsAppProvider;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -27,6 +30,10 @@ class CommerceFlowTest {
     @Autowired OrderRepository orders;
     @Autowired CartItemRepository cartItems;
     @Autowired StockHoldJob holdJob;
+    @Autowired PostPurchaseJob postPurchaseJob;
+    @Autowired LeadRepository leads;
+    @Autowired WhatsAppProvider whatsapp;
+    @jakarta.persistence.PersistenceContext jakarta.persistence.EntityManager em;
 
     private Product frame(int priceKwacha, int stock) {
         Product p = new Product();
@@ -121,6 +128,44 @@ class CommerceFlowTest {
         holdJob.releaseExpired();
         assertThat(stock(p.getId())).isEqualTo(1);
         assertThat(cartItems.findByCartId(carts.getOrCreate(cart.token()).getId())).isEmpty();
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional
+    void webOrderLinksALeadAndSendsWhatsAppUpdates() {
+        Product p = frame(400, 3);
+        var cart = carts.addItem(null, p.getId(), 1);
+        var result = checkout.start(cart.token(), new OrderDtos.CheckoutRequest(
+                "Grace Banda", "260971234567", null, "5 Great East Rd", "Lusaka"));
+
+        var lead = leads.findByWhatsappWaId("260971234567").orElseThrow();
+        assertThat(lead.getName()).isEqualTo("Grace Banda");
+
+        var mock = (MockWhatsAppProvider) whatsapp;
+        int before = mock.outbox().size();
+        checkout.confirmPayment(result.orderNo());
+        var paidMsg = mock.outbox().subList(before, mock.outbox().size()).stream()
+                .filter(s -> s.text() != null && s.text().contains(result.orderNo())).findFirst().orElseThrow();
+        assertThat(paidMsg.text()).contains("Grace").contains("Payment received");
+
+        var orderId = orderIdOf(result.orderNo());
+        checkout.updateStatus(orderId, OrderStatus.PACKED, null);
+        checkout.updateStatus(orderId, OrderStatus.SHIPPED, null);
+        checkout.updateStatus(orderId, OrderStatus.DELIVERED, null);
+
+        // backdate the DELIVERED event so the post-purchase job (3-day delay) picks it up
+        em.createQuery("update OrderEvent e set e.createdAt = :t where e.orderId = :o and e.status = :s")
+                .setParameter("t", java.time.Instant.now().minus(4, java.time.temporal.ChronoUnit.DAYS))
+                .setParameter("o", orderId)
+                .setParameter("s", OrderStatus.DELIVERED)
+                .executeUpdate();
+        em.flush();
+        em.clear();
+        int b2 = mock.outbox().size();
+        postPurchaseJob.run();
+        assertThat(mock.outbox().subList(b2, mock.outbox().size()))
+                .anyMatch(s -> s.text() != null && s.text().toLowerCase().contains("hope you"));
+        assertThat(orders.findById(orderId).orElseThrow().getFollowedUpAt()).isNotNull();
     }
 
     @Test
