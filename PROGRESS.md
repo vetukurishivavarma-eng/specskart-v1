@@ -155,6 +155,24 @@ carts, cart_items, orders, order_items, order_events, store_config). Money = min
   shareable result card, social proof, bundles, back-in-stock alerts, prescription-lens flow.
 - Physical fulfilment (pick/pack/courier hand-off) stays a back-office human step.
 
+### 2026-09-08 — frontend polish (committed)
+- **vite dev optimizer no longer hangs on mediapipe**: `optimizeDeps.include: ['@mediapipe/tasks-vision']`
+  in vite.config.ts forces it to pre-bundle at startup instead of discovering it mid-session
+  (that discovery caused the "bundling dependencies…" stall + ~14s reload loop).
+- **White flash on light↔dark route swap reduced**: Google Fonts moved from a render-blocking
+  `@import` in index.css to `<link rel="preconnect"/stylesheet">` in index.html; `html { background:#f6f3ee }`
+  inline so a torn-down layout never shows the browser's white default. `color-scheme: light`.
+- tsc -b clean, `vite build` clean (520 kB / 154 kB gzip). No backend change.
+
+**PAUSED mid-task (2026-09-08): "order-placed staff notification" + `followUpAt` date reminders.**
+User asked for a staff notification when an order is placed — NOT STARTED beyond investigation.
+Plan: add `specskart.staff.whatsapp-numbers` (List<String>) to AppProperties.WhatsApp or a new
+`Staff` record; in `OrderNotificationService` add `notifyStaffNewOrder(order)` called from the PAID
+branch of `onStatus` (or from CheckoutService right after `notifications.onStatus(order, PAID)`);
+message = "🛍️ New paid order ORD-XXX · items · total · customer · <admin order URL>"; loop configured
+numbers via `whatsapp.sendText`, skip if none set, don't log to a lead thread. `followUpAt` reminder
+work (Lead field + V14 migration + set/clear endpoint + real dashboard "due" count) also not started.
+
 ### Still open for the actual ad
 - FB Page (Ads Manager needs one).
 - Create the CTWA ad + a CRM Campaign whose **External ID = the FB Ad ID** — §7–§8.
