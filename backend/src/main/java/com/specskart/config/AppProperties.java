@@ -47,7 +47,13 @@ public record AppProperties(
     public record Face(boolean retainImages) {}
     public record WhatsApp(String provider, String phoneNumberId, String businessAccountId,
                            String accessToken, String webhookVerifyToken, String appSecret, String graphBaseUrl,
-                           String followUpTemplate, String followUpTemplateLang, String postPurchaseTemplate) {
+                           String followUpTemplate, String followUpTemplateLang, String postPurchaseTemplate,
+                           /** WhatsApp numbers that get a plain alert when a new order is paid. Comma-separated env var; blank = off. */
+                           List<String> staffNumbers) {
+
+        public List<String> staffNumbers() {
+            return staffNumbers == null ? List.of() : staffNumbers;
+        }
 
         /** True when a re-engagement template is configured for agent-initiated follow-ups. */
         public boolean followUpConfigured() {

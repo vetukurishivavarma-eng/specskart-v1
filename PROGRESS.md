@@ -164,14 +164,26 @@ carts, cart_items, orders, order_items, order_events, store_config). Money = min
   inline so a torn-down layout never shows the browser's white default. `color-scheme: light`.
 - tsc -b clean, `vite build` clean (520 kB / 154 kB gzip). No backend change.
 
-**PAUSED mid-task (2026-09-08): "order-placed staff notification" + `followUpAt` date reminders.**
-User asked for a staff notification when an order is placed — NOT STARTED beyond investigation.
-Plan: add `specskart.staff.whatsapp-numbers` (List<String>) to AppProperties.WhatsApp or a new
-`Staff` record; in `OrderNotificationService` add `notifyStaffNewOrder(order)` called from the PAID
-branch of `onStatus` (or from CheckoutService right after `notifications.onStatus(order, PAID)`);
-message = "🛍️ New paid order ORD-XXX · items · total · customer · <admin order URL>"; loop configured
-numbers via `whatsapp.sendText`, skip if none set, don't log to a lead thread. `followUpAt` reminder
-work (Lead field + V14 migration + set/clear endpoint + real dashboard "due" count) also not started.
+### 2026-09-09 — order alerts + AR try-on accuracy + upgrade plan (committed)
+- **Staff order alert.** `WHATSAPP_STAFF_NUMBERS` (comma-separated env var, blank = off) → every
+  listed number gets a plain WhatsApp when an order is paid: order no, items, total, customer,
+  `/admin/orders/{id}` link. `AppProperties.WhatsApp.staffNumbers` (List<String>),
+  `OrderNotificationService.notifyNewOrder`, called from `CheckoutService.confirmPayment` after the
+  customer message. `StaffOrderAlertTest` green.
+- **Customer status updates: already complete** — `updateStatus` → `onStatus` sends a personalised
+  WhatsApp on every transition. No change.
+- **AR try-on accuracy rewrite** (`lib/tryOn.ts`): width from the temple silhouette (234/454) not a
+  magic eye-span multiple; centred on the nose bridge (168) which carries yaw/pitch; roll from
+  4-point eye centres; new `smoothPlacement` EMA. `useFaceLandmarker().track` = non-throwing
+  single detection for a loop. **`TryOn.tsx` is now a live camera overlay** (~8 fps) with
+  "Freeze this look" to compare/share; frame strip works live and frozen. `TRY_ON_TUNING` still
+  the one knob but defaults are anatomy-derived. Real-device pass = polish, not a blocker.
+  Backend 46 green, frontend 17 green, both builds clean.
+- **`docs/UPGRADE_PLAN.md`** — full review of chat-interaction upgrades (track-order intent, list
+  messages, in-chat cart, human handoff), web UX changes, feature backlog, and the ops/security
+  debt, ordered by value. Read that for what's next.
+- Still not started: `followUpAt` date reminders (Lead field + V14 + endpoint + real dashboard
+  "due" count).
 
 ### Still open for the actual ad
 - FB Page (Ads Manager needs one).

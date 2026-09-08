@@ -203,6 +203,7 @@ public class CheckoutService {
             orders.save(order);
         }
         notifications.onStatus(order, OrderStatus.PAID);
+        notifications.notifyNewOrder(order);
     }
 
     @Transactional

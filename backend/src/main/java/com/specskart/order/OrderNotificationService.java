@@ -73,6 +73,35 @@ public class OrderNotificationService {
         send(order.getLeadId(), waId, msg, "order-" + status.name().toLowerCase());
     }
 
+    /**
+     * A plain WhatsApp to every configured staff number the moment an order is
+     * paid — the one back-office cue that a box needs packing. Best-effort: a
+     * number that fails is logged and the rest still go. Not recorded on any
+     * lead thread; the recipients aren't leads.
+     */
+    public void notifyNewOrder(Order order) {
+        List<String> staff = props.whatsapp().staffNumbers();
+        if (staff.isEmpty()) return;
+
+        String who = order.getCustomerName() != null && !order.getCustomerName().isBlank()
+                ? order.getCustomerName() : "Guest";
+        String phone = order.getCustomerPhone() != null ? " · " + order.getCustomerPhone() : "";
+        String msg = "🛍️ New order " + order.getOrderNo() + " — "
+                + money(order.getTotalMinor(), order.getCurrency()) + "\n"
+                + itemLine(order) + "\n" + who + phone
+                + "\n\nPack & dispatch: " + props.frontendBaseUrl() + "/admin/orders/" + order.getId();
+
+        for (String to : staff) {
+            String number = to.trim();
+            if (number.isEmpty()) continue;
+            try {
+                whatsapp.sendText(number, msg);
+            } catch (Exception e) {
+                log.warn("staff new-order alert to {} failed for {}: {}", number, order.getOrderNo(), e.getMessage());
+            }
+        }
+    }
+
     void send(java.util.UUID leadId, String waId, String text, String logKey) {
         try {
             whatsapp.sendText(waId, text);

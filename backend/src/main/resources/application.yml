@@ -69,6 +69,9 @@ specskart:
     # Approved marketing template for the post-delivery message; {{1}}=first name, {{2}}=promo code.
     # Without it the job still sends a plain message (delivered only if the 24h window is open).
     post-purchase-template: ${WHATSAPP_POST_PURCHASE_TEMPLATE:}
+    # WhatsApp numbers alerted when a new order is paid (so someone starts packing).
+    # Comma-separated, e.g. +260972809599,+260971234567. Blank = no alerts.
+    staff-numbers: ${WHATSAPP_STAFF_NUMBERS:}
   payments:
     provider: ${PAYMENTS_PROVIDER:mock}   # mock | flutterwave
     flutterwave:

@@ -378,6 +378,7 @@ retroactively link it in Phase 1.
 | `WHATSAPP_FOLLOW_UP_TEMPLATE` | — (disabled) | approved template for agent re‑engagement outside 24 h (§5a) |
 | `WHATSAPP_FOLLOW_UP_TEMPLATE_LANG` | `en` | template language code (shared by follow-up + post-purchase) |
 | `WHATSAPP_POST_PURCHASE_TEMPLATE` | — | approved marketing template for the 3-day-post-delivery message ({{1}}=name, {{2}}=promo code); without it a plain message is sent (delivered only inside the 24h window) |
+| `WHATSAPP_STAFF_NUMBERS` | — (off) | comma-separated WhatsApp numbers alerted the moment an order is paid, e.g. `+260972809599,+260971234567` — the cue to start packing. Customers already get a WhatsApp on every status change; this is the staff side. |
 | `PAYMENTS_PROVIDER` | `mock` | `flutterwave` for real card + mobile‑money checkout |
 | `FLW_SECRET_KEY` | — | Flutterwave secret key (Dashboard → Settings → API) |
 | `FLW_SECRET_HASH` | — | Flutterwave webhook "secret hash" — set the same value in the FLW webhook settings |
