@@ -77,13 +77,16 @@ export function buildTexturedFrame(texture: THREE.Texture, aspect: number): THRE
   const group = new THREE.Group()
   const W = 13.8                       // typical adult frame-front width in cm
   const H = W / Math.max(0.2, aspect)
-  const CURVE = 1.7                     // how far the outer edges bend back toward the ears (cm)
+  const CURVE_X = 2.0                   // outer edges wrap back toward the ears (cm); keep < offsetForward
+  const CURVE_Y = 0.6                   // slight forward bow top & bottom
 
-  const geo = new THREE.PlaneGeometry(W, H, 24, 1)
+  const geo = new THREE.PlaneGeometry(W, H, 32, 6)
   const pos = geo.attributes.position
   for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i)
-    pos.setZ(i, -CURVE * (x / (W / 2)) ** 2)
+    const x = pos.getX(i), y = pos.getY(i)
+    const zx = -CURVE_X * (x / (W / 2)) ** 2
+    const zy = CURVE_Y * (1 - (y / (H / 2)) ** 2)
+    pos.setZ(i, zx + zy)
   }
   geo.computeVertexNormals()
 

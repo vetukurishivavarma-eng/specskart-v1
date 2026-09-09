@@ -12,6 +12,15 @@ export type FrameSpec = { colour?: string | null; tryOnImageUrl?: string | null 
 
 type Opts = { onFace?: (visible: boolean) => void; tuning?: Partial<TryOn3DTuning> }
 
+type LM = { x: number; y: number; z: number }
+
+// MediaPipe face-mesh outline (ordered ring, 36 points closing back to 10).
+const FACE_OVAL = [
+  10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379,
+  378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127,
+  162, 21, 54, 103, 67, 109,
+]
+
 /**
  * Live 3D try-on: MediaPipe Face Landmarker (VIDEO mode, head-pose matrix on)
  * drives a Three.js glasses mesh rendered on a transparent canvas over the
@@ -24,6 +33,7 @@ export class TryOnScene {
   private camera: THREE.PerspectiveCamera
   private frame: THREE.Object3D
   private frameToken = 0
+  private occluder: THREE.Mesh
   private landmarker: FaceLandmarker | null = null
   private raf = 0
   private running = false
@@ -57,6 +67,46 @@ export class TryOnScene {
     this.scene.add(key)
 
     this.frame = this.mount(buildGlasses())
+
+    // Invisible depth-only face patch: written to the depth buffer before the
+    // frame so the temple arms (which sit behind the face plane) get hidden by
+    // the cheeks and ears instead of floating on top — the thing that otherwise
+    // makes it read as a flat sticker.
+    const occGeo = new THREE.BufferGeometry()
+    occGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array((FACE_OVAL.length + 1) * 3), 3))
+    const idx: number[] = []
+    for (let i = 0; i < FACE_OVAL.length; i++) idx.push(0, i + 1, ((i + 1) % FACE_OVAL.length) + 1)
+    occGeo.setIndex(idx)
+    this.occluder = new THREE.Mesh(occGeo, new THREE.MeshBasicMaterial({ colorWrite: false }))
+    this.occluder.renderOrder = -1
+    this.occluder.frustumCulled = false
+    this.occluder.visible = false
+    this.scene.add(this.occluder)
+  }
+
+  /** Rebuild the occluder patch from the live face outline, unprojected to face depth. */
+  private updateOccluder(lms: LM[]) {
+    const cam = this.camera
+    const dist = Math.hypot(this.frame.matrix.elements[12], this.frame.matrix.elements[13], this.frame.matrix.elements[14]) || 40
+    const pos = this.occluder.geometry.attributes.position as THREE.BufferAttribute
+    const p = new THREE.Vector3()
+    let cx = 0, cy = 0
+    for (const i of FACE_OVAL) { cx += lms[i].x; cy += lms[i].y }
+    cx /= FACE_OVAL.length; cy /= FACE_OVAL.length
+
+    const place = (nx: number, ny: number, slot: number) => {
+      p.set(nx * 2 - 1, -(ny * 2 - 1), 0.5).unproject(cam).normalize().multiplyScalar(dist)
+      pos.setXYZ(slot, p.x, p.y, p.z)
+    }
+    place(cx, cy, 0)
+    for (let k = 0; k < FACE_OVAL.length; k++) {
+      const l = lms[FACE_OVAL[k]]
+      // push the ring slightly outward so temples clearing the ears are still covered
+      place(cx + (l.x - cx) * 1.12, cy + (l.y - cy) * 1.12, k + 1)
+    }
+    pos.needsUpdate = true
+    this.occluder.geometry.computeBoundingSphere()
+    this.occluder.visible = true
   }
 
   /** Make an object the tracked frame: matrix-driven, hidden until a face is seen. */
@@ -185,12 +235,15 @@ export class TryOnScene {
     }
 
     const matrix = res?.facialTransformationMatrixes?.[0]?.data
+    const lms = res?.faceLandmarks?.[0] as LM[] | undefined
     if (matrix && matrix.length === 16) {
       this.frame.matrix.copy(solveGlassesMatrix(Array.from(matrix), this.tuning))
       this.frame.matrixWorldNeedsUpdate = true
+      if (lms) this.updateOccluder(lms)
       if (!this.frame.visible) { this.frame.visible = true; this.onFace(true) }
     } else if (this.frame.visible) {
       this.frame.visible = false
+      this.occluder.visible = false
       this.onFace(false)
     }
     this.render()
