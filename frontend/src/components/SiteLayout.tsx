@@ -1,18 +1,7 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { shop } from '../lib/shop'
+import CartIcon from './CartIcon'
 
 const WA = import.meta.env.VITE_WA_LINK ?? 'https://wa.me/260000000000'
-
-function BagLink() {
-  const { data } = useQuery({ queryKey: ['cart'], queryFn: shop.cart, staleTime: 10_000 })
-  const count = data?.lines.reduce((n, l) => n + l.qty, 0) ?? 0
-  return (
-    <NavLink to="/cart" className={({ isActive }) => isActive ? 'text-ink' : 'text-ink/55 hover:text-ink'}>
-      Bag{count > 0 ? ` (${count})` : ''}
-    </NavLink>
-  )
-}
 
 export default function SiteLayout() {
   return (
@@ -24,9 +13,11 @@ export default function SiteLayout() {
             {[['/how-it-works', 'How it works'], ['/store', 'Store'], ['/contact', 'Contact']].map(([to, label]) => (
               <NavLink key={to} to={to} className={({ isActive }) => isActive ? 'text-ink' : 'text-ink/55 hover:text-ink'}>{label}</NavLink>
             ))}
-            <BagLink />
           </nav>
-          <Link to="/frame-finder" className="btn-primary !px-4 !py-2 text-xs">Find My Frame</Link>
+          <div className="flex items-center gap-2">
+            <CartIcon />
+            <Link to="/frame-finder" className="btn-primary !px-4 !py-2 text-xs">Find My Frame</Link>
+          </div>
         </div>
       </header>
       <main className="flex-1"><Outlet /></main>

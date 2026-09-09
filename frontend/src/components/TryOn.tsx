@@ -157,8 +157,8 @@ export default function TryOn({ frames, onClose }: { frames: TryOnFrame[]; onClo
       <div className="relative flex-1 overflow-hidden">
         {phase === 'noframes' && (
           <Centered>
-            <p className="text-bone/70">Try-on images are still being added for these frames.</p>
-            <button onClick={onClose} className="btn-primary mt-5 !bg-bone !text-ink">Back</button>
+            <p className="text-bone/70">Virtual try-on isn't ready for these frames yet — the cut-out images are still being added.</p>
+            <button onClick={onClose} className="btn-primary mt-5 !bg-bone !text-ink">Keep browsing</button>
           </Centered>
         )}
 

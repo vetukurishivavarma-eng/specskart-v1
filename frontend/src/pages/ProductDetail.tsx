@@ -35,6 +35,7 @@ export default function ProductDetail() {
   const qc = useQueryClient()
   const [img, setImg] = useState(0)
   const [tryOn, setTryOn] = useState(false)
+  const [justAdded, setJustAdded] = useState(false)
 
   const { data: p, isLoading, isError } = useQuery({
     queryKey: ['product', slug],
@@ -43,7 +44,16 @@ export default function ProductDetail() {
 
   const add = useMutation({
     mutationFn: () => shop.addItem(p!.id, 1),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['cart'] }); nav('/cart') },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cart'] })
+      setJustAdded(true)
+      setTimeout(() => setJustAdded(false), 1800)
+    },
+  })
+
+  const buyNow = useMutation({
+    mutationFn: () => shop.addItem(p!.id, 1),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['cart'] }); nav('/checkout') },
   })
 
   const countdown = useCountdown(p?.dropsAt ?? null)
@@ -113,18 +123,36 @@ export default function ProductDetail() {
             <NotifyMe slug={p.slug} label="Notify me" />
           </div>
         ) : (
-          <button
-            disabled={add.isPending}
-            onClick={() => add.mutate()}
-            className="btn-primary mt-7 w-full disabled:cursor-not-allowed disabled:bg-ink/30"
-          >
-            {add.isPending ? 'Adding…' : 'Add to bag'}
-          </button>
+          <div className="mt-7">
+            <div className="relative">
+              {justAdded && (
+                <div className="animate-added-pop pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-moss px-4 py-1.5 text-sm font-medium text-bone shadow-lg">
+                  Added to bag ✓
+                </div>
+              )}
+              <button
+                disabled={add.isPending || buyNow.isPending}
+                onClick={() => add.mutate()}
+                className="btn-primary w-full disabled:cursor-not-allowed disabled:bg-ink/30"
+              >
+                {add.isPending ? 'Adding…' : justAdded ? 'Added ✓' : 'Add to bag'}
+              </button>
+            </div>
+            <button
+              disabled={buyNow.isPending || add.isPending}
+              onClick={() => buyNow.mutate()}
+              className="btn-ghost mt-3 w-full disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {buyNow.isPending ? 'Taking you to checkout…' : 'Buy now'}
+            </button>
+          </div>
         )}
         {p.tryOnImageUrl && !upcoming && (
           <button onClick={() => setTryOn(true)} className="btn-ghost mt-3 w-full">Try it on 👓</button>
         )}
-        {add.isError && <p className="mt-2 text-sm text-clay">{(add.error as Error).message}</p>}
+        {(add.isError || buyNow.isError) && (
+          <p className="mt-2 text-sm text-clay">{((add.error ?? buyNow.error) as Error).message}</p>
+        )}
         <p className="mt-3 text-xs text-ink/45">Fitted with your lenses and delivered across Zambia. Pay by card or mobile money.</p>
       </div>
 

@@ -50,6 +50,7 @@ export default function FrameFinder() {
   const [quizBusy, setQuizBusy] = useState(false)
   const [tryOnFrames, setTryOnFrames] = useState<TryOnFrame[] | null>(null)
   const [tryOnLoading, setTryOnLoading] = useState(false)
+  const [tryOnNote, setTryOnNote] = useState<string | null>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const { analyse, loading: modelLoading } = useFaceLandmarker()
@@ -160,11 +161,18 @@ export default function FrameFinder() {
   async function openTryOn() {
     if (!result) return
     setTryOnLoading(true)
+    setTryOnNote(null)
     try {
       const products = await shop.products({ faceShape: result.faceShape })
-      setTryOnFrames(products.map((p) => ({ slug: p.slug, name: p.name, tryOnImageUrl: p.tryOnImageUrl })))
+      const frames = products.map((p) => ({ slug: p.slug, name: p.name, tryOnImageUrl: p.tryOnImageUrl }))
+      if (!frames.some((f) => f.tryOnImageUrl)) {
+        // No cut-out images uploaded yet — don't open the camera for nothing.
+        setTryOnNote("Virtual try-on isn't ready for these frames yet. Tap “Shop my frames” to see them all.")
+        return
+      }
+      setTryOnFrames(frames)
     } catch {
-      setTryOnFrames([]) // component shows the "no frames" fallback
+      setTryOnNote('Could not load the try-on. Please try again in a moment.')
     } finally {
       setTryOnLoading(false)
     }
@@ -306,6 +314,7 @@ export default function FrameFinder() {
                 disabled={tryOnLoading} onClick={openTryOn}>
                 {tryOnLoading ? 'Loading try-on…' : 'Try them on 👓'}
               </button>
+              {tryOnNote && <p className="text-center text-xs text-bone/60">{tryOnNote}</p>}
               <a href={`/store?face=${result.faceShape}${result.promoCode ? `&promo=${result.promoCode}` : ''}`}
                  className="btn-ghost block w-full !border-bone/25 !text-bone text-center">Shop my frames</a>
               <button className="btn-ghost w-full !border-bone/25 !text-bone" onClick={sendToWhatsApp} disabled={sentToWa}>
