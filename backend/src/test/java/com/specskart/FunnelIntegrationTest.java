@@ -97,6 +97,32 @@ class FunnelIntegrationTest {
     }
 
     @Test
+    void concurrentDeliveriesOfTheSameMessageProcessOnceAndDoNotThrow() throws Exception {
+        var in = new InboundMessage("2609770099", "2609770099", "Race", "Hi", null, "race-msg-1", Map.of());
+        int threads = 6;
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(threads);
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var errors = new java.util.concurrent.CopyOnWriteArrayList<Throwable>();
+        var done = new java.util.concurrent.CountDownLatch(threads);
+        for (int i = 0; i < threads; i++) {
+            pool.submit(() -> {
+                try { start.await(); inbound.process(in); }
+                catch (Throwable t) { errors.add(t); }
+                finally { done.countDown(); }
+            });
+        }
+        start.countDown();
+        assertThat(done.await(20, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        pool.shutdownNow();
+
+        assertThat(errors).as("no delivery should throw").isEmpty();
+        Lead lead = leads.findByWhatsappWaId("2609770099").orElseThrow();
+        long received = events.findByLeadIdOrderByCreatedAtAsc(lead.getId()).stream()
+                .filter(e -> e.getEventType() == LeadEventType.WHATSAPP_MESSAGE_RECEIVED).count();
+        assertThat(received).isEqualTo(1);
+    }
+
+    @Test
     void pressingFindFramesSendsAnOpaqueSessionLinkWithoutThePhoneNumber() {
         inbound.process(new InboundMessage("2609770003", "2609770003", "Finder", null, "FIND_FRAMES", "m3", Map.of()));
         MockWhatsAppProvider mock = (MockWhatsAppProvider) provider;
