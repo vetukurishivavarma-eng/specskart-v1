@@ -1,6 +1,23 @@
 # Specskart v1 — build progress
 
-_Last updated: 2026-09-09. Session: session_01WZE2ADJovex9KwPEsQkhZ6_
+_Last updated: 2026-09-09. Session: session_01LikGxFAD44keaoNy1Mzp7g_
+
+## Session 2026-09-09 b — try-on: lens-front crop + procedural 3D arms
+
+Frontend: tsc + vite build green, 19 vitest green (was 17).
+
+- **Try-on frame model reworked.** The textured frame mapped the *whole* product
+  photo onto one curved plane, so the foreshortened temple stubs in the photo
+  came along and it read as a sticker. Now `buildTexturedFrame` maps only the
+  central lens-front band (`FRAME_MODEL_TUNING.texInsetX`, default 10% off each
+  side, via `texture.repeat.x`/`offset.x` + ClampToEdge) and bolts on real
+  procedural 3D temple arms — extracted `buildTempleArm()` shared with
+  `buildGlasses` — hinged at the front's outer-top, tinted with
+  `colourToHex(product.colour)`. `tryOnScene.setFrame` now threads `spec.colour`
+  into `buildTexturedFrame`. New knobs: `texInsetX`, `templeLenCm`,
+  `templeHingeYFrac`. Tests: 2 new in `glassesModel.test.ts`.
+  **Not device-tested (no camera here).** Next if still not convincing:
+  per-frame 3D models (vendor / commission).
 
 ## Session 2026-09-09 (HEAD `1e7e6bf`, all pushed to `main`, Render auto-deploys web + api)
 

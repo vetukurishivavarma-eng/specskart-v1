@@ -46,6 +46,45 @@ function roundedRect(w: number, h: number, r: number): THREE.Shape {
 
 export type Glasses = THREE.Group & { setColour(hex: number): void }
 
+// ponytail: model-shape tuning for the textured frame — wants a real-device pass.
+// Product photo has splayed temple stubs at its far edges; texInsetX trims that
+// fraction off each side so only the lens-front band is mapped, and real 3D arms
+// are bolted on instead. Arms too short/long -> templeLenCm. Hinge too high/low
+// on the photo -> templeHingeYFrac (fraction of half-height, from centre up).
+export const FRAME_MODEL_TUNING = {
+  texInsetX: 0.1,
+  templeLenCm: 10.5,
+  templeHingeYFrac: 0.55,
+}
+
+/**
+ * One temple arm as a child group positioned at its hinge, so a small toe-in
+ * rotates about the hinge rather than the arm's middle. Shared by the parametric
+ * mesh and the textured frame. Every mesh is tagged `part: 'frame'` so a colour
+ * swap reaches it.
+ */
+function buildTempleArm(sign: number, mat: THREE.Material, hingeX: number, hingeY: number, len: number): THREE.Group {
+  const arm = new THREE.Group()
+  arm.position.set(sign * hingeX, hingeY, 0)
+  arm.rotation.y = sign * 0.09 // toe in toward the head
+
+  const hinge = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.7), mat)
+  hinge.userData.part = 'frame'
+  arm.add(hinge)
+
+  const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.45, len), mat)
+  shaft.position.set(sign * 0.05, -0.1, -len / 2)
+  shaft.userData.part = 'frame'
+  arm.add(shaft)
+
+  const earBend = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.4, 0.4), mat)
+  earBend.position.set(sign * 0.05, -0.75, -len + 0.2)
+  earBend.userData.part = 'frame'
+  arm.add(earBend)
+
+  return arm
+}
+
 /**
  * Load the product's cut-out photo as a texture. Uses an <img> with CORS so the
  * WebGL texture is not tainted (the API sends Access-Control-Allow-Origin for
@@ -69,16 +108,29 @@ export function loadFrameTexture(url: string): Promise<{ texture: THREE.Texture;
 }
 
 /**
- * The actual product frame: its cut-out photo mapped onto a gently face-wrapping
- * curved surface, so it carries the real design while the MediaPipe head matrix
- * gives it true 3D position, rotation and perspective — not a flat 2D paste.
+ * The actual product frame: the *lens-front* band of its cut-out photo mapped
+ * onto a gently face-wrapping curved surface, with real procedural 3D temple
+ * arms bolted on. A front photo's temple stubs are foreshortened and can't
+ * become true arms, so they are cropped out (`texInsetX`) and replaced — that
+ * is what stops the whole thing reading as a flat sticker. Colour tints the
+ * arms (we have no per-frame arm model); the front keeps the real photo.
  */
-export function buildTexturedFrame(texture: THREE.Texture, aspect: number): THREE.Group {
+export function buildTexturedFrame(texture: THREE.Texture, aspect: number, colour?: string | null): THREE.Group {
   const group = new THREE.Group()
-  const W = 13.8                       // typical adult frame-front width in cm
-  const H = W / Math.max(0.2, aspect)
-  const CURVE_X = 2.0                   // outer edges wrap back toward the ears (cm); keep < offsetForward
-  const CURVE_Y = 0.6                   // slight forward bow top & bottom
+  const inset = Math.min(0.4, Math.max(0, FRAME_MODEL_TUNING.texInsetX))
+  const shown = 1 - inset * 2                                 // fraction of the photo width kept
+
+  // Show only the central band: the frame front, not the splayed arm stubs.
+  texture.wrapS = THREE.ClampToEdgeWrapping
+  texture.wrapT = THREE.ClampToEdgeWrapping
+  texture.repeat.x = shown
+  texture.offset.x = inset
+  texture.needsUpdate = true
+
+  const W = 13.8                                              // adult frame-front width in cm
+  const H = W / (Math.max(0.2, aspect) * shown)               // photo height at the scale that maps the kept band to W
+  const CURVE_X = 2.0                                         // outer edges wrap back toward the ears (cm)
+  const CURVE_Y = 0.6                                         // slight forward bow top & bottom
 
   const geo = new THREE.PlaneGeometry(W, H, 32, 6)
   const pos = geo.attributes.position
@@ -93,7 +145,17 @@ export function buildTexturedFrame(texture: THREE.Texture, aspect: number): THRE
   const mat = new THREE.MeshBasicMaterial({
     map: texture, transparent: true, alphaTest: 0.35, side: THREE.DoubleSide, depthWrite: false, toneMapped: false,
   })
-  group.add(new THREE.Mesh(geo, mat))
+  const front = new THREE.Mesh(geo, mat)
+  front.userData.part = 'texture'
+  group.add(front)
+
+  // Procedural arms hinged at the outer-top of the front, tinted to the product.
+  const armMat = new THREE.MeshStandardMaterial({ color: colourToHex(colour), roughness: 0.4, metalness: 0.15 })
+  const hingeX = W / 2 - 0.3
+  const hingeY = Math.min(H / 2 - 0.4, (H / 2) * FRAME_MODEL_TUNING.templeHingeYFrac)
+  for (const sign of [-1, 1]) {
+    group.add(buildTempleArm(sign, armMat, hingeX, hingeY, FRAME_MODEL_TUNING.templeLenCm))
+  }
   return group
 }
 
@@ -139,31 +201,11 @@ export function buildGlasses(colour = 0x26262a): Glasses {
   bridge.userData.part = 'frame'
   group.add(bridge)
 
-  // Temples: from the hinge at the outer-top of each rim, straight back to the ears,
-  // then a short down-bend. Modelled as a child group so a small toe-in rotates about
-  // the hinge, not the arm's middle.
-  const TEMPLE_LEN = 10.5
+  // Temples: hinge at the outer-top of each rim, straight back to the ears, then
+  // a short down-bend.
   const hingeY = LENS_H / 2 - RIM - 0.2
   for (const sign of [-1, 1]) {
-    const arm = new THREE.Group()
-    arm.position.set(sign * (CENTRE_X + LENS_W / 2 - RIM / 2), hingeY, 0)
-    arm.rotation.y = sign * 0.09 // toe in toward the head
-
-    const hinge = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.7), frameMat)
-    hinge.userData.part = 'frame'
-    arm.add(hinge)
-
-    const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.45, TEMPLE_LEN), frameMat)
-    shaft.position.set(sign * 0.05, -0.1, -TEMPLE_LEN / 2)
-    shaft.userData.part = 'frame'
-    arm.add(shaft)
-
-    const earBend = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.4, 0.4), frameMat)
-    earBend.position.set(sign * 0.05, -0.75, -TEMPLE_LEN + 0.2)
-    earBend.userData.part = 'frame'
-    arm.add(earBend)
-
-    group.add(arm)
+    group.add(buildTempleArm(sign, frameMat, CENTRE_X + LENS_W / 2 - RIM / 2, hingeY, 10.5))
   }
 
   group.setColour = (hex: number) => {

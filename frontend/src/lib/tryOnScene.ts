@@ -156,7 +156,7 @@ export class TryOnScene {
       try {
         const { texture, aspect } = await loadFrameTexture(spec.tryOnImageUrl)
         if (token !== this.frameToken) { texture.dispose(); return } // superseded by a newer switch
-        next = buildTexturedFrame(texture, aspect)
+        next = buildTexturedFrame(texture, aspect, spec.colour)
       } catch {
         /* fall through to the generic mesh */
       }
