@@ -1,18 +1,37 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { TryOnScene } from '../lib/tryOnScene'
+import { TRY_ON_3D_TUNING } from '../lib/tryOnMatrix'
 
-export type TryOnFrame = { slug: string; name: string; colour?: string | null }
+export type TryOnFrame = { slug: string; name: string; colour?: string | null; tryOnImageUrl?: string | null }
 
 type Phase = 'starting' | 'live' | 'posed' | 'blocked'
+type Fit = { scale: number; offsetUpCm: number; offsetForwardCm: number }
 
-/** Full-screen 3D virtual try-on: a tracked glasses mesh over the live camera. */
+const FIT_KEY = 'specskart_tryon_fit'
+const DEFAULT_FIT: Fit = {
+  scale: TRY_ON_3D_TUNING.scale,
+  offsetUpCm: TRY_ON_3D_TUNING.offsetUpCm,
+  offsetForwardCm: TRY_ON_3D_TUNING.offsetForwardCm,
+}
+
+function loadFit(): Fit {
+  try {
+    const raw = localStorage.getItem(FIT_KEY)
+    if (raw) return { ...DEFAULT_FIT, ...JSON.parse(raw) }
+  } catch { /* private mode / bad json */ }
+  return DEFAULT_FIT
+}
+
+/** Full-screen 3D virtual try-on: a head-tracked frame over the live camera. */
 export default function TryOn({ frames, onClose }: { frames: TryOnFrame[]; onClose: () => void }) {
   const [phase, setPhase] = useState<Phase>('starting')
   const [idx, setIdx] = useState(0)
   const [seesFace, setSeesFace] = useState(false)
   const [modelLoading, setModelLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
+  const [adjust, setAdjust] = useState(false)
+  const [fit, setFit] = useState<Fit>(loadFit)
 
   const stageRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -42,9 +61,9 @@ export default function TryOn({ frames, onClose }: { frames: TryOnFrame[]; onClo
         await v.play()
         setPhase('live')
 
-        const scene = new TryOnScene(stage, v, { onFace: setSeesFace })
+        const scene = new TryOnScene(stage, v, { onFace: setSeesFace, tuning: loadFit() })
         sceneRef.current = scene
-        scene.setColour(current?.colour)
+        scene.setFrame(current ?? {})
         scene.start().then(() => setModelLoading(false))
           .catch(() => setErr('Could not start the face tracker. Check your connection and try again.'))
         ro = new ResizeObserver(() => scene.resize())
@@ -62,8 +81,21 @@ export default function TryOn({ frames, onClose }: { frames: TryOnFrame[]; onClo
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Swap the frame colour when the selection changes.
-  useEffect(() => { sceneRef.current?.setColour(current?.colour) }, [idx]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Swap the frame when the selection changes.
+  useEffect(() => { sceneRef.current?.setFrame(current ?? {}) }, [idx]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function updateFit(patch: Partial<Fit>) {
+    const next = { ...fit, ...patch }
+    setFit(next)
+    sceneRef.current?.setTuning(next)
+    try { localStorage.setItem(FIT_KEY, JSON.stringify(next)) } catch { /* private mode */ }
+  }
+
+  function resetFit() {
+    setFit(DEFAULT_FIT)
+    sceneRef.current?.setTuning(DEFAULT_FIT)
+    try { localStorage.removeItem(FIT_KEY) } catch { /* */ }
+  }
 
   function capture() {
     sceneRef.current?.freeze()
@@ -106,6 +138,23 @@ export default function TryOn({ frames, onClose }: { frames: TryOnFrame[]; onClo
 
             {frames.length > 1 && <FrameStrip frames={frames} idx={idx} onPick={setIdx} />}
 
+            <div className="mt-2 w-full">
+              <button onClick={() => setAdjust((a) => !a)} className="text-xs text-bone/55 underline">
+                {adjust ? 'Hide fit controls' : 'Adjust fit'}
+              </button>
+              {adjust && (
+                <div className="mt-2 space-y-2 rounded-xl border border-bone/15 p-3 text-xs">
+                  <Slider label="Size" min={0.7} max={1.8} step={0.02} value={fit.scale}
+                    onChange={(v) => updateFit({ scale: v })} />
+                  <Slider label="Up / down" min={-1} max={5} step={0.1} value={fit.offsetUpCm}
+                    onChange={(v) => updateFit({ offsetUpCm: v })} />
+                  <Slider label="Depth" min={0} max={4} step={0.1} value={fit.offsetForwardCm}
+                    onChange={(v) => updateFit({ offsetForwardCm: v })} />
+                  <button onClick={resetFit} className="text-bone/50 underline">Reset</button>
+                </div>
+              )}
+            </div>
+
             {phase === 'posed' ? (
               <div className="mt-4 flex w-full gap-3">
                 <button onClick={retake} className="btn-ghost flex-1 !border-bone/25 !text-bone">Retake</button>
@@ -116,7 +165,7 @@ export default function TryOn({ frames, onClose }: { frames: TryOnFrame[]; onClo
               </div>
             ) : (
               <button
-                className="btn-primary mt-4 w-full !bg-bone !text-ink disabled:opacity-50"
+                className="btn-primary mt-3 w-full !bg-bone !text-ink disabled:opacity-50"
                 disabled={phase !== 'live' || !seesFace}
                 onClick={capture}
               >
@@ -127,6 +176,18 @@ export default function TryOn({ frames, onClose }: { frames: TryOnFrame[]; onClo
         )}
       </div>
     </div>
+  )
+}
+
+function Slider({ label, min, max, step, value, onChange }: {
+  label: string; min: number; max: number; step: number; value: number; onChange: (v: number) => void
+}) {
+  return (
+    <label className="flex items-center gap-3">
+      <span className="w-20 shrink-0 text-bone/60">{label}</span>
+      <input type="range" min={min} max={max} step={step} value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))} className="flex-1 accent-bone" />
+    </label>
   )
 }
 

@@ -16,9 +16,10 @@ export type TryOn3DTuning = {
 
 // ponytail: 3D alignment tuning — the numbers that want a real-device pass.
 // Glasses too big/small -> scale. Sitting on the eyeballs -> raise offsetForwardCm.
-// Riding high/low -> offsetUpCm. Gone / inverted -> toggle flipZ.
+// Riding low on the nose -> raise offsetUpCm. Gone / inverted -> toggle flipZ.
+// The "Adjust fit" panel in the try-on writes scale/offsetUpCm/offsetForwardCm live.
 export const TRY_ON_3D_TUNING: TryOn3DTuning = {
-  fovDeg: 63, scale: 1.0, offsetForwardCm: 1.7, offsetUpCm: 0.15, flipZ: false,
+  fovDeg: 63, scale: 1.0, offsetForwardCm: 2.2, offsetUpCm: 2.7, flipZ: false,
 }
 
 /**

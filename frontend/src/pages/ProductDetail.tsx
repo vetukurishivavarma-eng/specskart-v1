@@ -161,7 +161,7 @@ export default function ProductDetail() {
       {tryOn && (
         <Suspense fallback={null}>
           <TryOn
-            frames={[{ slug: p.slug, name: p.name, colour: p.colour }]}
+            frames={[{ slug: p.slug, name: p.name, colour: p.colour, tryOnImageUrl: assetUrl(p.tryOnImageUrl) || null }]}
             onClose={() => setTryOn(false)}
           />
         </Suspense>

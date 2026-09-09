@@ -204,10 +204,11 @@ export default function ProductEditor() {
             <p className="mt-1 text-xs text-ink/40">JPG or PNG, up to 10 MB. Resized and optimised automatically.</p>
 
             <div className="mt-6">
-              <span className="lbl">Transparent cut-out (optional)</span>
+              <span className="lbl">Try-on image</span>
               <p className="mt-1 text-xs text-ink/40">
-                A background-removed PNG for use as a clean catalogue image. The live virtual try-on is 3D and
-                works on every frame without this.
+                A front-on, background-removed picture of this frame. The 3D virtual try-on maps it onto a
+                head-tracked surface so it looks like the real product. Without one, try-on shows a generic
+                tinted frame.
               </p>
               {product?.tryOnImageUrl ? (
                 <div className="mt-2 flex items-center gap-3">

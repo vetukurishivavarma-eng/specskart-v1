@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../lib/api'
 import { useFaceLandmarker } from '../lib/useFaceLandmarker'
 import { syntheticGeometry, type Geometry } from '../lib/faceGeometry'
-import { rememberFace, shop } from '../lib/shop'
+import { assetUrl, rememberFace, shop } from '../lib/shop'
 import type { TryOnFrame } from '../components/TryOn'
 
 // Pulls in Three.js + MediaPipe — kept out of the initial bundle.
@@ -167,7 +167,9 @@ export default function FrameFinder() {
     setTryOnNote(null)
     try {
       const products = await shop.products({ faceShape: result.faceShape })
-      setTryOnFrames(products.map((p) => ({ slug: p.slug, name: p.name, colour: p.colour })))
+      setTryOnFrames(products.map((p) => ({
+        slug: p.slug, name: p.name, colour: p.colour, tryOnImageUrl: assetUrl(p.tryOnImageUrl) || null,
+      })))
     } catch {
       setTryOnNote('Could not load the try-on. Please try again in a moment.')
     } finally {

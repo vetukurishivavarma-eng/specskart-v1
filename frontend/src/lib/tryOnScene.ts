@@ -1,12 +1,14 @@
 import * as THREE from 'three'
 import { FilesetResolver, FaceLandmarker, type FaceLandmarkerResult } from '@mediapipe/tasks-vision'
-import { buildGlasses, colourToHex, type Glasses } from './glassesModel'
+import { buildGlasses, buildTexturedFrame, colourToHex, loadFrameTexture } from './glassesModel'
 import { solveGlassesMatrix, TRY_ON_3D_TUNING, type TryOn3DTuning } from './tryOnMatrix'
 
 export { TRY_ON_3D_TUNING, solveGlassesMatrix } from './tryOnMatrix'
 
 const WASM = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm'
 const MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task'
+
+export type FrameSpec = { colour?: string | null; tryOnImageUrl?: string | null }
 
 type Opts = { onFace?: (visible: boolean) => void; tuning?: Partial<TryOn3DTuning> }
 
@@ -20,7 +22,8 @@ export class TryOnScene {
   private renderer: THREE.WebGLRenderer
   private scene = new THREE.Scene()
   private camera: THREE.PerspectiveCamera
-  private glasses: Glasses
+  private frame: THREE.Object3D
+  private frameToken = 0
   private landmarker: FaceLandmarker | null = null
   private raf = 0
   private running = false
@@ -53,10 +56,27 @@ export class TryOnScene {
     key.position.set(1, 2, 3)
     this.scene.add(key)
 
-    this.glasses = buildGlasses()
-    this.glasses.matrixAutoUpdate = false
-    this.glasses.visible = false
-    this.scene.add(this.glasses)
+    this.frame = this.mount(buildGlasses())
+  }
+
+  /** Make an object the tracked frame: matrix-driven, hidden until a face is seen. */
+  private mount(obj: THREE.Object3D): THREE.Object3D {
+    obj.matrixAutoUpdate = false
+    obj.visible = false
+    this.scene.add(obj)
+    return obj
+  }
+
+  private disposeFrame() {
+    this.scene.remove(this.frame)
+    this.frame.traverse((o) => {
+      if (o instanceof THREE.Mesh) {
+        o.geometry.dispose()
+        const m = o.material as THREE.Material & { map?: THREE.Texture }
+        m.map?.dispose()
+        m.dispose()
+      }
+    })
   }
 
   async start() {
@@ -74,8 +94,42 @@ export class TryOnScene {
     this.loop()
   }
 
-  setColour(name: string | null | undefined) {
-    this.glasses.setColour(colourToHex(name))
+  /**
+   * Show a product frame. If it has a cut-out image, map that onto a face-wrapping
+   * curved surface (looks like the real product); otherwise fall back to a generic
+   * mesh tinted to the product colour. Async because the texture has to load.
+   */
+  async setFrame(spec: FrameSpec) {
+    const token = ++this.frameToken
+    let next: THREE.Object3D | null = null
+    if (spec.tryOnImageUrl) {
+      try {
+        const { texture, aspect } = await loadFrameTexture(spec.tryOnImageUrl)
+        if (token !== this.frameToken) { texture.dispose(); return } // superseded by a newer switch
+        next = buildTexturedFrame(texture, aspect)
+      } catch {
+        /* fall through to the generic mesh */
+      }
+    }
+    if (token !== this.frameToken) return
+    if (!next) {
+      const g = buildGlasses(colourToHex(spec.colour))
+      next = g
+    }
+    const wasVisible = this.frame.visible
+    this.disposeFrame()
+    this.frame = this.mount(next)
+    this.frame.visible = wasVisible
+    this.render()
+  }
+
+  setTuning(patch: Partial<TryOn3DTuning>) {
+    this.tuning = { ...this.tuning, ...patch }
+    this.resize() // re-applies fov + re-renders; the loop picks up the rest next frame
+  }
+
+  getTuning(): TryOn3DTuning {
+    return { ...this.tuning }
   }
 
   freeze() { this.running = false; cancelAnimationFrame(this.raf) }
@@ -132,11 +186,11 @@ export class TryOnScene {
 
     const matrix = res?.facialTransformationMatrixes?.[0]?.data
     if (matrix && matrix.length === 16) {
-      this.glasses.matrix.copy(solveGlassesMatrix(Array.from(matrix), this.tuning))
-      this.glasses.matrixWorldNeedsUpdate = true
-      if (!this.glasses.visible) { this.glasses.visible = true; this.onFace(true) }
-    } else if (this.glasses.visible) {
-      this.glasses.visible = false
+      this.frame.matrix.copy(solveGlassesMatrix(Array.from(matrix), this.tuning))
+      this.frame.matrixWorldNeedsUpdate = true
+      if (!this.frame.visible) { this.frame.visible = true; this.onFace(true) }
+    } else if (this.frame.visible) {
+      this.frame.visible = false
       this.onFace(false)
     }
     this.render()
