@@ -84,6 +84,10 @@ export default function Store() {
           {products.map((p) => <Tile key={p.id} p={p} />)}
         </div>
       )}
+
+      <div className="mt-16 border-t border-ink/10 pt-6 text-right">
+        <Link to="/admin/login" className="text-sm text-ink/45 hover:text-ink">Staff login →</Link>
+      </div>
     </div>
   )
 }
