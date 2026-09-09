@@ -69,9 +69,15 @@ export default function OrderDetail() {
         <section className="card p-4 text-sm">
           <div className="label">Timeline</div>
           <ol className="mt-3 space-y-1">
-            {o.timeline.map((e, i) => (
-              <li key={i} className="flex gap-3"><span className="text-ink/40">{new Date(e.at).toLocaleString()}</span><span>{e.status}{e.note ? ` — ${e.note}` : ''}</span></li>
-            ))}
+            {o.timeline.map((e, i) => {
+              const alert = e.note?.startsWith('⚠')
+              return (
+                <li key={i} className="flex gap-3">
+                  <span className="text-ink/40">{new Date(e.at).toLocaleString()}</span>
+                  <span className={alert ? 'text-clay' : undefined}>{e.status}{e.note ? ` — ${e.note}` : ''}</span>
+                </li>
+              )
+            })}
           </ol>
         </section>
       </div>

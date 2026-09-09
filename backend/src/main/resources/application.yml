@@ -69,6 +69,14 @@ specskart:
     # Approved marketing template for the post-delivery message; {{1}}=first name, {{2}}=promo code.
     # Without it the job still sends a plain message (delivered only if the 24h window is open).
     post-purchase-template: ${WHATSAPP_POST_PURCHASE_TEMPLATE:}
+    # Approved template for customer order-status updates (PAID/PACKED/SHIPPED/…). Delivered even
+    # outside the 24h window. {{1}}=first name, {{2}}=status line, {{3}}=order number, {{4}}=tracking URL.
+    # Blank = plain text, which Meta only delivers while the customer's 24h service window is open —
+    # so website buyers who never messaged first get nothing. Uses follow-up-template-lang.
+    order-update-template: ${WHATSAPP_ORDER_UPDATE_TEMPLATE:}
+    # Approved template for the staff new-order alert. {{1}}=order number, {{2}}=amount,
+    # {{3}}=customer, {{4}}=admin link. Blank = plain text (staff rarely have an open 24h window).
+    staff-order-template: ${WHATSAPP_STAFF_ORDER_TEMPLATE:}
     # WhatsApp numbers alerted when a new order is paid (so someone starts packing).
     # Comma-separated, e.g. +260972809599,+260971234567. Blank = no alerts.
     staff-numbers: ${WHATSAPP_STAFF_NUMBERS:}

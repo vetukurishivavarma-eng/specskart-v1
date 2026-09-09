@@ -48,11 +48,25 @@ public record AppProperties(
     public record WhatsApp(String provider, String phoneNumberId, String businessAccountId,
                            String accessToken, String webhookVerifyToken, String appSecret, String graphBaseUrl,
                            String followUpTemplate, String followUpTemplateLang, String postPurchaseTemplate,
+                           /** Approved template for customer order-status updates. Blank = plain text (24h-window only). */
+                           String orderUpdateTemplate,
+                           /** Approved template for the staff new-order alert. Blank = plain text. */
+                           String staffOrderTemplate,
                            /** WhatsApp numbers that get a plain alert when a new order is paid. Comma-separated env var; blank = off. */
                            List<String> staffNumbers) {
 
         public List<String> staffNumbers() {
             return staffNumbers == null ? List.of() : staffNumbers;
+        }
+
+        /** Approved template configured for customer order-status updates (delivers outside the 24h window). */
+        public boolean orderUpdateConfigured() {
+            return orderUpdateTemplate != null && !orderUpdateTemplate.isBlank();
+        }
+
+        /** Approved template configured for the staff new-order alert. */
+        public boolean staffOrderConfigured() {
+            return staffOrderTemplate != null && !staffOrderTemplate.isBlank();
         }
 
         /** True when a re-engagement template is configured for agent-initiated follow-ups. */

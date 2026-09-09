@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
-/** Turns order status changes into automatic, personalised WhatsApp updates. No agent involved. */
+/** Turns order status changes into automatic WhatsApp updates. No agent involved. */
 @Service
 public class OrderNotificationService {
 
@@ -20,14 +20,16 @@ public class OrderNotificationService {
 
     private final LeadRepository leads;
     private final OrderItemRepository items;
+    private final OrderEventRepository orderEvents;
     private final WhatsAppProvider whatsapp;
     private final WhatsAppMessageRepository messages;
     private final AppProperties props;
 
-    public OrderNotificationService(LeadRepository leads, OrderItemRepository items, WhatsAppProvider whatsapp,
-                                    WhatsAppMessageRepository messages, AppProperties props) {
+    public OrderNotificationService(LeadRepository leads, OrderItemRepository items, OrderEventRepository orderEvents,
+                                    WhatsAppProvider whatsapp, WhatsAppMessageRepository messages, AppProperties props) {
         this.leads = leads;
         this.items = items;
+        this.orderEvents = orderEvents;
         this.whatsapp = whatsapp;
         this.messages = messages;
         this.props = props;
@@ -38,6 +40,8 @@ public class OrderNotificationService {
     }
 
     public void onStatus(Order order, OrderStatus status) {
+        String line = statusLine(status);
+        if (line == null) return; // status with no customer-facing message
         if (order.getLeadId() == null) return;
         Lead lead = leads.findById(order.getLeadId()).orElse(null);
         if (lead == null) return;
@@ -46,8 +50,76 @@ public class OrderNotificationService {
 
         String hi = firstName(lead);
         String track = props.frontendBaseUrl() + "/order/" + order.getOrderNo();
-        String items = itemLine(order);
+        String logKey = "order-" + status.name().toLowerCase();
 
+        try {
+            if (props.whatsapp().orderUpdateConfigured()) {
+                // Approved template — the only thing Meta delivers outside the customer's 24h window.
+                whatsapp.sendTemplate(waId, props.whatsapp().orderUpdateTemplate(),
+                        props.whatsapp().followUpTemplateLang(),
+                        List.of(hi.isBlank() ? "there" : hi.trim(), line, order.getOrderNo(), track));
+            } else {
+                whatsapp.sendText(waId, plainMessage(order, status, lead, hi, track));
+            }
+            logOutbound(order.getLeadId(), logKey, "sent");
+        } catch (Exception e) {
+            log.warn("{} WhatsApp send failed for order {}: {}", logKey, order.getOrderNo(), e.getMessage());
+            logOutbound(order.getLeadId(), logKey, "failed");
+            recordFailure(order, "Customer WhatsApp (" + status.name() + ") not delivered", e);
+        }
+    }
+
+    /**
+     * A WhatsApp to every configured staff number the moment an order is paid — the one
+     * back-office cue that a box needs packing. Best-effort per number; a failure is logged
+     * and also written to the order timeline so it is visible in admin.
+     */
+    public void notifyNewOrder(Order order) {
+        List<String> staff = props.whatsapp().staffNumbers();
+        if (staff.isEmpty()) return;
+
+        String who = order.getCustomerName() != null && !order.getCustomerName().isBlank()
+                ? order.getCustomerName() : "Guest";
+        if (order.getCustomerPhone() != null) who += " · " + order.getCustomerPhone();
+        String amount = money(order.getTotalMinor(), order.getCurrency());
+        String adminLink = props.frontendBaseUrl() + "/admin/orders/" + order.getId();
+        String plain = "🛍️ New order " + order.getOrderNo() + " — " + amount + "\n"
+                + itemLine(order) + "\n" + who + "\n\nPack & dispatch: " + adminLink;
+        boolean useTemplate = props.whatsapp().staffOrderConfigured();
+
+        for (String to : staff) {
+            String number = to.trim();
+            if (number.isEmpty()) continue;
+            try {
+                if (useTemplate) {
+                    whatsapp.sendTemplate(number, props.whatsapp().staffOrderTemplate(),
+                            props.whatsapp().followUpTemplateLang(),
+                            List.of(order.getOrderNo(), amount, who, adminLink));
+                } else {
+                    whatsapp.sendText(number, plain);
+                }
+            } catch (Exception e) {
+                log.warn("staff new-order alert to {} failed for {}: {}", number, order.getOrderNo(), e.getMessage());
+                recordFailure(order, "Staff alert to " + mask(number) + " failed", e);
+            }
+        }
+    }
+
+    /** Short, single-line status headline — fills {{2}} of the order-update template. Null = no customer message. */
+    static String statusLine(OrderStatus status) {
+        return switch (status) {
+            case PAID -> "Payment received — we're preparing your frames";
+            case PACKED -> "Packed and ready for dispatch";
+            case SHIPPED -> "Handed to the courier — on its way to you";
+            case DELIVERED -> "Delivered — enjoy your new frames!";
+            case CANCELLED -> "Your order has been cancelled";
+            case REFUNDED -> "Your refund has been processed";
+            default -> null;
+        };
+    }
+
+    private String plainMessage(Order order, OrderStatus status, Lead lead, String hi, String track) {
+        String items = itemLine(order);
         String rewards = "";
         if (order.getPointsEarned() > 0) {
             rewards = "\n\n⭐ You earned " + order.getPointsEarned() + " points (balance: " + lead.getPoints() + ").";
@@ -55,11 +127,9 @@ public class OrderNotificationService {
         if (lead.getReferralCode() != null) {
             rewards += "\nShare code *" + lead.getReferralCode() + "* — your friend gets a discount, you get points.";
         }
-
-        String msg = switch (status) {
+        return switch (status) {
             case PAID -> "Thanks" + hi + "! Payment received ✅\n\nOrder " + order.getOrderNo() + "\n" + items
-                    + "\nTotal " + money(order.getTotalMinor(), order.getCurrency())
-                    + rewards
+                    + "\nTotal " + money(order.getTotalMinor(), order.getCurrency()) + rewards
                     + "\n\nWe're preparing your frames. Track your order any time:\n" + track;
             case PACKED -> "Good news" + hi + " — order " + order.getOrderNo() + " is packed and ready for dispatch 📦\n" + track;
             case SHIPPED -> "On its way 🛵\nOrder " + order.getOrderNo() + " has been handed to the courier — "
@@ -69,51 +139,11 @@ public class OrderNotificationService {
             case REFUNDED -> "A refund for order " + order.getOrderNo() + " has been processed.";
             default -> null;
         };
-        if (msg == null) return;
-        send(order.getLeadId(), waId, msg, "order-" + status.name().toLowerCase());
-    }
-
-    /**
-     * A plain WhatsApp to every configured staff number the moment an order is
-     * paid — the one back-office cue that a box needs packing. Best-effort: a
-     * number that fails is logged and the rest still go. Not recorded on any
-     * lead thread; the recipients aren't leads.
-     */
-    public void notifyNewOrder(Order order) {
-        List<String> staff = props.whatsapp().staffNumbers();
-        if (staff.isEmpty()) return;
-
-        String who = order.getCustomerName() != null && !order.getCustomerName().isBlank()
-                ? order.getCustomerName() : "Guest";
-        String phone = order.getCustomerPhone() != null ? " · " + order.getCustomerPhone() : "";
-        String msg = "🛍️ New order " + order.getOrderNo() + " — "
-                + money(order.getTotalMinor(), order.getCurrency()) + "\n"
-                + itemLine(order) + "\n" + who + phone
-                + "\n\nPack & dispatch: " + props.frontendBaseUrl() + "/admin/orders/" + order.getId();
-
-        for (String to : staff) {
-            String number = to.trim();
-            if (number.isEmpty()) continue;
-            try {
-                whatsapp.sendText(number, msg);
-            } catch (Exception e) {
-                log.warn("staff new-order alert to {} failed for {}: {}", number, order.getOrderNo(), e.getMessage());
-            }
-        }
-    }
-
-    void send(java.util.UUID leadId, String waId, String text, String logKey) {
-        try {
-            whatsapp.sendText(waId, text);
-            logOutbound(leadId, logKey);
-        } catch (Exception e) {
-            log.warn("{} WhatsApp send failed for lead {}: {}", logKey, leadId, e.getMessage());
-        }
     }
 
     /** Record an outbound message on the lead's WhatsApp thread (the send happened elsewhere). */
     public void logSent(java.util.UUID leadId, String key) {
-        logOutbound(leadId, key);
+        logOutbound(leadId, key, "sent");
     }
 
     static String firstName(Lead lead) {
@@ -129,13 +159,32 @@ public class OrderNotificationService {
                 .orElse("");
     }
 
-    private void logOutbound(java.util.UUID leadId, String body) {
+    /** Put a failed WhatsApp send on the order timeline so it shows in admin (⚠ prefix = alert). */
+    private void recordFailure(Order order, String what, Exception e) {
+        try {
+            String reason = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            String note = "⚠ " + what + ": " + reason;
+            OrderEvent ev = new OrderEvent();
+            ev.setOrderId(order.getId());
+            ev.setStatus(order.getStatus());
+            ev.setNote(note.length() > 500 ? note.substring(0, 500) : note);
+            orderEvents.save(ev);
+        } catch (Exception ex) {
+            log.warn("could not record notification failure for order {}: {}", order.getOrderNo(), ex.getMessage());
+        }
+    }
+
+    private static String mask(String number) {
+        return number.length() <= 4 ? number : number.substring(0, number.length() - 4) + "••••";
+    }
+
+    private void logOutbound(java.util.UUID leadId, String body, String status) {
         WhatsAppMessage m = new WhatsAppMessage();
         m.setLeadId(leadId);
         m.setDirection("OUTBOUND");
         m.setMessageType("text");
         m.setBody(body);
-        m.setStatus("sent");
+        m.setStatus(status);
         messages.save(m);
     }
 }
