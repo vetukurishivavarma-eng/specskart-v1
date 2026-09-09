@@ -204,7 +204,11 @@ export default function ProductEditor() {
             <p className="mt-1 text-xs text-ink/40">JPG or PNG, up to 10 MB. Resized and optimised automatically.</p>
 
             <div className="mt-6">
-              <span className="lbl">Try-on image (transparent PNG)</span>
+              <span className="lbl">Transparent cut-out (optional)</span>
+              <p className="mt-1 text-xs text-ink/40">
+                A background-removed PNG for use as a clean catalogue image. The live virtual try-on is 3D and
+                works on every frame without this.
+              </p>
               {product?.tryOnImageUrl ? (
                 <div className="mt-2 flex items-center gap-3">
                   <div className="h-24 w-32 overflow-hidden rounded-lg border border-ink/15 bg-[repeating-conic-gradient(#e5e5e5_0_25%,#fff_0_50%)] bg-[length:16px_16px]">
@@ -236,7 +240,7 @@ export default function ProductEditor() {
               {uploadTryOn.isPending && <p className="mt-1 text-xs text-ink/50">Uploading…</p>}
               {uploadTryOn.isError && <p className="mt-1 text-xs text-clay">{(uploadTryOn.error as Error).message}</p>}
               <p className="mt-1 text-xs text-ink/40">
-                Generate pulls the first photo and removes a plain (light, uncluttered) background automatically.
+                Generate pulls the first photo and removes a plain (light, uncluttered) background automatically.{' '}
                 Or upload your own: a transparent PNG is kept as-is; a plain photo gets its background removed. Resized to 900px wide.
               </p>
             </div>

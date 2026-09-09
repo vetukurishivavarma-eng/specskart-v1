@@ -1,10 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, ApiError } from '../lib/api'
 import { useFaceLandmarker } from '../lib/useFaceLandmarker'
 import { syntheticGeometry, type Geometry } from '../lib/faceGeometry'
 import { rememberFace, shop } from '../lib/shop'
-import TryOn, { type TryOnFrame } from '../components/TryOn'
+import type { TryOnFrame } from '../components/TryOn'
+
+// Pulls in Three.js + MediaPipe — kept out of the initial bundle.
+const TryOn = lazy(() => import('../components/TryOn'))
 
 const WA = import.meta.env.VITE_WA_LINK ?? 'https://wa.me/260000000000'
 
@@ -164,13 +167,7 @@ export default function FrameFinder() {
     setTryOnNote(null)
     try {
       const products = await shop.products({ faceShape: result.faceShape })
-      const frames = products.map((p) => ({ slug: p.slug, name: p.name, tryOnImageUrl: p.tryOnImageUrl }))
-      if (!frames.some((f) => f.tryOnImageUrl)) {
-        // No cut-out images uploaded yet — don't open the camera for nothing.
-        setTryOnNote("Virtual try-on isn't ready for these frames yet. Tap “Shop my frames” to see them all.")
-        return
-      }
-      setTryOnFrames(frames)
+      setTryOnFrames(products.map((p) => ({ slug: p.slug, name: p.name, colour: p.colour })))
     } catch {
       setTryOnNote('Could not load the try-on. Please try again in a moment.')
     } finally {
@@ -333,7 +330,11 @@ export default function FrameFinder() {
         )}
       </div>
 
-      {tryOnFrames && <TryOn frames={tryOnFrames} onClose={() => setTryOnFrames(null)} />}
+      {tryOnFrames && (
+        <Suspense fallback={null}>
+          <TryOn frames={tryOnFrames} onClose={() => setTryOnFrames(null)} />
+        </Suspense>
+      )}
     </div>
   )
 }

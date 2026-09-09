@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { shop, money, assetUrl } from '../lib/shop'
-import TryOn from '../components/TryOn'
+
+// Pulls in Three.js + MediaPipe — kept out of the initial bundle.
+const TryOn = lazy(() => import('../components/TryOn'))
 
 function useCountdown(target: string | null) {
   const [left, setLeft] = useState(() => target ? new Date(target).getTime() - Date.now() : 0)
@@ -147,7 +149,7 @@ export default function ProductDetail() {
             </button>
           </div>
         )}
-        {p.tryOnImageUrl && !upcoming && (
+        {!upcoming && (
           <button onClick={() => setTryOn(true)} className="btn-ghost mt-3 w-full">Try it on 👓</button>
         )}
         {(add.isError || buyNow.isError) && (
@@ -157,10 +159,12 @@ export default function ProductDetail() {
       </div>
 
       {tryOn && (
-        <TryOn
-          frames={[{ slug: p.slug, name: p.name, tryOnImageUrl: p.tryOnImageUrl }]}
-          onClose={() => setTryOn(false)}
-        />
+        <Suspense fallback={null}>
+          <TryOn
+            frames={[{ slug: p.slug, name: p.name, colour: p.colour }]}
+            onClose={() => setTryOn(false)}
+          />
+        </Suspense>
       )}
     </div>
   )

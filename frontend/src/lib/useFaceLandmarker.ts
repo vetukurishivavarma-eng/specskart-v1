@@ -29,22 +29,6 @@ export function useFaceLandmarker() {
     }
   }, [])
 
-  /**
-   * One detection for a live-preview loop: the raw landmarks or null. Never
-   * throws (a missing or doubled face is just "no overlay this frame"), and
-   * skips the geometry maths the try-on overlay doesn't need.
-   */
-  const track = useCallback(async (source: HTMLVideoElement | HTMLImageElement): Promise<{ x: number; y: number; z: number }[] | null> => {
-    const fl = ref.current ?? (await ensure())
-    try {
-      const res = fl.detect(source)
-      if ((res.faceLandmarks?.length ?? 0) !== 1) return null
-      return res.faceLandmarks[0] as { x: number; y: number; z: number }[]
-    } catch {
-      return null
-    }
-  }, [ensure])
-
   const analyse = useCallback(async (source: HTMLVideoElement | HTMLImageElement): Promise<{ geometry: Geometry; faces: number; landmarks: { x: number; y: number; z: number }[] }> => {
     const fl = await ensure()
     const res = fl.detect(source)
@@ -64,5 +48,5 @@ export function useFaceLandmarker() {
     return { geometry: geometryFromLandmarks(landmarks as any, dims), faces, landmarks }
   }, [ensure])
 
-  return { analyse, track, loading, error }
+  return { analyse, loading, error }
 }
