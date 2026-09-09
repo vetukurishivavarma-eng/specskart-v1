@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+*.glb
+test_photos/*
+!test_photos/.gitkeep
+previews.json
+preview_*.png
+ar_preview.html

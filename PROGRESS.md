@@ -2,6 +2,57 @@
 
 _Last updated: 2026-09-09. Session: session_01LikGxFAD44keaoNy1Mzp7g_
 
+## Session 2026-09-09 c — product-accurate AR try-on: Phase A (Python service)
+
+Client rejected the 2D photo-on-a-plane try-on and asked for a Lenskart-style
+AR showing the *exact* selected product, fully automated from the product photo.
+
+**Decision (see `docs/AR_TRYON.md`):** single-image-to-3D (TripoSR/Hunyuan3D) does
+NOT work on eyewear — thin arms melt, lenses go opaque, needs 6–24 GB VRAM this
+box/Render don't have. Chose **parametric auto-fit**: measure the frame from the
+photo (CV), build a parametric 3D frame in mm, texture the front with the real
+photo pixels, procedural arms, auto-fit to the face at render (no sliders).
+Exact: silhouette, lens/bridge shape, colour, front finish. Approximate: arm
+styling + true side thickness. Rimless / angled / busy-bg photos → rejected with
+a reason, never a generic substitute.
+
+### Phase A — DONE (committed): `ar-service/` (Python, FastAPI, CPU-only)
+- `segment.py` chroma-key cut-out (+ opt-in `AR_USE_REMBG` u2net, experimental).
+- `measure.py` — lens contour, width/height, bridge, rim, colour, dark/light,
+  rimless + angled-photo rejection. Size anchored to a per-category lens-width table.
+- `geometry.py` — trimesh parametric GLB: rims extruded from the measured lens
+  contour + face-curved, transparent lens fill, procedural bridge + temple arms,
+  a photo-textured front card. GLB carries frame_width_mm etc. in metadata.
+- `validate.py` — geometry / bounds 90–175mm / symmetry / <1.5MB / loads-in-three.
+- `pipeline.py` + `main.py` (`POST /generate` multipart, `GET /healthz`).
+- `tests/test_pipeline.py` — 5 checks green (synthetic fixtures, no pytest dep):
+  ratios within tolerance, dark+light colour, round+cateye contours, valid GLB
+  produced, rimless blob rejected.
+- Verified GLBs re-load in trimesh with the right parts + dims (129×36mm wayfarer,
+  121×53mm round). NOT yet viewed in a browser (Chrome ext not connected here) —
+  `ar_preview.html` (self-contained three.js viewer, GLBs embedded) is the check.
+
+### Phase B — NOT STARTED — Spring wiring
+Migration V14: `products.ar_status|ar_model_version|ar_generation_error|ar_generated_at`
++ `ar_model_files` blob table. `ArAssetService` (@Async → calls ar-service via
+RestClient, stores GLB, flips status NONE→PENDING→PROCESSING→READY|FAILED).
+Endpoints: `POST /api/admin/ar-assets/{id}/generate|retry`, `GET /api/public/ar-assets/{id}`,
+`GET /api/public/ar-models/{id}.glb?v=N` (immutable cache). Auto-trigger from
+`AdminCatalogService.addImage`. `AppProperties.Ar(serviceUrl, autoGenerate)`.
+Expose ar_status/ar_model_url on the public `ProductDetail` DTO. `ArAssetServiceTest`.
+
+### Phase C — NOT STARTED — frontend rework (`TryOn.tsx` / `tryOnScene.ts`)
+Load ONLY the selected product's GLB via GLTFLoader (three examples/jsm). **Delete
+the fit sliders** and `buildGlasses`/`buildTexturedFrame` runtime meshing. Auto-fit:
+scale = 1.36×IPD (iris landmarks) / model frame_width_mm; position eye-midpoint +
+bridge→nose landmark 168; rotation from the existing head matrix; keep the FACE_OVAL
+occluder. States: READY→try-on · PENDING→"preparing" (+flat preview if a cut-out
+exists) · FAILED/UNAVAILABLE→"not available for this frame", NEVER a generic model.
+
+### Phase D — test with 5+ real catalogue photos → `ar-service/TEST_RESULTS.md`
+Seeded products use `picsum.photos` (not glasses) — the client's real photos are
+the eval set. Drop them in `ar-service/test_photos/`.
+
 ## Session 2026-09-09 b — try-on: lens-front crop + procedural 3D arms
 
 Frontend: tsc + vite build green, 19 vitest green (was 17).
