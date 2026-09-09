@@ -1,6 +1,62 @@
 # Specskart v1 — build progress
 
-_Last updated: 2026-09-08 (Phase 2 complete). Session: session_01Tne6a6brsdoue2fDNsWxqQ_
+_Last updated: 2026-09-09. Session: session_01WZE2ADJovex9KwPEsQkhZ6_
+
+## Session 2026-09-09 (HEAD `1e7e6bf`, all pushed to `main`, Render auto-deploys web + api)
+
+Backend 50 tests green · frontend tsc + 17 vitest + vite build green.
+
+- **`4610445` — order-status WhatsApp via approved templates + failures visible in admin.**
+  A real paid test order sent NO customer confirmation: `OrderNotificationService.onStatus` used
+  free-form `sendText`, which Meta only delivers inside the customer's 24h service window, and the
+  failure was a swallowed `log.warn`. Now sends via an approved template when one is configured
+  (`WHATSAPP_ORDER_UPDATE_TEMPLATE` — {{1}} first name, {{2}} status line, {{3}} order no,
+  {{4}} tracking URL; `WHATSAPP_STAFF_ORDER_TEMPLATE` — {{1}} order no, {{2}} amount, {{3}} customer,
+  {{4}} admin link), plain-text fallback otherwise. Every failed send now writes a `⚠ …: <reason>`
+  OrderEvent → shown red on the admin order timeline (`OrderDetail.tsx`). `OrderNotificationTest`.
+  **TODO (user): create + approve the two templates in Meta Business Manager, set the two env vars
+  on `specskart-api`.**
+- **`e7f626e` — inbound WhatsApp webhook crash + duplicate bot replies.**
+  Meta's near-simultaneous re-deliveries all passed the `existsByDedupeKey` check then collided on
+  the `webhook_events_dedupe_key_key` unique constraint at commit — after `bot.handleInbound` had
+  already sent — so customers got 3–4 identical replies and every duplicate logged a stack trace.
+  New `WebhookDedupe.claim()` (REQUIRES_NEW tx + `saveAndFlush`) makes the losing racer fail on the
+  insert before any side effect; `process()` treats a thrown `DataAccessException` like "already
+  seen". 6-thread concurrency test in `FunnelIntegrationTest`.
+- **`456db84` — storefront cart UX.** ProductDetail "Add to bag" adds in place (no jump to /cart) +
+  "Added to bag ✓" pop + header cart-icon bump; new **"Buy now"** → straight to `/checkout`. New
+  `components/CartIcon.tsx` = persistent header bag icon + live count badge, visible on mobile too.
+- **`a93c839`** — visible "Staff login →" link on the store page.
+- **`baafba1` — `BackgroundKeyer`** (zero-dep border flood-fill background remover + auto-crop).
+  Admin product editor "✨ Generate from main photo" →
+  `POST /api/admin/catalog/products/{id}/try-on-image/from-photo` (optional `?tolerance=8..120`);
+  direct try-on upload also keys out flat/opaque backgrounds. `BackgroundKeyerTest`. Plain light
+  backgrounds only.
+- **`ef758f3` + `5a6de16` + `1e7e6bf` — virtual try-on rebuilt as real-time 3D.**
+  The old try-on was a 2D affine `ctx.drawImage` of the front PNG (no perspective / yaw / pitch /
+  depth). Deleted `lib/tryOn.ts` + its tests. New pipeline:
+  - `useFaceLandmarker` / `lib/tryOnScene.ts` `TryOnScene` — FaceLandmarker in **VIDEO mode with
+    `outputFacialTransformationMatrixes`** (per-frame 4×4 head pose).
+  - `lib/tryOnMatrix.ts` `solveGlassesMatrix()` + `TRY_ON_3D_TUNING` {fovDeg, scale, offsetForwardCm,
+    offsetUpCm, flipZ} — the on-device tuning knobs.
+  - `lib/glassesModel.ts` — `buildTexturedFrame()` maps the product's cut-out photo onto a
+    face-wrapping curved plane (real design + true 3D pose); `buildGlasses()` parametric generic
+    mesh tinted by `colourToHex(product.colour)` is the fallback when there's no cut-out.
+  - Depth-only **face occluder** from MediaPipe's FACE_OVAL ring so the temples hide behind the
+    cheeks/ears (kills most of the "sticker" look).
+  - Transparent WebGL canvas over `<video>`; caller CSS-mirrors both layers. `TryOn` is lazy-loaded
+    (Three.js + MediaPipe kept out of the main bundle: 153 kB gz main / ~145 kB gz try-on chunk).
+  - **"Adjust fit"** panel in the try-on modal — Size / Up-down / Depth sliders write to the live
+    scene and persist per browser (`localStorage` `specskart_tryon_fit`).
+  - Works on every frame → the "try-on isn't ready for this frame" dead-end is gone; ProductDetail
+    always offers try-on, Frame Finder no longer checks for cut-out images.
+  - Added `three@0.186`. `glassesModel.test.ts` + `tryOnMatrix.test.ts`.
+  - **Status: tracks + renders on device, but user still finds the photo-on-a-plane approach flat.
+    Known ceiling — a front photo's temple arms are foreshortened stubs and can't become true 3D
+    arms. Next level = per-frame 3D models (commission or a try-on vendor). Open middle-ground idea:
+    crop texture to the lens-front + bolt on procedural 3D arms.**
+
+_Earlier: Last updated 2026-09-08 (Phase 2 complete). Session: session_01Tne6a6brsdoue2fDNsWxqQ_
 
 ## Status: PHASE 1 + PHASE 2 COMPLETE. Real WhatsApp funnel live on +260 97 2809599. Automated
 online shop live (mock payments until Flutterwave keys added). HEAD `59f2c76`.
