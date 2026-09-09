@@ -119,6 +119,11 @@ export default function ProductEditor() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-product', id] }),
   })
 
+  const genTryOn = useMutation({
+    mutationFn: () => api(`/admin/catalog/products/${id}/try-on-image/from-photo`, { method: 'POST', auth: true }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-product', id] }),
+  })
+
   const s = <K extends keyof Form>(k: K, v: Form[K]) => setF({ ...f, [k]: v })
 
   return (
@@ -210,17 +215,30 @@ export default function ProductEditor() {
               ) : (
                 <p className="mt-1 text-xs text-ink/40">None yet.</p>
               )}
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <button type="button" className="btn-ghost !px-3 !py-1 text-xs"
+                  disabled={!photos.length || genTryOn.isPending}
+                  onClick={() => genTryOn.mutate()}>
+                  {genTryOn.isPending ? 'Generating…' : '✨ Generate from main photo'}
+                </button>
+                {!photos.length && <span className="text-xs text-ink/40">Add a photo first</span>}
+              </div>
+              {genTryOn.isError && <p className="mt-1 text-xs text-clay">{(genTryOn.error as Error).message}</p>}
+
               <input
                 ref={tryOnRef}
                 type="file"
-                accept="image/png"
+                accept="image/*"
                 className="mt-2 text-sm"
                 disabled={uploadTryOn.isPending}
                 onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadTryOn.mutate(file) }}
               />
               {uploadTryOn.isPending && <p className="mt-1 text-xs text-ink/50">Uploading…</p>}
               {uploadTryOn.isError && <p className="mt-1 text-xs text-clay">{(uploadTryOn.error as Error).message}</p>}
-              <p className="mt-1 text-xs text-ink/40">Front-on glasses on a transparent background. Alpha is kept; resized to 900px wide.</p>
+              <p className="mt-1 text-xs text-ink/40">
+                Generate pulls the first photo and removes a plain (light, uncluttered) background automatically.
+                Or upload your own: a transparent PNG is kept as-is; a plain photo gets its background removed. Resized to 900px wide.
+              </p>
             </div>
           </>
         )}

@@ -9,6 +9,7 @@ import javax.imageio.ImageIO;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;
@@ -81,16 +82,42 @@ public class AdminCatalogService {
     public CatalogDtos.AdminProduct setTryOnImage(UUID productId, MultipartFile file) {
         Product p = products.findById(productId)
                 .orElseThrow(() -> ApiException.notFound("PRODUCT_NOT_FOUND", "Save the product before adding a try-on image."));
-        if (file == null || file.isEmpty()) throw ApiException.badRequest("NO_FILE", "Choose a PNG to upload.");
+        if (file == null || file.isEmpty()) throw ApiException.badRequest("NO_FILE", "Choose an image to upload.");
 
+        BufferedImage src = decode(readAll(file));
+        // A flat (fully opaque) upload — e.g. a normal JPEG photo — gets its backdrop keyed out;
+        // a PNG that already carries transparency is kept as-is.
+        boolean removeBg = isFullyOpaque(src);
+        saveTryOn(p, renderTryOnPng(src, removeBg, BackgroundKeyer.DEFAULT_TOLERANCE));
+        return toAdmin(p);
+    }
+
+    /**
+     * Build the try-on cut-out from the product's first uploaded photo: flood-fill the plain
+     * backdrop to transparent, auto-crop to the frame. Works when the photo is shot on a light,
+     * uncluttered background; otherwise the result is poor and a hand-made PNG should be uploaded.
+     */
+    @Transactional
+    public CatalogDtos.AdminProduct generateTryOnFromPhoto(UUID productId, Integer tolerance) {
+        Product p = products.findById(productId)
+                .orElseThrow(() -> ApiException.notFound("PRODUCT_NOT_FOUND", "No such product."));
+        byte[] photo = images.findByProductIdOrderBySortAsc(productId).stream()
+                .map(ProductImage::getFileId).filter(java.util.Objects::nonNull).findFirst()
+                .flatMap(imageFiles::findById).map(ProductImageFile::getBytes)
+                .orElseThrow(() -> ApiException.badRequest("NO_PHOTO", "Add a product photo first, then generate the try-on image from it."));
+        int tol = tolerance == null ? BackgroundKeyer.DEFAULT_TOLERANCE : Math.max(8, Math.min(120, tolerance));
+        saveTryOn(p, renderTryOnPng(decode(photo), true, tol));
+        return toAdmin(p);
+    }
+
+    private void saveTryOn(Product p, byte[] png) {
         deleteTryOnBlob(p);
         ProductImageFile blob = new ProductImageFile();
         blob.setContentType("image/png");
-        blob.setBytes(toTransparentPng(file));
+        blob.setBytes(png);
         imageFiles.save(blob);
         p.setTryOnImageUrl("/api/public/product-images/" + blob.getId());
         products.save(p);
-        return toAdmin(p);
     }
 
     @Transactional
@@ -111,17 +138,16 @@ public class AdminCatalogService {
         }
     }
 
-    /** Downscale to {@value #TRY_ON_MAX_W}px wide and re-encode as PNG, PRESERVING alpha. */
-    private byte[] toTransparentPng(MultipartFile file) {
-        BufferedImage src;
-        try {
-            src = ImageIO.read(file.getInputStream());
-        } catch (IOException e) {
-            throw ApiException.badRequest("BAD_IMAGE", "Couldn't read that file.");
-        }
-        if (src == null) throw ApiException.badRequest("BAD_IMAGE", "That doesn't look like an image.");
+    /**
+     * Produce the stored try-on PNG: optionally key out the plain backdrop and auto-crop to the
+     * frame, then downscale to {@value #TRY_ON_MAX_W}px wide. Alpha is always preserved.
+     */
+    private byte[] renderTryOnPng(BufferedImage src, boolean removeBg, int tolerance) {
+        BufferedImage keyed = removeBg
+                ? BackgroundKeyer.autoCrop(BackgroundKeyer.keyOut(src, tolerance), 12)
+                : src;
 
-        int w = src.getWidth(), h = src.getHeight();
+        int w = keyed.getWidth(), h = keyed.getHeight();
         double scale = Math.min(1.0, (double) TRY_ON_MAX_W / w);
         int tw = Math.max(1, (int) Math.round(w * scale));
         int th = Math.max(1, (int) Math.round(h * scale));
@@ -129,7 +155,7 @@ public class AdminCatalogService {
         BufferedImage out = new BufferedImage(tw, th, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = out.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-        g.drawImage(src, 0, 0, tw, th, null);
+        g.drawImage(keyed, 0, 0, tw, th, null);
         g.dispose();
 
         try {
@@ -139,6 +165,36 @@ public class AdminCatalogService {
         } catch (IOException e) {
             throw ApiException.badRequest("BAD_IMAGE", "Couldn't process that image.");
         }
+    }
+
+    private byte[] readAll(MultipartFile file) {
+        try {
+            return file.getBytes();
+        } catch (IOException e) {
+            throw ApiException.badRequest("BAD_IMAGE", "Couldn't read that file.");
+        }
+    }
+
+    private BufferedImage decode(byte[] bytes) {
+        BufferedImage src;
+        try {
+            src = ImageIO.read(new ByteArrayInputStream(bytes));
+        } catch (IOException e) {
+            throw ApiException.badRequest("BAD_IMAGE", "Couldn't read that file.");
+        }
+        if (src == null) throw ApiException.badRequest("BAD_IMAGE", "That doesn't look like an image.");
+        return src;
+    }
+
+    /** True if the image has no alpha channel or every (sampled) pixel is effectively opaque. */
+    private static boolean isFullyOpaque(BufferedImage img) {
+        if (!img.getColorModel().hasAlpha()) return true;
+        for (int y = 0; y < img.getHeight(); y += 2) {
+            for (int x = 0; x < img.getWidth(); x += 2) {
+                if ((img.getRGB(x, y) >>> 24) < 250) return false;
+            }
+        }
+        return true;
     }
 
     /** Downscale to {@value #MAX_DIM}px on the long edge and re-encode as JPEG (flattening any alpha). */

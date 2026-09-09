@@ -59,6 +59,13 @@ public class AdminCatalogController {
         return admin.setTryOnImage(id, file);
     }
 
+    /** Build the try-on cut-out from the product's first photo (flood-fill the plain backdrop). */
+    @PostMapping("/products/{id}/try-on-image/from-photo")
+    public CatalogDtos.AdminProduct tryOnFromPhoto(@PathVariable UUID id,
+                                                   @RequestParam(value = "tolerance", required = false) Integer tolerance) {
+        return admin.generateTryOnFromPhoto(id, tolerance);
+    }
+
     @DeleteMapping("/products/{id}/try-on-image")
     public CatalogDtos.AdminProduct deleteTryOn(@PathVariable UUID id) {
         return admin.clearTryOnImage(id);
