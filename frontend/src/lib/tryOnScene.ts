@@ -18,7 +18,7 @@ const IRIS_A = 468        // one iris centre; the other is IRIS_B — we order b
 const IRIS_B = 473
 const NOSE_TIP = 1
 const PD_CM = 6.3         // average inter-pupillary distance, for cm→pixel conversion
-const REST_DROP = 0.045   // seat the frame this fraction of the eye span below the pupils
+const REST_DROP = 0.08    // seat the frame this fraction of the eye span below the pupils
 const YAW_FADE_START = 0.16  // |nose offset / eye span| where the frame starts fading
 const YAW_FADE_END = 0.34    // …and where it is fully gone (head turned too far for a flat frame)
 const SMOOTH = 0.45      // ponytail: plain EMA on the eye points; swap for one-euro if lag shows
@@ -31,7 +31,7 @@ const FACE_OVAL = [
 
 /** Two lens-opening centres as fractions of the cut-out, plus a dark silhouette
  *  of the whole frame for the contact shadow. */
-type PreparedFrame = { img: CanvasImageSource; w: number; h: number; lc: LM; rc: LM; shadow: HTMLCanvasElement }
+type PreparedFrame = { img: HTMLCanvasElement; w: number; h: number; lc: LM; rc: LM; shadow: HTMLCanvasElement }
 
 /**
  * Two lens-opening centres (fractions) from an opaque/transparent mask: flood the
@@ -39,7 +39,7 @@ type PreparedFrame = { img: CanvasImageSource; w: number; h: number; lc: LM; rc:
  * it can't reach are the enclosed lens openings. Falls back to a symmetric guess
  * when the rim doesn't fully close in the photo.
  */
-export function findLensCentres(opaque: Uint8Array, w: number, h: number): { lc: LM; rc: LM } {
+export function findLensCentres(opaque: Uint8Array, w: number, h: number): { lc: LM; rc: LM; found: boolean } {
   const N = w * h
   const outside = new Uint8Array(N)
   const stack: number[] = []
@@ -77,23 +77,86 @@ export function findLensCentres(opaque: Uint8Array, w: number, h: number): { lc:
 
   if (blobs.length >= 2) {
     const [a, b] = blobs.slice(0, 2).sort((p, q) => p.sx - q.sx)
-    return { lc: { x: a.sx / w, y: a.sy / h }, rc: { x: b.sx / w, y: b.sy / h } }
+    return { lc: { x: a.sx / w, y: a.sy / h }, rc: { x: b.sx / w, y: b.sy / h }, found: true }
   }
-  return { lc: { x: 0.27, y: 0.48 }, rc: { x: 0.73, y: 0.48 } }
+  return { lc: { x: 0.27, y: 0.48 }, rc: { x: 0.73, y: 0.48 }, found: false }
 }
 
-function analyzeFrame(bitmap: CanvasImageSource, W: number, H: number): { lc: LM; rc: LM } {
-  const scale = Math.min(1, 360 / W)
+/**
+ * A catalogue photo may have tinted or opaque lenses (or, on a bad photo, the
+ * folded temple arms lying across them). If the lens openings aren't already
+ * transparent, repaint them as faint glass in place — left/right halves of the
+ * frame, an inscribed ellipse per lens. Mutates `data`. Returns the lens centres
+ * when it acted, else null (caller then uses hole detection).
+ */
+export function repaintLenses(data: Uint8ClampedArray, w: number, h: number, opaque: Uint8Array): { lc: LM; rc: LM } | null {
+  const N = w * h
+  let ox = 0, on = 0, minY = h, maxY = 0
+  const bright = new Uint8Array(N)
+  for (let i = 0; i < N; i++) {
+    if (!opaque[i]) continue
+    const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2]
+    const mx = Math.max(r, g, b)
+    ox += i % w; on++
+    const y = (i / w) | 0
+    if (y < minY) minY = y
+    if (y > maxY) maxY = y
+    if (mx > 115) bright[i] = 1                          // tinted / clear-ish lens fill
+  }
+  if (on < 0.02 * N) return null
+  const midX = ox / on
+  const box = (x0: number, x1: number) => {
+    let bx0 = w, by0 = h, bx1 = 0, by1 = 0, cnt = 0
+    for (let i = 0; i < N; i++) {
+      if (!bright[i]) continue
+      const x = i % w
+      if (x < x0 || x >= x1) continue
+      const y = (i / w) | 0
+      if (x < bx0) bx0 = x; if (x > bx1) bx1 = x
+      if (y < by0) by0 = y; if (y > by1) by1 = y
+      cnt++
+    }
+    return cnt > 0.01 * N ? { bx0, by0, bx1, by1 } : null
+  }
+  const lb = box(0, midX), rb = box(midX, w)
+  if (!lb || !rb) return null
+  const paint = (b: { bx0: number; by0: number; bx1: number; by1: number }): LM => {
+    const cx = (b.bx0 + b.bx1) / 2, cy = (b.by0 + b.by1) / 2
+    const rx = Math.max(1, (b.bx1 - b.bx0) / 2 * 0.94), ry = Math.max(1, (b.by1 - b.by0) / 2 * 0.94)
+    for (let y = b.by0; y <= b.by1; y++) for (let x = b.bx0; x <= b.bx1; x++) {
+      const dx = (x - cx) / rx, dy = (y - cy) / ry
+      if (dx * dx + dy * dy > 1) continue
+      const i = (y * w + x) * 4
+      data[i] = 150; data[i + 1] = 150; data[i + 2] = 148
+      data[i + 3] = Math.min(data[i + 3], 30)
+    }
+    return { x: cx / w, y: cy / h }
+  }
+  return { lc: paint(lb), rc: paint(rb) }
+}
+
+type Prepared = { source: HTMLCanvasElement; w: number; h: number; lc: LM; rc: LM }
+
+function prepareFrame(bitmap: CanvasImageSource, W: number, H: number): Prepared {
+  const scale = Math.min(1, 480 / W)
   const w = Math.max(1, Math.round(W * scale))
   const h = Math.max(1, Math.round(H * scale))
   const c = document.createElement('canvas')
   c.width = w; c.height = h
   const cx = c.getContext('2d', { willReadFrequently: true })!
   cx.drawImage(bitmap, 0, 0, w, h)
-  const data = cx.getImageData(0, 0, w, h).data
+  const imgData = cx.getImageData(0, 0, w, h)
+  const data = imgData.data
   const opaque = new Uint8Array(w * h)
   for (let i = 0; i < w * h; i++) opaque[i] = data[i * 4 + 3] > 60 ? 1 : 0
-  return findLensCentres(opaque, w, h)
+
+  const holes = findLensCentres(opaque, w, h)
+  let { lc, rc } = holes
+  if (!holes.found) {
+    const glass = repaintLenses(data, w, h, opaque)
+    if (glass) { cx.putImageData(imgData, 0, 0); lc = glass.lc; rc = glass.rc }
+  }
+  return { source: c, w, h, lc, rc }
 }
 
 function makeShadow(bitmap: CanvasImageSource, w: number, h: number): HTMLCanvasElement {
@@ -164,11 +227,10 @@ export class TryOnScene {
     const token = ++this.frameToken
     if (!spec.tryOnImageUrl) { this.frame = null; this.clear(); return }
     try {
-      const img = await loadImage(spec.tryOnImageUrl)
+      const raw = await loadImage(spec.tryOnImageUrl)
       if (token !== this.frameToken) return
-      const w = img.naturalWidth, h = img.naturalHeight
-      const { lc, rc } = analyzeFrame(img, w, h)
-      this.frame = { img, w, h, lc, rc, shadow: makeShadow(img, w, h) }
+      const { source, w, h, lc, rc } = prepareFrame(raw, raw.naturalWidth, raw.naturalHeight)
+      this.frame = { img: source, w, h, lc, rc, shadow: makeShadow(source, w, h) }
     } catch {
       this.frame = null
     }
