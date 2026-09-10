@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# local try-on tuning demo (static, not part of the app)
+demo-assets/

@@ -1,19 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { TryOnScene } from '../lib/tryOnScene'
-import { TRY_ON_3D_TUNING } from '../lib/tryOnMatrix'
+import { TryOnScene, TRY_ON_TUNING } from '../lib/tryOnScene'
 
 export type TryOnFrame = { slug: string; name: string; colour?: string | null; tryOnImageUrl?: string | null }
 
 type Phase = 'starting' | 'live' | 'posed' | 'blocked'
-type Fit = { scale: number; offsetUpCm: number; offsetForwardCm: number }
+type Fit = { scale: number; offsetUpCm: number }
 
 const FIT_KEY = 'specskart_tryon_fit'
-const DEFAULT_FIT: Fit = {
-  scale: TRY_ON_3D_TUNING.scale,
-  offsetUpCm: TRY_ON_3D_TUNING.offsetUpCm,
-  offsetForwardCm: TRY_ON_3D_TUNING.offsetForwardCm,
-}
+const DEFAULT_FIT: Fit = { scale: TRY_ON_TUNING.scale, offsetUpCm: TRY_ON_TUNING.offsetUpCm }
 
 function loadFit(): Fit {
   try {
@@ -23,7 +18,7 @@ function loadFit(): Fit {
   return DEFAULT_FIT
 }
 
-/** Full-screen 3D virtual try-on: a head-tracked frame over the live camera. */
+/** Full-screen virtual try-on: the product cut-out fitted to the face over the live camera. */
 export default function TryOn({ frames, onClose }: { frames: TryOnFrame[]; onClose: () => void }) {
   const [phase, setPhase] = useState<Phase>('starting')
   const [idx, setIdx] = useState(0)
@@ -135,6 +130,9 @@ export default function TryOn({ frames, onClose }: { frames: TryOnFrame[]; onClo
 
             {modelLoading && phase !== 'posed' && <p className="mt-3 text-sm text-bone/50">Loading the face model…</p>}
             {err && <p className="mt-3 text-sm text-clay">{err}</p>}
+            {current && !current.tryOnImageUrl && (
+              <p className="mt-3 text-sm text-bone/50">Try-on preview isn’t ready for this frame yet.</p>
+            )}
 
             {frames.length > 1 && <FrameStrip frames={frames} idx={idx} onPick={setIdx} />}
 
@@ -146,10 +144,8 @@ export default function TryOn({ frames, onClose }: { frames: TryOnFrame[]; onClo
                 <div className="mt-2 space-y-2 rounded-xl border border-bone/15 p-3 text-xs">
                   <Slider label="Size" min={0.7} max={1.8} step={0.02} value={fit.scale}
                     onChange={(v) => updateFit({ scale: v })} />
-                  <Slider label="Up / down" min={-1} max={5} step={0.1} value={fit.offsetUpCm}
+                  <Slider label="Up / down" min={-2} max={4} step={0.1} value={fit.offsetUpCm}
                     onChange={(v) => updateFit({ offsetUpCm: v })} />
-                  <Slider label="Depth" min={0} max={4} step={0.1} value={fit.offsetForwardCm}
-                    onChange={(v) => updateFit({ offsetForwardCm: v })} />
                   <button onClick={resetFit} className="text-bone/50 underline">Reset</button>
                 </div>
               )}

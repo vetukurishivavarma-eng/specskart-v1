@@ -167,9 +167,11 @@ export default function FrameFinder() {
     setTryOnNote(null)
     try {
       const products = await shop.products({ faceShape: result.faceShape })
-      setTryOnFrames(products.map((p) => ({
-        slug: p.slug, name: p.name, colour: p.colour, tryOnImageUrl: assetUrl(p.tryOnImageUrl) || null,
-      })))
+      const frames = products
+        .map((p) => ({ slug: p.slug, name: p.name, colour: p.colour, tryOnImageUrl: assetUrl(p.tryOnImageUrl) || null }))
+        .filter((f) => f.tryOnImageUrl)
+      if (!frames.length) { setTryOnNote('None of these frames have a try-on preview yet.'); return }
+      setTryOnFrames(frames)
     } catch {
       setTryOnNote('Could not load the try-on. Please try again in a moment.')
     } finally {

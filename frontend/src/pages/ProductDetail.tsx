@@ -149,7 +149,7 @@ export default function ProductDetail() {
             </button>
           </div>
         )}
-        {!upcoming && (
+        {!upcoming && p.tryOnImageUrl && (
           <button onClick={() => setTryOn(true)} className="btn-ghost mt-3 w-full">Try it on 👓</button>
         )}
         {(add.isError || buyNow.isError) && (
