@@ -18,7 +18,7 @@ const IRIS_A = 468        // one iris centre; the other is IRIS_B — we order b
 const IRIS_B = 473
 const NOSE_TIP = 1
 const PD_CM = 6.3         // average inter-pupillary distance, for cm→pixel conversion
-const REST_DROP = 0.08    // seat the frame this fraction of the eye span below the pupils
+const REST_DROP = 0.12    // seat the frame this fraction of the eye span below the pupils
 const YAW_FADE_START = 0.16  // |nose offset / eye span| where the frame starts fading
 const YAW_FADE_END = 0.34    // …and where it is fully gone (head turned too far for a flat frame)
 const SMOOTH = 0.45      // ponytail: plain EMA on the eye points; swap for one-euro if lag shows
@@ -347,12 +347,12 @@ export class TryOnScene {
 
     const place = () => { ctx.translate(cx, cy); ctx.rotate(roll); ctx.scale(s, s); ctx.translate(-lensMid.x, -lensMid.y) }
 
-    // 1. contact shadow — dark frame silhouette, blurred, dropped a touch
+    // 1. contact shadow — dark frame silhouette, heavily blurred, barely dropped
     ctx.save()
     ctx.clip(oval)
-    ctx.globalAlpha = 0.3 * fade
-    ctx.filter = `blur(${Math.max(1, span * 0.02)}px)`
-    ctx.translate(0, span * 0.04)
+    ctx.globalAlpha = 0.16 * fade
+    ctx.filter = `blur(${Math.max(3, span * 0.05)}px)`
+    ctx.translate(0, span * 0.025)
     place()
     ctx.drawImage(f.shadow, 0, 0)
     ctx.restore()
