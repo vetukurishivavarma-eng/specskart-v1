@@ -71,6 +71,25 @@ public class CatalogService {
                 .map(p -> card(p, firstImage.get(p.getId()))).toList();
     }
 
+    /**
+     * "Trending" / best-seller picks for marketing. The admin `featured` flag is the
+     * curation signal; topped up with the newest in-stock products if there aren't
+     * enough featured ones.
+     * ponytail: featured-flag as the best-seller proxy — swap for a real order-count
+     * query if the client wants sales-ranked.
+     */
+    @Transactional(readOnly = true)
+    public List<Product> trending(int limit) {
+        List<Product> featured = products.findByStatusAndFeaturedTrueOrderByCreatedAtDesc("ACTIVE").stream()
+                .filter(Product::inStock).filter(p -> !p.isUpcoming()).limit(limit).toList();
+        if (featured.size() >= limit) return featured;
+        List<Product> topUp = products.findByStatusOrderByCreatedAtDesc("ACTIVE").stream()
+                .filter(Product::inStock).filter(p -> !p.isUpcoming())
+                .filter(p -> featured.stream().noneMatch(f -> f.getId().equals(p.getId())))
+                .limit(limit - featured.size()).toList();
+        return java.util.stream.Stream.concat(featured.stream(), topUp.stream()).toList();
+    }
+
     /** Top in-stock products whose category suits this face shape — used by the WhatsApp bot. */
     @Transactional(readOnly = true)
     public List<Product> forFaceShape(String faceShape, int limit) {

@@ -36,11 +36,13 @@ public class AdminLeadController {
     private final FaceAnalysisService faceAnalysis;
     private final ConsentRecordRepository consents;
     private final WhatsAppBotService bot;
+    private final com.specskart.lead.LeadFollowUpService followUp;
 
     public AdminLeadController(LeadRepository leads, LeadService leadService, LeadNoteRepository notes,
                               CampaignRepository campaigns, LeadEventRepository events,
                               WhatsAppMessageRepository waMessages, FaceAnalysisService faceAnalysis,
-                              ConsentRecordRepository consents, WhatsAppBotService bot) {
+                              ConsentRecordRepository consents, WhatsAppBotService bot,
+                              com.specskart.lead.LeadFollowUpService followUp) {
         this.leads = leads;
         this.leadService = leadService;
         this.notes = notes;
@@ -50,6 +52,7 @@ public class AdminLeadController {
         this.faceAnalysis = faceAnalysis;
         this.consents = consents;
         this.bot = bot;
+        this.followUp = followUp;
     }
 
     @GetMapping
@@ -101,7 +104,23 @@ public class AdminLeadController {
                 .toList();
 
         return new AdminDtos.LeadDetail(AdminMapper.row(l, campaignName), AdminMapper.attribution(l),
-                timeline, noteDtos, msgs, analyses, consentDtos);
+                timeline, noteDtos, msgs, analyses, consentDtos, followUp.statusOf(l));
+    }
+
+    /** Start / restart the automated WhatsApp nurture sequence for this lead. */
+    @PostMapping("/{id}/follow-up/start")
+    public AdminDtos.LeadRow startFollowUp(@PathVariable UUID id) {
+        followUp.adminRestart(id);
+        Lead l = leadService.get(id);
+        return AdminMapper.row(l, campaignNames().get(l.getCampaignId()));
+    }
+
+    /** Stop the automated nurture sequence — no further touches. */
+    @PostMapping("/{id}/follow-up/stop")
+    public AdminDtos.LeadRow stopFollowUp(@PathVariable UUID id) {
+        followUp.adminStop(id);
+        Lead l = leadService.get(id);
+        return AdminMapper.row(l, campaignNames().get(l.getCampaignId()));
     }
 
     @PatchMapping("/{id}/status")

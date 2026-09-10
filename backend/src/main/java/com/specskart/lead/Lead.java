@@ -80,4 +80,15 @@ public class Lead extends BaseEntity {
 
     /** This lead's shareable referral code (generated on first order). */
     private String referralCode;
+
+    /** Automated WhatsApp nurture sequence state. Null until the lead is enrolled. */
+    @Enumerated(EnumType.STRING)
+    private FollowUpState followUpState;
+
+    /** Zero-based index of the last nurture touch sent. */
+    @Column(nullable = false)
+    private int followUpStep = 0;
+
+    /** When the next nurture touch is due. */
+    private Instant followUpNextAt;
 }

@@ -11,6 +11,17 @@ public interface WhatsAppProvider {
 
     void sendButtons(String toWaId, String bodyText, List<Button> buttons);
 
+    /** An image message with an optional caption. Inside the 24h window only (like sendText). */
+    void sendImage(String toWaId, String imageUrl, String caption);
+
+    /**
+     * An approved template with an image header. The only way to send a picture to a
+     * cold lead outside the 24h window (marketing / utility category as approved in
+     * Meta). {@code headerImageUrl} may be null for a text-only template.
+     */
+    void sendMediaTemplate(String toWaId, String templateName, String languageCode,
+                           String headerImageUrl, List<String> bodyParams);
+
     /**
      * Send an approved message template. This is the ONLY message type Meta accepts
      * outside the 24-hour customer-service window, so agent-initiated re-engagement of

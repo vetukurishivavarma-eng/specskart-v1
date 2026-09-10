@@ -90,6 +90,41 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
     }
 
     @Override
+    public void sendImage(String toWaId, String imageUrl, String caption) {
+        var image = new java.util.LinkedHashMap<String, Object>();
+        image.put("link", imageUrl);
+        if (caption != null && !caption.isBlank()) image.put("caption", caption);
+        post(Map.of(
+                "messaging_product", "whatsapp",
+                "to", toWaId,
+                "type", "image",
+                "image", image));
+    }
+
+    @Override
+    public void sendMediaTemplate(String toWaId, String templateName, String languageCode,
+                                  String headerImageUrl, List<String> bodyParams) {
+        var components = new java.util.ArrayList<Map<String, Object>>();
+        if (headerImageUrl != null && !headerImageUrl.isBlank()) {
+            components.add(Map.of("type", "header", "parameters",
+                    List.of(Map.of("type", "image", "image", Map.of("link", headerImageUrl)))));
+        }
+        if (bodyParams != null && !bodyParams.isEmpty()) {
+            components.add(Map.of("type", "body", "parameters", bodyParams.stream()
+                    .map(p -> Map.of("type", "text", "text", p == null ? "" : p)).toList()));
+        }
+        var template = new java.util.LinkedHashMap<String, Object>();
+        template.put("name", templateName);
+        template.put("language", Map.of("code", languageCode));
+        if (!components.isEmpty()) template.put("components", components);
+        post(Map.of(
+                "messaging_product", "whatsapp",
+                "to", toWaId,
+                "type", "template",
+                "template", template));
+    }
+
+    @Override
     public void sendTemplate(String toWaId, String templateName, String languageCode, List<String> bodyParams) {
         var template = new java.util.LinkedHashMap<String, Object>();
         template.put("name", templateName);

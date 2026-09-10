@@ -53,10 +53,38 @@ public record AppProperties(
                            /** Approved template for the staff new-order alert. Blank = plain text. */
                            String staffOrderTemplate,
                            /** WhatsApp numbers that get a plain alert when a new order is paid. Comma-separated env var; blank = off. */
-                           List<String> staffNumbers) {
+                           List<String> staffNumbers,
+                           /** Approved template for the automated nurture sequence. Image header +
+                            *  {{1}}=first name, {{2}}=headline, {{3}}=offer line, {{4}}=shop link.
+                            *  Blank = the sequence sends plain image+text (24h-window only). */
+                           String nurtureTemplate,
+                           /** Master switch for the automated nurture sequence. */
+                           Boolean nurtureEnabled,
+                           /** Absolute base URL that serves product images publicly (this API's own
+                            *  origin, e.g. https://specskart-api.onrender.com). Blank = nurture messages
+                            *  go text-only. */
+                           String assetBaseUrl) {
 
         public List<String> staffNumbers() {
             return staffNumbers == null ? List.of() : staffNumbers;
+        }
+
+        /** True when the automated nurture sequence should run at all. */
+        public boolean nurtureOn() {
+            return nurtureEnabled == null || nurtureEnabled;
+        }
+
+        /** Approved template configured for the nurture sequence (delivers outside the 24h window). */
+        public boolean nurtureConfigured() {
+            return nurtureTemplate != null && !nurtureTemplate.isBlank();
+        }
+
+        /** Turn a relative product-image path into an absolute URL Meta can fetch, or null. */
+        public String absoluteAsset(String path) {
+            if (path == null || path.isBlank()) return null;
+            if (path.startsWith("http")) return path;
+            if (assetBaseUrl == null || assetBaseUrl.isBlank()) return null;
+            return assetBaseUrl.replaceAll("/+$", "") + (path.startsWith("/") ? path : "/" + path);
         }
 
         /** Approved template configured for customer order-status updates (delivers outside the 24h window). */

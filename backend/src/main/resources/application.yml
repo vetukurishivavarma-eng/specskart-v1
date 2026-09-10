@@ -80,6 +80,15 @@ specskart:
     # WhatsApp numbers alerted when a new order is paid (so someone starts packing).
     # Comma-separated, e.g. +260972809599,+260971234567. Blank = no alerts.
     staff-numbers: ${WHATSAPP_STAFF_NUMBERS:}
+    # Automated nurture sequence — timed product follow-ups to a cold lead until they buy.
+    # Approved template with an IMAGE header: {{1}}=first name, {{2}}=headline, {{3}}=offer line,
+    # {{4}}=shop link. Blank = the sequence sends plain image+text (only delivered if the lead's
+    # 24h window is open). Uses follow-up-template-lang.
+    nurture-template: ${WHATSAPP_NURTURE_TEMPLATE:}
+    nurture-enabled: ${WHATSAPP_NURTURE_ENABLED:true}
+    # This API's own public origin, used to build absolute product-image URLs for WhatsApp
+    # (Meta must be able to GET the image). e.g. https://specskart-api.onrender.com
+    asset-base-url: ${WHATSAPP_ASSET_BASE_URL:}
   payments:
     provider: ${PAYMENTS_PROVIDER:mock}   # mock | flutterwave
     flutterwave:

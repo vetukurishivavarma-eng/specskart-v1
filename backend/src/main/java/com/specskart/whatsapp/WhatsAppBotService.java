@@ -9,6 +9,7 @@ import com.specskart.framefinder.FrameFinderService;
 import com.specskart.order.CartService;
 import com.specskart.order.OrderNotificationService;
 import com.specskart.lead.Lead;
+import com.specskart.lead.LeadFollowUpService;
 import com.specskart.lead.LeadService;
 import com.specskart.lead.LeadStatus;
 import com.specskart.shared.ApiException;
@@ -44,11 +45,12 @@ public class WhatsAppBotService {
     private final AppProperties props;
     private final CatalogService catalog;
     private final CartService carts;
+    private final LeadFollowUpService followUp;
 
     public WhatsAppBotService(WhatsAppProvider provider, WhatsAppMessageRepository messages,
                               FrameFinderService frameFinder, LeadService leadService,
                               AnalyticsService analytics, AppProperties props,
-                              CatalogService catalog, CartService carts) {
+                              CatalogService catalog, CartService carts, LeadFollowUpService followUp) {
         this.provider = provider;
         this.messages = messages;
         this.frameFinder = frameFinder;
@@ -57,11 +59,13 @@ public class WhatsAppBotService {
         this.props = props;
         this.catalog = catalog;
         this.carts = carts;
+        this.followUp = followUp;
     }
 
     @Transactional
     public void handleInbound(Lead lead, String text, String buttonId, String waMessageId) {
         logInbound(lead.getId(), waMessageId, text, buttonId);
+        followUp.onInbound(lead.getId(), text); // opt-out keyword, or defer the automated touches
         BotIntent intent = classify(text, buttonId);
         log.info("bot intent {} for lead {}", intent, lead.getId());
         switch (intent) {
@@ -74,6 +78,7 @@ public class WhatsAppBotService {
             }
             case RESULTS_NOT_NOW -> {
                 leadService.advanceStatusSoft(lead.getId(), LeadStatus.FOLLOW_UP);
+                followUp.enroll(lead.getId());
                 sendText(lead, "No problem — your recommendations are saved. Message us anytime to pick up where you left off.");
             }
             case GREETING, UNKNOWN -> sendWelcome(lead);
@@ -118,6 +123,7 @@ public class WhatsAppBotService {
                         new WhatsAppProvider.Button(BTN_RESULTS_NOT_NOW, "Not Now")));
         logOutbound(lead.getId(), "interactive", "analysis-follow-up");
         analytics.record(LeadEventType.WHATSAPP_RESULTS_REQUESTED, lead.getId(), null);
+        followUp.enroll(lead.getId()); // start the nurture clock now that they've been analysed
     }
 
     private static long hoursLeft(com.specskart.catalog.PromoCode promo) {

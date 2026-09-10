@@ -40,6 +40,7 @@ public class CheckoutService {
     private final OrderNotificationService notifications;
     private final AnalyticsService analytics;
     private final LeadService leadService;
+    private final com.specskart.lead.LeadFollowUpService followUp;
     private final LoyaltyService loyalty;
     private final AppProperties props;
 
@@ -47,7 +48,8 @@ public class CheckoutService {
                            OrderItemRepository orderItems, OrderEventRepository orderEvents,
                            ProductRepository products, PromoCodeRepository promos, PaymentProvider payments,
                            CartService cartService, OrderNotificationService notifications,
-                           AnalyticsService analytics, LeadService leadService, LoyaltyService loyalty,
+                           AnalyticsService analytics, LeadService leadService,
+                           com.specskart.lead.LeadFollowUpService followUp, LoyaltyService loyalty,
                            AppProperties props) {
         this.carts = carts;
         this.cartItems = cartItems;
@@ -61,6 +63,7 @@ public class CheckoutService {
         this.notifications = notifications;
         this.analytics = analytics;
         this.leadService = leadService;
+        this.followUp = followUp;
         this.loyalty = loyalty;
         this.props = props;
     }
@@ -199,6 +202,7 @@ public class CheckoutService {
             analytics.record(LeadEventType.ORDER_PAID, order.getLeadId(), null);
             analytics.record(LeadEventType.LEAD_CONVERTED, order.getLeadId(), null);
             leadService.advanceStatusSoft(order.getLeadId(), LeadStatus.CONVERTED);
+            followUp.onConverted(order.getLeadId());
             loyalty.onOrderPaid(order);
             orders.save(order);
         }

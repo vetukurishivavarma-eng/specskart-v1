@@ -22,7 +22,8 @@ public class AdminDtos {
 
     public record LeadDetail(LeadRow lead, Map<String, Object> attribution, List<TimelineItem> timeline,
                              List<NoteDto> notes, List<Map<String, Object>> whatsappMessages,
-                             List<Map<String, Object>> faceAnalyses, List<Map<String, Object>> consents) {}
+                             List<Map<String, Object>> faceAnalyses, List<Map<String, Object>> consents,
+                             Map<String, Object> followUp) {}
 
     public record StatusUpdate(String status) {}
     public record NewNote(String body) {}

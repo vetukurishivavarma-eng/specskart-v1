@@ -17,6 +17,8 @@ public enum LeadEventType {
     WHATSAPP_RESULTS_REQUESTED,
     EXPERT_CONTACT_REQUESTED, // retired flow — kept so historical lead_events rows still deserialize
     WHATSAPP_FOLLOW_UP_SENT,
+    WHATSAPP_NURTURE_SENT,
+    WHATSAPP_NURTURE_ENDED,
     PRODUCTS_SHOWN,
     ORDER_PLACED,
     ORDER_PAID,

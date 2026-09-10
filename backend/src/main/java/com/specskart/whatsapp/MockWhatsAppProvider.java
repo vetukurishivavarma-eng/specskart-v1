@@ -16,9 +16,12 @@ public class MockWhatsAppProvider implements WhatsAppProvider {
     private static final Logger log = LoggerFactory.getLogger(MockWhatsAppProvider.class);
 
     public record Sent(String toWaId, String text, List<Button> buttons,
-                       String templateName, List<String> templateParams) {
+                       String templateName, List<String> templateParams, String imageUrl) {
         public Sent(String toWaId, String text, List<Button> buttons) {
-            this(toWaId, text, buttons, null, List.of());
+            this(toWaId, text, buttons, null, List.of(), null);
+        }
+        public Sent(String toWaId, String text, List<Button> buttons, String templateName, List<String> templateParams) {
+            this(toWaId, text, buttons, templateName, templateParams, null);
         }
     }
 
@@ -46,6 +49,20 @@ public class MockWhatsAppProvider implements WhatsAppProvider {
     public synchronized void sendTemplate(String toWaId, String templateName, String languageCode, List<String> bodyParams) {
         outbox.add(new Sent(toWaId, null, List.of(), templateName, List.copyOf(bodyParams)));
         log.info("[MOCK-WA] -> {} : template={} lang={} params={}", toWaId, templateName, languageCode, bodyParams);
+    }
+
+    @Override
+    public synchronized void sendImage(String toWaId, String imageUrl, String caption) {
+        outbox.add(new Sent(toWaId, caption, List.of(), null, List.of(), imageUrl));
+        log.info("[MOCK-WA] -> {} : image={} caption={}", toWaId, imageUrl, caption);
+    }
+
+    @Override
+    public synchronized void sendMediaTemplate(String toWaId, String templateName, String languageCode,
+                                               String headerImageUrl, List<String> bodyParams) {
+        outbox.add(new Sent(toWaId, null, List.of(), templateName, List.copyOf(bodyParams), headerImageUrl));
+        log.info("[MOCK-WA] -> {} : mediaTemplate={} lang={} header={} params={}",
+                toWaId, templateName, languageCode, headerImageUrl, bodyParams);
     }
 
     public synchronized List<Sent> outbox() {

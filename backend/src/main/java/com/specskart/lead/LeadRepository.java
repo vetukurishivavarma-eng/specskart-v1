@@ -7,12 +7,21 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface LeadRepository extends JpaRepository<Lead, UUID> {
 
     Optional<Lead> findByWhatsappWaId(String waId);
+
+    /** Leads whose next nurture touch is due (job picks these up each hour). */
+    List<Lead> findTop50ByFollowUpStateAndFollowUpNextAtLessThanEqualOrderByFollowUpNextAtAsc(
+            FollowUpState state, Instant when);
+
+    /** Cold leads never enrolled in the nurture sequence, for the one-time backfill. */
+    List<Lead> findTop100ByFollowUpStateIsNullAndArchivedAtIsNullAndStatusInAndCreatedAtAfter(
+            java.util.Collection<LeadStatus> statuses, Instant since);
     Optional<Lead> findByWhatsappNumber(String number);
     Optional<Lead> findByReferralCode(String referralCode);
     boolean existsByReferralCode(String referralCode);
