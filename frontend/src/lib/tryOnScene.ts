@@ -128,7 +128,7 @@ export function repaintLenses(data: Uint8ClampedArray, w: number, h: number, opa
       if (dx * dx + dy * dy > 1) continue
       const i = (y * w + x) * 4
       data[i] = 150; data[i + 1] = 150; data[i + 2] = 148
-      data[i + 3] = Math.min(data[i + 3], 30)
+      data[i + 3] = Math.min(data[i + 3], 14)   // near-clear so the eyes read through
     }
     return { x: cx / w, y: cy / h }
   }
@@ -366,9 +366,9 @@ export class TryOnScene {
     }
     ctx.clip(lensPath)
     ctx.setTransform(1, 0, 0, 1, 0, 0)
-    ctx.globalAlpha = 0.12 * fade
+    ctx.globalAlpha = 0.07 * fade
     ctx.globalCompositeOperation = 'lighter'
-    ctx.filter = `blur(${Math.max(2, span * 0.06)}px) brightness(1.35)`
+    ctx.filter = `blur(${Math.max(2, span * 0.06)}px) brightness(1.2)`
     ctx.drawImage(this.video, 0, 0, W, H)
     ctx.restore()
 
