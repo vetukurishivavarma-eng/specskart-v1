@@ -33,6 +33,16 @@ public class StoreConfig {
     @Column(nullable = false)
     private String currency = "ZMW";
 
+    /** Waive delivery on a customer's first order (acquisition hook). */
+    @Column(nullable = false)
+    private boolean firstOrderFreeShipping = false;
+
+    @Column(nullable = false, length = 300)
+    private String paymentNote = "Pay by card, MTN / Airtel Money, or cash on delivery.";
+
+    @Column(nullable = false, length = 300)
+    private String guaranteeNote = "Delivered across Zambia · 30-day fit guarantee · free frame adjustments.";
+
     public long shippingFor(long subtotalMinor) {
         if (freeShippingOverMinor != null && subtotalMinor >= freeShippingOverMinor) return 0;
         return shippingFeeMinor;

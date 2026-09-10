@@ -16,8 +16,20 @@ public record AppProperties(
         Payments payments,
         Promo promo,
         Loyalty loyalty,
-        Lenses lenses
+        Lenses lenses,
+        Cod cod
 ) {
+    /**
+     * Cash / pay-on-delivery. enabled: offer it at checkout at all.
+     * maxOrderMinor: hide COD for baskets above this (0 = no cap) — caps the risk on
+     * a no-show / refused delivery.
+     */
+    public record Cod(Boolean enabled, long maxOrderMinor) {
+        public boolean on() { return enabled == null || enabled; }
+        public boolean allowedFor(long totalMinor) {
+            return on() && (maxOrderMinor <= 0 || totalMinor <= maxOrderMinor);
+        }
+    }
     /** Per-pair price add-on (minor units) for each prescription-lens option. Non-prescription = 0. */
     public record Lenses(long singleVisionAddMinor, long progressiveAddMinor, long blueLightAddMinor) {
         public long addFor(String lensType) {

@@ -22,15 +22,18 @@ public class CatalogService {
     private final RecommendationService recommendations;
     private final StockAlertRepository stockAlerts;
 
+    private final com.specskart.config.AppProperties props;
+
     public CatalogService(ProductRepository products, ProductImageRepository images, PromoCodeRepository promos,
                           StoreConfigRepository storeConfig, RecommendationService recommendations,
-                          StockAlertRepository stockAlerts) {
+                          StockAlertRepository stockAlerts, com.specskart.config.AppProperties props) {
         this.products = products;
         this.images = images;
         this.promos = promos;
         this.storeConfig = storeConfig;
         this.recommendations = recommendations;
         this.stockAlerts = stockAlerts;
+        this.props = props;
     }
 
     @Transactional(readOnly = true)
@@ -135,7 +138,8 @@ public class CatalogService {
     public CatalogDtos.StoreConfigDto storeConfig() {
         StoreConfig c = storeConfig.current();
         return new CatalogDtos.StoreConfigDto(c.getHeroTitle(), c.getHeroSubtitle(), c.getHeroImageUrl(),
-                c.getShippingFeeMinor(), c.getFreeShippingOverMinor(), c.getDeliveryEta(), c.getCurrency());
+                c.getShippingFeeMinor(), c.getFreeShippingOverMinor(), c.getDeliveryEta(), c.getCurrency(),
+                c.isFirstOrderFreeShipping(), props.cod().on(), c.getPaymentNote(), c.getGuaranteeNote());
     }
 
     /** Validate a promo against a subtotal without redeeming it. */

@@ -39,4 +39,11 @@ public class AdminOrderController {
         checkout.updateStatus(id, target, body.note());
         return query.byId(id);
     }
+
+    /** Confirm cash was collected for a pay-on-delivery order (settles loyalty / conversion). */
+    @PostMapping("/{id}/cash-received")
+    public OrderDtos.OrderView cashReceived(@PathVariable UUID id) {
+        checkout.markCashReceived(id);
+        return query.byId(id);
+    }
 }

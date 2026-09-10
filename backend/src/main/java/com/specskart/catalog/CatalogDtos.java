@@ -24,7 +24,9 @@ public final class CatalogDtos {
 
     public record StoreConfigDto(String heroTitle, String heroSubtitle, String heroImageUrl,
                                  long shippingFeeMinor, Long freeShippingOverMinor,
-                                 String deliveryEta, String currency) {}
+                                 String deliveryEta, String currency,
+                                 boolean firstOrderFreeShipping, boolean codEnabled,
+                                 String paymentNote, String guaranteeNote) {}
 
     public record PromoPreview(String code, String discountType, int discountValue,
                                long discountMinor, boolean applicable, String message) {}
@@ -53,5 +55,6 @@ public final class CatalogDtos {
 
     public record StoreConfigUpsert(String heroTitle, String heroSubtitle, String heroImageUrl,
                                     Long shippingFeeMinor, Long freeShippingOverMinor,
-                                    String deliveryEta, String currency) {}
+                                    String deliveryEta, String currency,
+                                    Boolean firstOrderFreeShipping, String paymentNote, String guaranteeNote) {}
 }

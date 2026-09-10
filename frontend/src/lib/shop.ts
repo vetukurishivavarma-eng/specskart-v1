@@ -108,6 +108,13 @@ export type OrderView = {
   timeline: { status: string; note: string | null; at: string }[]
   pointsEarned: number; pointsRedeemed: number; pointsBalance: number; referralCode: string | null
   lensType: string | null; lensAddMinor: number; rxJson: string | null
+  paymentMethod: 'ONLINE' | 'COD'; cashDueMinor: number
+}
+
+export type StoreConfig = {
+  heroTitle: string; heroSubtitle: string; heroImageUrl: string | null
+  deliveryEta: string; currency: string; shippingFeeMinor: number; freeShippingOverMinor: number | null
+  firstOrderFreeShipping: boolean; codEnabled: boolean; paymentNote: string; guaranteeNote: string
 }
 
 async function cartCall<T = CartView>(path: string, opts: RequestInit = {}): Promise<T> {
@@ -124,7 +131,7 @@ export const shop = {
   },
   featured: () => api<ProductCard[]>('/public/products/featured'),
   product: (slug: string) => api<ProductDetail>(`/public/products/${slug}`),
-  storeConfig: () => api<{ heroTitle: string; heroSubtitle: string; heroImageUrl: string | null; deliveryEta: string; currency: string; shippingFeeMinor: number; freeShippingOverMinor: number | null }>('/public/store-config'),
+  storeConfig: () => api<StoreConfig>('/public/store-config'),
   socialProof: () => api<SocialProof>('/public/social-proof'),
 
   cart: () => cartCall(`/public/cart${sParam()}`),
@@ -137,8 +144,8 @@ export const shop = {
   setLens: (lensType: string | null, rxJson?: string | null) =>
     cartCall('/public/cart/lens', { method: 'POST', body: JSON.stringify({ lensType, rxJson: rxJson ?? null }) }),
 
-  checkout: (body: Record<string, string | number | undefined>) =>
-    cartCall<{ orderNo: string; checkoutUrl: string; totalMinor: number; currency: string }>(
+  checkout: (body: Record<string, string | number | boolean | undefined>) =>
+    cartCall<{ orderNo: string; checkoutUrl: string | null; totalMinor: number; currency: string }>(
       `/public/checkout${sParam()}`, { method: 'POST', body: JSON.stringify(body) }),
   order: (orderNo: string) => api<OrderView>(`/public/orders/${orderNo}`),
   confirmOrder: (orderNo: string) =>

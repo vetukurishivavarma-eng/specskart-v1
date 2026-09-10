@@ -52,6 +52,12 @@ export default function Store() {
       <h1 className="mt-2 text-4xl">{cfg?.heroTitle ?? 'Frames matched to your face.'}</h1>
       <p className="mt-3 max-w-xl text-ink/65">{cfg?.heroSubtitle}</p>
 
+      <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink/60">
+        {cfg?.firstOrderFreeShipping && <span>🚚 Free delivery on your first order</span>}
+        {cfg?.paymentNote && <span>💳 {cfg.paymentNote}</span>}
+        {cfg?.guaranteeNote && <span>✓ {cfg.guaranteeNote}</span>}
+      </div>
+
       {face && (
         <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-moss/15 px-3 py-1 text-sm">
           Showing frames for a <strong>{faceLabel}</strong> face

@@ -67,4 +67,15 @@ public class Order extends BaseEntity {
     private long lensAddMinor = 0;
     @Column(columnDefinition = "text")
     private String rxJson;
+
+    /** True for a cash / pay-on-delivery order. */
+    public boolean isCod() {
+        return "COD".equalsIgnoreCase(paymentProvider);
+    }
+
+    /** COD order whose cash hasn't been collected yet and isn't cancelled. */
+    public boolean cashStillDue() {
+        return isCod() && paidAt == null
+                && status != OrderStatus.CANCELLED && status != OrderStatus.REFUNDED;
+    }
 }

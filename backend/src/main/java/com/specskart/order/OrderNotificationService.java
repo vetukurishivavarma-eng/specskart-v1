@@ -83,7 +83,8 @@ public class OrderNotificationService {
         if (order.getCustomerPhone() != null) who += " · " + order.getCustomerPhone();
         String amount = money(order.getTotalMinor(), order.getCurrency());
         String adminLink = props.frontendBaseUrl() + "/admin/orders/" + order.getId();
-        String plain = "🛍️ New order " + order.getOrderNo() + " — " + amount + "\n"
+        String pay = order.isCod() ? "\n💵 CASH ON DELIVERY — collect " + amount + " on hand-over" : "";
+        String plain = "🛍️ New order " + order.getOrderNo() + " — " + amount + pay + "\n"
                 + itemLine(order) + "\n" + who + "\n\nPack & dispatch: " + adminLink;
         boolean useTemplate = props.whatsapp().staffOrderConfigured();
 
@@ -108,6 +109,7 @@ public class OrderNotificationService {
     /** Short, single-line status headline — fills {{2}} of the order-update template. Null = no customer message. */
     static String statusLine(OrderStatus status) {
         return switch (status) {
+            case CONFIRMED -> "Order confirmed — pay cash when it arrives";
             case PAID -> "Payment received — we're preparing your frames";
             case PACKED -> "Packed and ready for dispatch";
             case SHIPPED -> "Handed to the courier — on its way to you";
@@ -128,6 +130,9 @@ public class OrderNotificationService {
             rewards += "\nShare code *" + lead.getReferralCode() + "* — your friend gets a discount, you get points.";
         }
         return switch (status) {
+            case CONFIRMED -> "Order confirmed" + hi + " ✅\n\nOrder " + order.getOrderNo() + "\n" + items
+                    + "\n\nPay *" + money(order.getTotalMinor(), order.getCurrency())
+                    + "* in cash to the courier on delivery. We're getting your frames ready — track any time:\n" + track;
             case PAID -> "Thanks" + hi + "! Payment received ✅\n\nOrder " + order.getOrderNo() + "\n" + items
                     + "\nTotal " + money(order.getTotalMinor(), order.getCurrency()) + rewards
                     + "\n\nWe're preparing your frames. Track your order any time:\n" + track;

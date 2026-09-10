@@ -6,8 +6,9 @@ import { shop, money, setCartToken } from '../lib/shop'
 const WA = import.meta.env.VITE_WA_LINK ?? 'https://wa.me/260000000000'
 
 const STEPS = ['PAID', 'PACKED', 'SHIPPED', 'DELIVERED']
+const STEPS_COD = ['CONFIRMED', 'PACKED', 'SHIPPED', 'DELIVERED']
 const LABEL: Record<string, string> = {
-  PENDING_PAYMENT: 'Awaiting payment', PAID: 'Payment received', PACKED: 'Packed',
+  PENDING_PAYMENT: 'Awaiting payment', CONFIRMED: 'Order confirmed', PAID: 'Payment received', PACKED: 'Packed',
   SHIPPED: 'Out for delivery', DELIVERED: 'Delivered', CANCELLED: 'Cancelled', REFUNDED: 'Refunded',
 }
 
@@ -33,7 +34,8 @@ export default function OrderTracking() {
     </div>
   )
 
-  const stepIdx = STEPS.indexOf(order.status)
+  const steps = order.paymentMethod === 'COD' ? STEPS_COD : STEPS
+  const stepIdx = steps.indexOf(order.status)
   const terminal = order.status === 'CANCELLED' || order.status === 'REFUNDED'
 
   return (
@@ -45,9 +47,15 @@ export default function OrderTracking() {
         <p className="mt-3 text-ink/60">We’re waiting for your payment to confirm. This page updates automatically.</p>
       )}
 
+      {order.cashDueMinor > 0 && (
+        <div className="mt-4 rounded-xl border border-ink/15 bg-bone px-4 py-3 text-sm">
+          💵 Pay <b>{money(order.cashDueMinor, order.currency)}</b> in cash to the courier when your frames arrive.
+        </div>
+      )}
+
       {!terminal && stepIdx >= 0 && (
         <ol className="mt-8 flex justify-between">
-          {STEPS.map((s, i) => (
+          {steps.map((s, i) => (
             <li key={s} className="flex flex-1 flex-col items-center text-center">
               <span className={`h-3 w-3 rounded-full ${i <= stepIdx ? 'bg-ink' : 'bg-ink/20'}`} />
               <span className={`mt-2 text-xs ${i <= stepIdx ? 'text-ink' : 'text-ink/40'}`}>{LABEL[s]}</span>

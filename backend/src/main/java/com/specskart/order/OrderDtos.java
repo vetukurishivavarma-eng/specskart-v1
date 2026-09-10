@@ -29,8 +29,15 @@ public final class OrderDtos {
     // ---- checkout ----
     public record CheckoutRequest(String customerName, String customerPhone, String customerEmail,
                                   String shipAddress, String shipCity,
-                                  Integer redeemPoints, String referralCode) {}
+                                  Integer redeemPoints, String referralCode,
+                                  Boolean payOnDelivery) {
+        public CheckoutRequest(String customerName, String customerPhone, String customerEmail,
+                               String shipAddress, String shipCity, Integer redeemPoints, String referralCode) {
+            this(customerName, customerPhone, customerEmail, shipAddress, shipCity, redeemPoints, referralCode, false);
+        }
+    }
 
+    /** checkoutUrl is null for a cash-on-delivery order (nothing to pay online). */
     public record CheckoutResult(String orderNo, String checkoutUrl, long totalMinor, String currency) {}
 
     // ---- order views ----
@@ -42,7 +49,8 @@ public final class OrderDtos {
                             String currency, String promoCode, Instant paidAt, Instant createdAt,
                             List<OrderLine> lines, List<StatusEvent> timeline,
                             int pointsEarned, int pointsRedeemed, int pointsBalance, String referralCode,
-                            String lensType, long lensAddMinor, String rxJson) {}
+                            String lensType, long lensAddMinor, String rxJson,
+                            String paymentMethod, long cashDueMinor) {}
 
     public record StatusEvent(String status, String note, Instant at) {}
 

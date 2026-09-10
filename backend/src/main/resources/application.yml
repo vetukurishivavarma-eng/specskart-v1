@@ -54,6 +54,11 @@ specskart:
     single-vision-add-minor: ${LENS_SINGLE_VISION_MINOR:15000}   # +K150
     progressive-add-minor: ${LENS_PROGRESSIVE_MINOR:45000}       # +K450
     blue-light-add-minor: ${LENS_BLUE_LIGHT_MINOR:8000}          # +K80
+  cod:
+    # Cash / pay-on-delivery at checkout — standard for Zambian e-commerce.
+    enabled: ${COD_ENABLED:true}
+    # Hide COD for baskets above this (minor units). 0 = no cap.
+    max-order-minor: ${COD_MAX_ORDER_MINOR:0}
   whatsapp:
     provider: ${WHATSAPP_PROVIDER:mock}
     phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}

@@ -39,9 +39,12 @@ public class CartService {
     private final com.specskart.lead.LeadRepository leads;
     private final com.specskart.config.AppProperties props;
 
+    private final OrderRepository orders;
+
     public CartService(CartRepository carts, CartItemRepository items, ProductRepository products,
                        ProductImageRepository images, PromoCodeRepository promos, StoreConfigRepository storeConfig,
-                       com.specskart.lead.LeadRepository leads, com.specskart.config.AppProperties props) {
+                       com.specskart.lead.LeadRepository leads, com.specskart.config.AppProperties props,
+                       OrderRepository orders) {
         this.carts = carts;
         this.items = items;
         this.products = products;
@@ -50,6 +53,12 @@ public class CartService {
         this.storeConfig = storeConfig;
         this.leads = leads;
         this.props = props;
+        this.orders = orders;
+    }
+
+    /** No lead (anonymous) or a lead who has never ordered before. */
+    private boolean isFirstOrder(java.util.UUID leadId) {
+        return leadId == null || orders.findByLeadIdOrderByCreatedAtDesc(leadId).isEmpty();
     }
 
     @Transactional
@@ -209,6 +218,9 @@ public class CartService {
         StoreConfig sc = storeConfig.current();
         long goods = subtotal + lensAdd;
         long shipping = out.isEmpty() ? 0 : sc.shippingFor(goods - discount);
+        if (shipping > 0 && sc.isFirstOrderFreeShipping() && isFirstOrder(cart.getLeadId())) {
+            shipping = 0;
+        }
         long total = Math.max(0, goods - discount) + shipping;
         int points = cart.getLeadId() == null ? 0
                 : leads.findById(cart.getLeadId()).map(com.specskart.lead.Lead::getPoints).orElse(0);

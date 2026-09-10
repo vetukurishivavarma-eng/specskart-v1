@@ -170,6 +170,20 @@ public class CheckoutService {
             leadService.advanceStatusSoft(order.getLeadId(), LeadStatus.INTERESTED);
         }
 
+        // Cash / pay-on-delivery: no gateway hop. Confirm the order, alert the packer,
+        // tell the customer what to pay the courier. Loyalty / CRM-conversion happen
+        // when the cash is actually collected (markCashReceived / on DELIVERED).
+        if (Boolean.TRUE.equals(req.payOnDelivery()) && props.cod().allowedFor(order.getTotalMinor())) {
+            order.setPaymentProvider("COD");
+            order.setStatus(OrderStatus.CONFIRMED);
+            orders.save(order);
+            event(order, OrderStatus.CONFIRMED, "Order confirmed — pay cash on delivery");
+            notifications.onStatus(order, OrderStatus.CONFIRMED);
+            notifications.notifyNewOrder(order);
+            return new OrderDtos.CheckoutResult(order.getOrderNo(), null,
+                    order.getTotalMinor(), order.getCurrency());
+        }
+
         String redirect = props.frontendBaseUrl() + "/order/" + order.getOrderNo();
         var payment = payments.start(new PaymentProvider.PaymentRequest(
                 order.getOrderNo(), order.getTotalMinor(), order.getCurrency(),
@@ -194,10 +208,31 @@ public class CheckoutService {
             return;
         }
         order.setStatus(OrderStatus.PAID);
-        order.setPaidAt(Instant.now());
         orders.save(order);
         event(order, OrderStatus.PAID, "Payment confirmed");
+        applyConversion(order);
+        notifications.onStatus(order, OrderStatus.PAID);
+        notifications.notifyNewOrder(order);
+    }
 
+    /** Mark a cash-on-delivery order as paid once the courier has collected the money. */
+    @Transactional
+    public Order markCashReceived(UUID orderId) {
+        Order order = orders.findById(orderId)
+                .orElseThrow(() -> ApiException.notFound("ORDER_NOT_FOUND", "No such order."));
+        if (!order.cashStillDue()) {
+            throw ApiException.badRequest("NOT_COD_OR_ALREADY_PAID",
+                    "This order isn't awaiting cash on delivery.");
+        }
+        applyConversion(order);
+        event(order, order.getStatus(), "Cash received");
+        return order;
+    }
+
+    /** The loyalty / CRM-conversion / nurture-stop effects of an order being paid for. */
+    private void applyConversion(Order order) {
+        order.setPaidAt(Instant.now());
+        orders.save(order);
         if (order.getLeadId() != null) {
             analytics.record(LeadEventType.ORDER_PAID, order.getLeadId(), null);
             analytics.record(LeadEventType.LEAD_CONVERTED, order.getLeadId(), null);
@@ -206,8 +241,6 @@ public class CheckoutService {
             loyalty.onOrderPaid(order);
             orders.save(order);
         }
-        notifications.onStatus(order, OrderStatus.PAID);
-        notifications.notifyNewOrder(order);
     }
 
     @Transactional
@@ -225,6 +258,11 @@ public class CheckoutService {
         event(order, target, note);
         if (target == OrderStatus.DELIVERED && order.getLeadId() != null) {
             analytics.record(LeadEventType.ORDER_DELIVERED, order.getLeadId(), null);
+        }
+        // COD: handing the parcel over IS the payment — settle it now if the packer
+        // didn't already mark cash received.
+        if (target == OrderStatus.DELIVERED && order.cashStillDue()) {
+            applyConversion(order);
         }
         notifications.onStatus(order, target);
         return order;

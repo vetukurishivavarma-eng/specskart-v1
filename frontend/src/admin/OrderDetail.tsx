@@ -5,6 +5,7 @@ import { money, type OrderView } from '../lib/shop'
 
 const NEXT: Record<string, string[]> = {
   PENDING_PAYMENT: ['PAID', 'CANCELLED'],
+  CONFIRMED: ['PACKED', 'CANCELLED'],
   PAID: ['PACKED', 'CANCELLED', 'REFUNDED'],
   PACKED: ['SHIPPED', 'CANCELLED', 'REFUNDED'],
   SHIPPED: ['DELIVERED', 'REFUNDED'],
@@ -19,11 +20,16 @@ export default function OrderDetail() {
     queryFn: () => api<OrderView>(`/admin/orders/${id}`, { auth: true }),
   })
 
+  const invalidate = () => { qc.invalidateQueries({ queryKey: ['admin-order', id] }); qc.invalidateQueries({ queryKey: ['admin-orders'] }) }
   const move = useMutation({
     mutationFn: (status: string) => api(`/admin/orders/${id}/status`, {
       method: 'PATCH', auth: true, body: JSON.stringify({ status, note: null }),
     }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-order', id] }); qc.invalidateQueries({ queryKey: ['admin-orders'] }) },
+    onSuccess: invalidate,
+  })
+  const cashReceived = useMutation({
+    mutationFn: () => api(`/admin/orders/${id}/cash-received`, { method: 'POST', auth: true }),
+    onSuccess: invalidate,
   })
 
   if (isLoading || !o) return <p className="text-ink/50">Loading…</p>
@@ -35,7 +41,18 @@ export default function OrderDetail() {
         <div>
           <h1 className="text-2xl">{o.orderNo}</h1>
           <p className="text-ink/55">{o.status} · placed {new Date(o.createdAt).toLocaleString()}</p>
+          {o.paymentMethod === 'COD' && (
+            <p className="mt-1 text-sm">
+              💵 Cash on delivery — {o.cashDueMinor > 0
+                ? <b>{money(o.cashDueMinor, o.currency)} to collect</b>
+                : <span className="text-moss">cash received</span>}
+            </p>
+          )}
           <div className="mt-3 flex flex-wrap gap-2">
+            {o.cashDueMinor > 0 && (
+              <button disabled={cashReceived.isPending} onClick={() => cashReceived.mutate()}
+                className="btn-primary !px-3 !py-1 text-xs">Mark cash received</button>
+            )}
             {nexts.map((s) => (
               <button key={s} disabled={move.isPending} onClick={() => move.mutate(s)}
                 className="btn-ghost !px-3 !py-1 text-xs">→ {s}</button>

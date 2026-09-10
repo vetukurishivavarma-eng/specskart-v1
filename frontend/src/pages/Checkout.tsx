@@ -1,25 +1,30 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { shop, money } from '../lib/shop'
 
 export default function Checkout() {
+  const navigate = useNavigate()
   const { data: cart, isLoading } = useQuery({ queryKey: ['cart'], queryFn: shop.cart })
+  const { data: cfg } = useQuery({ queryKey: ['storeConfig'], queryFn: shop.storeConfig })
   const [f, setF] = useState({ customerName: '', customerPhone: '', customerEmail: '', shipAddress: '', shipCity: '' })
   const on = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value })
   const [usePoints, setUsePoints] = useState(false)
   const [referral, setReferral] = useState('')
+  const [method, setMethod] = useState<'ONLINE' | 'COD'>('ONLINE')
 
   const points = cart?.pointsAvailable ?? 0
   const pointsDiscount = usePoints ? points * (cart?.pointValueMinor ?? 0) : 0
+  const cod = method === 'COD'
 
   const pay = useMutation({
     mutationFn: () => shop.checkout({
       ...f,
       redeemPoints: usePoints ? points : undefined,
       referralCode: referral.trim() || undefined,
+      payOnDelivery: cod,
     }),
-    onSuccess: (r) => { window.location.href = r.checkoutUrl },
+    onSuccess: (r) => { r.checkoutUrl ? (window.location.href = r.checkoutUrl) : navigate(`/order/${r.orderNo}`) },
   })
 
   if (isLoading) return <div className="container-x py-16 text-ink/50">Loading…</div>
@@ -57,13 +62,32 @@ export default function Checkout() {
             </label>
           )}
 
+          <fieldset className="mt-4 space-y-2">
+            <span className="text-xs font-medium uppercase tracking-widest text-ink/50">How would you like to pay?</span>
+            <label className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${!cod ? 'border-ink bg-ink/5' : 'border-ink/20'}`}>
+              <input type="radio" name="pay" checked={!cod} onChange={() => setMethod('ONLINE')} className="mt-0.5" />
+              <span><b>Pay now</b> — card or mobile money (MTN / Airtel). Secure checkout.</span>
+            </label>
+            {cfg?.codEnabled !== false && (
+              <label className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${cod ? 'border-ink bg-ink/5' : 'border-ink/20'}`}>
+                <input type="radio" name="pay" checked={cod} onChange={() => setMethod('COD')} className="mt-0.5" />
+                <span><b>Pay on delivery</b> — cash to the courier when your frames arrive.</span>
+              </label>
+            )}
+          </fieldset>
+
           <button className="btn-primary mt-4 w-full disabled:bg-ink/30" disabled={!valid || pay.isPending}>
-            {pay.isPending ? 'Redirecting to payment…'
+            {pay.isPending ? 'Placing your order…'
+              : cod ? `Place order · pay ${money(cart.totalMinor, cart.currency)} on delivery`
               : (usePoints || referral.trim()) ? 'Continue to payment'
               : `Pay ${money(cart.totalMinor, cart.currency)}`}
           </button>
           {pay.isError && <p className="text-sm text-clay">{(pay.error as Error).message}</p>}
-          <p className="text-xs text-ink/45">You’ll be taken to a secure page to pay by card or mobile money (MTN / Airtel).</p>
+          <p className="text-xs text-ink/45">
+            {cod ? 'We’ll get your frames ready and the courier collects the cash on hand-over.'
+                 : 'You’ll be taken to a secure page to pay by card or mobile money (MTN / Airtel).'}
+          </p>
+          {cfg?.guaranteeNote && <p className="text-xs text-ink/45">✓ {cfg.guaranteeNote}</p>}
         </form>
       </div>
 

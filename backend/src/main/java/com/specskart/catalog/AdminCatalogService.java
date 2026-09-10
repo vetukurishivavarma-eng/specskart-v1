@@ -31,14 +31,18 @@ public class AdminCatalogService {
     private final PromoCodeRepository promos;
     private final StoreConfigRepository storeConfig;
 
+    private final com.specskart.config.AppProperties props;
+
     public AdminCatalogService(ProductRepository products, ProductImageRepository images,
                                ProductImageFileRepository imageFiles,
-                               PromoCodeRepository promos, StoreConfigRepository storeConfig) {
+                               PromoCodeRepository promos, StoreConfigRepository storeConfig,
+                               com.specskart.config.AppProperties props) {
         this.products = products;
         this.images = images;
         this.imageFiles = imageFiles;
         this.promos = promos;
         this.storeConfig = storeConfig;
+        this.props = props;
     }
 
     // ---- uploaded photos ----
@@ -381,8 +385,12 @@ public class AdminCatalogService {
         c.setFreeShippingOverMinor(in.freeShippingOverMinor());
         if (in.deliveryEta() != null) c.setDeliveryEta(in.deliveryEta());
         if (in.currency() != null) c.setCurrency(in.currency().toUpperCase(Locale.ROOT));
+        if (in.firstOrderFreeShipping() != null) c.setFirstOrderFreeShipping(in.firstOrderFreeShipping());
+        if (in.paymentNote() != null) c.setPaymentNote(in.paymentNote());
+        if (in.guaranteeNote() != null) c.setGuaranteeNote(in.guaranteeNote());
         storeConfig.save(c);
         return new CatalogDtos.StoreConfigDto(c.getHeroTitle(), c.getHeroSubtitle(), c.getHeroImageUrl(),
-                c.getShippingFeeMinor(), c.getFreeShippingOverMinor(), c.getDeliveryEta(), c.getCurrency());
+                c.getShippingFeeMinor(), c.getFreeShippingOverMinor(), c.getDeliveryEta(), c.getCurrency(),
+                c.isFirstOrderFreeShipping(), props.cod().on(), c.getPaymentNote(), c.getGuaranteeNote());
     }
 }

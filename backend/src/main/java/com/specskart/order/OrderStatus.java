@@ -4,6 +4,8 @@ import java.util.Set;
 
 public enum OrderStatus {
     PENDING_PAYMENT,
+    /** Cash-on-delivery order, confirmed and ready to fulfil — payment collected on hand-over. */
+    CONFIRMED,
     PAID,
     PACKED,
     SHIPPED,
@@ -12,7 +14,8 @@ public enum OrderStatus {
     REFUNDED;
 
     private static final java.util.Map<OrderStatus, Set<OrderStatus>> NEXT = java.util.Map.of(
-            PENDING_PAYMENT, Set.of(PAID, CANCELLED),
+            PENDING_PAYMENT, Set.of(PAID, CONFIRMED, CANCELLED),
+            CONFIRMED, Set.of(PAID, PACKED, CANCELLED),
             PAID, Set.of(PACKED, CANCELLED, REFUNDED),
             PACKED, Set.of(SHIPPED, CANCELLED, REFUNDED),
             SHIPPED, Set.of(DELIVERED, REFUNDED),
