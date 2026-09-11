@@ -150,6 +150,17 @@ public class LeadService {
         return leads.save(lead);
     }
 
+    /** WhatsApp "help me choose": remember which product slugs were just shown so a later
+     *  "BUY 1/2/3" reply can resolve the number without a session store. */
+    @Transactional
+    public void rememberPicks(UUID leadId, List<String> slugs) {
+        Lead lead = get(leadId);
+        Map<String, Object> meta = new java.util.HashMap<>(lead.getProviderMetadata());
+        meta.put("lastPicks", slugs);
+        lead.setProviderMetadata(meta);
+        leads.save(lead);
+    }
+
     private void applyAttribution(Lead lead, AttributionContext ctx) {
         lead.setAcquisitionSource(ctx.source);
         lead.setAdId(ctx.adId);

@@ -36,6 +36,13 @@ public class WhatsAppBotService {
     static final String BTN_WEBSITE = "VISIT_WEBSITE";
     static final String BTN_RESULTS_FRAMES = "RESULTS_SHOW_FRAMES";
     static final String BTN_RESULTS_NOT_NOW = "RESULTS_NOT_NOW";
+    static final String BTN_HELP_CHOOSE = "HELP_CHOOSE";
+    static final String BTN_BUDGET_LOW = "BUDGET_LOW";
+    static final String BTN_BUDGET_MED = "BUDGET_MED";
+    static final String BTN_BUDGET_HIGH = "BUDGET_HIGH";
+
+    private static final java.util.regex.Pattern BUY_PATTERN =
+            java.util.regex.Pattern.compile("(?i)^\\s*buy\\s*([1-3])\\s*$");
 
     private final WhatsAppProvider provider;
     private final WhatsAppMessageRepository messages;
@@ -66,12 +73,24 @@ public class WhatsAppBotService {
     public void handleInbound(Lead lead, String text, String buttonId, String waMessageId) {
         logInbound(lead.getId(), waMessageId, text, buttonId);
         followUp.onInbound(lead.getId(), text); // opt-out keyword, or defer the automated touches
+
+        // "BUY 1/2/3" against the picks just shown — a freeform reply, not a button, and
+        // its meaning depends on what was last sent, so it's resolved before classify().
+        if (buttonId == null && text != null) {
+            var m = BUY_PATTERN.matcher(text.trim());
+            if (m.matches()) { handleBuy(lead, Integer.parseInt(m.group(1))); return; }
+        }
+
         BotIntent intent = classify(text, buttonId);
         log.info("bot intent {} for lead {}", intent, lead.getId());
         switch (intent) {
             case FIND_FRAMES -> sendFrameFinderLink(lead);
             case EXPLORE_FRAMES -> sendShop(lead, "Our full collection is here — every style, buy online:\n");
             case VISIT_WEBSITE -> sendText(lead, "Here's our website: " + props.frontendBaseUrl());
+            case HELP_CHOOSE -> sendBudgetPrompt(lead);
+            case BUDGET_LOW -> sendBudgetPicks(lead, "low");
+            case BUDGET_MED -> sendBudgetPicks(lead, "mid");
+            case BUDGET_HIGH -> sendBudgetPicks(lead, "high");
             case RESULTS_SHOW_FRAMES -> {
                 leadService.advanceStatusSoft(lead.getId(), LeadStatus.INTERESTED);
                 sendRecommendedProducts(lead);
@@ -91,9 +110,62 @@ public class WhatsAppBotService {
                 "Hi" + name + " 👋\nWelcome to " + props.storeName()
                         + ".\n\nI can help you find frames that complement your face. What would you like to do?",
                 List.of(new WhatsAppProvider.Button(BTN_FIND, "Find Frames For My Face"),
-                        new WhatsAppProvider.Button(BTN_EXPLORE, "Explore Frames")));
+                        new WhatsAppProvider.Button(BTN_EXPLORE, "Explore Frames"),
+                        new WhatsAppProvider.Button(BTN_HELP_CHOOSE, "Help Me Choose")));
         logOutbound(lead.getId(), "interactive", "welcome");
         analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
+    }
+
+    /** Personal-shopper entry point: one question (budget), then picks — no LLM, just a
+     *  short deterministic flow reusing the catalogue + recommendation logic. */
+    private void sendBudgetPrompt(Lead lead) {
+        provider.sendButtons(waId(lead), "Happy to help 🛍️ What's your budget for a pair?",
+                List.of(new WhatsAppProvider.Button(BTN_BUDGET_LOW, "Under K300"),
+                        new WhatsAppProvider.Button(BTN_BUDGET_MED, "K300 – K600"),
+                        new WhatsAppProvider.Button(BTN_BUDGET_HIGH, "K600+")));
+        logOutbound(lead.getId(), "interactive", "budget-prompt");
+    }
+
+    private void sendBudgetPicks(Lead lead, String tier) {
+        leadService.saveStyleProfile(lead.getId(), null, null, tier, null);
+        List<Product> picks = catalog.forBudget(lead.getFaceShape(), tier, 3);
+        if (picks.isEmpty()) {
+            sendText(lead, "Nothing in that range right now — here's the full shop:\n" + shopLink(lead));
+            return;
+        }
+        leadService.rememberPicks(lead.getId(), picks.stream().map(Product::getSlug).toList());
+        StringBuilder sb = new StringBuilder("Here's what I'd pick for you 👓\n");
+        for (int i = 0; i < picks.size(); i++) {
+            Product p = picks.get(i);
+            sb.append("\n").append(i + 1).append(") *").append(p.getName()).append("* — ")
+                    .append(OrderNotificationService.money(p.getPriceMinor(), p.getCurrency()));
+        }
+        sb.append("\n\nReply *BUY 1*, *BUY 2* or *BUY 3* and I'll add it to your bag with a checkout link"
+                + " — pay online or cash on delivery.");
+        sendText(lead, sb.toString());
+    }
+
+    /** Resolve a "BUY n" reply against the picks last shown, add it to a fresh lead-linked
+     *  cart, and hand back a checkout link — the whole purchase never leaves the chat. */
+    private void handleBuy(Lead lead, int index) {
+        Object raw = lead.getProviderMetadata().get("lastPicks");
+        List<?> slugs = raw instanceof List<?> l ? l : List.of();
+        if (index < 1 || index > slugs.size()) {
+            sendText(lead, "I don't have a pick #" + index + " for you right now — reply *Help me choose* to see options.");
+            return;
+        }
+        String slug = String.valueOf(slugs.get(index - 1));
+        var product = catalog.bySlug(slug);
+        if (product.isEmpty()) {
+            sendText(lead, "That one's no longer available — reply *Help me choose* and I'll find something else.");
+            return;
+        }
+        String token = carts.startForLead(lead.getId()).getToken();
+        carts.addItem(token, product.get().getId(), 1);
+        String link = props.frontendBaseUrl() + "/store?c=" + token;
+        sendText(lead, "Added *" + product.get().getName() + "* to your bag ✅\n\n"
+                + "Checkout here — pay online or cash on delivery:\n" + link);
+        analytics.record(LeadEventType.PRODUCTS_SHOWN, lead.getId(), null);
     }
 
     private void sendFrameFinderLink(Lead lead) {
@@ -160,6 +232,10 @@ public class WhatsAppBotService {
                     case BTN_WEBSITE -> BotIntent.VISIT_WEBSITE;
                     case BTN_RESULTS_FRAMES -> BotIntent.RESULTS_SHOW_FRAMES;
                     case BTN_RESULTS_NOT_NOW -> BotIntent.RESULTS_NOT_NOW;
+                    case BTN_HELP_CHOOSE -> BotIntent.HELP_CHOOSE;
+                    case BTN_BUDGET_LOW -> BotIntent.BUDGET_LOW;
+                    case BTN_BUDGET_MED -> BotIntent.BUDGET_MED;
+                    case BTN_BUDGET_HIGH -> BotIntent.BUDGET_HIGH;
                     default -> BotIntent.UNKNOWN;
                 };
             } catch (Exception ignored) { }
@@ -167,6 +243,7 @@ public class WhatsAppBotService {
         String t = text == null ? "" : text.toLowerCase().trim();
         if (t.isBlank()) return BotIntent.GREETING;
         if (t.matches(".*(hi|hello|hey|start|namaste).*") && t.length() < 15) return BotIntent.GREETING;
+        if (t.contains("help") || t.contains("choose") || t.contains("recommend") || t.contains("suggest")) return BotIntent.HELP_CHOOSE;
         if (t.contains("face") || t.contains("suit") || t.contains("frame finder") || t.equals("1")) return BotIntent.FIND_FRAMES;
         if (t.contains("explore") || t.contains("latest") || t.contains("catalog") || t.equals("2")) return BotIntent.EXPLORE_FRAMES;
         if (t.contains("website") || t.contains("site") || t.equals("3")) return BotIntent.VISIT_WEBSITE;

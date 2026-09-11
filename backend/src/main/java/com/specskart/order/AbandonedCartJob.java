@@ -1,5 +1,7 @@
 package com.specskart.order;
 
+import com.specskart.catalog.ProductImage;
+import com.specskart.catalog.ProductImageRepository;
 import com.specskart.catalog.PromoCode;
 import com.specskart.catalog.PromoCodeRepository;
 import com.specskart.config.AppProperties;
@@ -34,10 +36,12 @@ class AbandonedCartJob {
     private final WhatsAppProvider whatsapp;
     private final WhatsAppMessageRepository messages;
     private final AppProperties props;
+    private final ProductImageRepository productImages;
 
     AbandonedCartJob(CartRepository carts, CartItemRepository items, LeadRepository leads,
                      PromoCodeRepository promos, WhatsAppProvider whatsapp,
-                     WhatsAppMessageRepository messages, AppProperties props) {
+                     WhatsAppMessageRepository messages, AppProperties props,
+                     ProductImageRepository productImages) {
         this.carts = carts;
         this.items = items;
         this.leads = leads;
@@ -45,6 +49,7 @@ class AbandonedCartJob {
         this.whatsapp = whatsapp;
         this.messages = messages;
         this.props = props;
+        this.productImages = productImages;
     }
 
     @Scheduled(fixedDelayString = "PT15M", initialDelayString = "PT2M")
@@ -74,8 +79,11 @@ class AbandonedCartJob {
             }
             msg.append("\n\nPick up where you left off:\n").append(link);
 
+            String heroImage = props.whatsapp().absoluteAsset(firstImageUrl(lines.get(0).getProductId()));
+
             try {
-                whatsapp.sendText(waId, msg.toString());
+                if (heroImage != null) whatsapp.sendImage(waId, heroImage, msg.toString());
+                else whatsapp.sendText(waId, msg.toString());
                 cart.setNudgedAt(now);
                 carts.save(cart);
                 logOutbound(lead.getId());
@@ -84,6 +92,12 @@ class AbandonedCartJob {
                 log.warn("abandoned-cart nudge failed for lead {}: {}", lead.getId(), e.getMessage());
             }
         }
+    }
+
+    private String firstImageUrl(java.util.UUID productId) {
+        if (productId == null) return null;
+        return productImages.findByProductIdOrderBySortAsc(productId).stream()
+                .findFirst().map(ProductImage::getUrl).orElse(null);
     }
 
     private String discountText(PromoCode p) {

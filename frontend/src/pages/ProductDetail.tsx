@@ -44,6 +44,8 @@ export default function ProductDetail() {
     queryFn: () => shop.product(slug!),
   })
 
+  useEffect(() => { if (slug) shop.trackView(slug) }, [slug])
+
   const add = useMutation({
     mutationFn: () => shop.addItem(p!.id, 1),
     onSuccess: () => {

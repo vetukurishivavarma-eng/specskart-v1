@@ -44,6 +44,14 @@ public class StorefrontController {
         return cart.setQty(token, productId, body.qty());
     }
 
+    /** Fire-and-forget product-view ping — fuels abandoned-browse WhatsApp recovery for
+     *  leads we already know (cart token linked to one). A no-op otherwise. */
+    @PostMapping("/track/view/{slug}")
+    public void trackView(@RequestHeader(value = "X-Cart-Token", required = false) String token,
+                          @PathVariable String slug) {
+        cart.recordProductView(token, slug);
+    }
+
     @PostMapping("/cart/promo")
     public OrderDtos.CartView promo(@RequestHeader(value = "X-Cart-Token", required = false) String token,
                                     @RequestBody OrderDtos.ApplyPromo body) {

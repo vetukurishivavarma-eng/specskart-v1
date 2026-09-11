@@ -105,6 +105,38 @@ public class CatalogService {
                 .toList();
     }
 
+    /**
+     * WhatsApp "help me choose" personal shopper: filters by budget tier ("low" &lt; K300,
+     * "mid" K300-600, "high" &gt; K600) and, when known, face-shape-suited categories.
+     * Relaxes face-shape first, then price, rather than ever returning nothing.
+     */
+    @Transactional(readOnly = true)
+    public List<Product> forBudget(String faceShapeOrNull, String tier, int limit) {
+        long lo, hi;
+        switch (tier == null ? "" : tier) {
+            case "low" -> { lo = 0; hi = 30_000; }
+            case "high" -> { lo = 60_000; hi = Long.MAX_VALUE; }
+            default -> { lo = 30_000; hi = 60_000; }
+        }
+        List<String> codes = faceShapeOrNull == null ? List.of() : recommendedCategoryCodes(faceShapeOrNull);
+        List<Product> pool = codes.isEmpty() ? products.findByStatusOrderByCreatedAtDesc("ACTIVE")
+                : products.findByStatusAndFrameCategoryCodeInOrderByStockQtyDesc("ACTIVE", codes);
+        List<Product> inBudget = pool.stream().filter(Product::inStock).filter(p -> !p.isUpcoming())
+                .filter(p -> p.getPriceMinor() >= lo && p.getPriceMinor() <= hi)
+                .limit(limit).toList();
+        if (!inBudget.isEmpty() || codes.isEmpty()) return inBudget;
+        // nothing in that price band for the suited categories — relax the face-shape filter
+        return products.findByStatusOrderByCreatedAtDesc("ACTIVE").stream()
+                .filter(Product::inStock).filter(p -> !p.isUpcoming())
+                .filter(p -> p.getPriceMinor() >= lo && p.getPriceMinor() <= hi)
+                .limit(limit).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.Optional<Product> bySlug(String slug) {
+        return products.findBySlug(slug).filter(Product::isActive);
+    }
+
     @Transactional(readOnly = true)
     public CatalogDtos.ProductDetail detail(String slug) {
         Product p = products.findBySlug(slug)

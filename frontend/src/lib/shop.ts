@@ -152,4 +152,7 @@ export const shop = {
     api<OrderView>(`/public/orders/${orderNo}/confirm`, { method: 'POST' }),
   notifyMe: (slug: string, whatsapp: string) =>
     api<{ ok: boolean }>(`/public/products/${slug}/notify-me`, { method: 'POST', body: JSON.stringify({ whatsapp }) }),
+  /** Fire-and-forget: fuels WhatsApp abandoned-browse recovery for leads we already know. */
+  trackView: (slug: string) =>
+    api<void>(`/public/track/view/${slug}`, { method: 'POST', headers: headers() }).catch(() => {}),
 }

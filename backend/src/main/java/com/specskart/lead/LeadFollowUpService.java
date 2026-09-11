@@ -214,7 +214,14 @@ public class LeadFollowUpService {
             return;
         }
 
-        PromoCode promo = promoIssuer.forFaceAnalysis(lead.getId());
+        // Dynamic offer: a HOT lead is already close to buying — showing the picks alone is
+        // usually enough, so don't spend margin on a discount at the first touch. A COLD one
+        // who's ignored the whole sequence gets one bigger, shorter-lived push at the end.
+        LeadScoring.Score score = LeadScoring.of(lead);
+        boolean skipDiscount = s.kind() == Kind.MATCHES && score.temperature() == LeadScoring.Temperature.HOT;
+        PromoCode promo = skipDiscount ? null
+                : s.kind() == Kind.LAST_CALL ? promoIssuer.forLastCall(lead.getId())
+                : promoIssuer.forFaceAnalysis(lead.getId());
         String offer = promo == null ? "See your picks below"
                 : promo.getDiscountValue() + "% off your first pair with code " + promo.getCode()
                   + (promo.getExpiresAt() != null ? " (" + hoursLeft(promo) + "h left)" : "");

@@ -4,6 +4,8 @@ import com.specskart.catalog.CatalogService;
 import com.specskart.catalog.Product;
 import com.specskart.catalog.ProductImageRepository;
 import com.specskart.catalog.ProductRepository;
+import com.specskart.catalog.ProductView;
+import com.specskart.catalog.ProductViewRepository;
 import com.specskart.catalog.PromoCode;
 import com.specskart.catalog.PromoCodeRepository;
 import com.specskart.catalog.StoreConfig;
@@ -40,11 +42,12 @@ public class CartService {
     private final com.specskart.config.AppProperties props;
 
     private final OrderRepository orders;
+    private final ProductViewRepository views;
 
     public CartService(CartRepository carts, CartItemRepository items, ProductRepository products,
                        ProductImageRepository images, PromoCodeRepository promos, StoreConfigRepository storeConfig,
                        com.specskart.lead.LeadRepository leads, com.specskart.config.AppProperties props,
-                       OrderRepository orders) {
+                       OrderRepository orders, ProductViewRepository views) {
         this.carts = carts;
         this.items = items;
         this.products = products;
@@ -54,6 +57,28 @@ public class CartService {
         this.leads = leads;
         this.props = props;
         this.orders = orders;
+        this.views = views;
+    }
+
+    /**
+     * Record that a known lead (their cart token is already linked) looked at a product —
+     * upserted, so repeat browsing just refreshes the timestamp and re-arms the recovery
+     * nudge. Silently a no-op for an anonymous visitor (no cart / no lead on it yet); browse
+     * recovery only ever targets leads we can already reach on WhatsApp.
+     */
+    @Transactional
+    public void recordProductView(String token, String slug) {
+        if (token == null || slug == null) return;
+        Cart cart = carts.findByToken(token).orElse(null);
+        if (cart == null || cart.getLeadId() == null) return;
+        Product p = products.findBySlug(slug).orElse(null);
+        if (p == null) return;
+        ProductView v = views.findByLeadIdAndProductId(cart.getLeadId(), p.getId()).orElseGet(ProductView::new);
+        v.setLeadId(cart.getLeadId());
+        v.setProductId(p.getId());
+        v.setViewedAt(Instant.now());
+        v.setNotifiedAt(null);
+        views.save(v);
     }
 
     /** No lead (anonymous) or a lead who has never ordered before. */

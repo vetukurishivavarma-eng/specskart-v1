@@ -43,7 +43,10 @@ public record AppProperties(
         }
     }
     public record Session(int expiryHours) {}
-    public record Promo(int faceAnalysisPercent, int faceAnalysisHours) {}
+    public record Promo(int faceAnalysisPercent, int faceAnalysisHours,
+                        /** Bigger, shorter-lived discount for the nurture sequence's last-call touch —
+                         *  a lead who's ignored everything else gets one final, stronger nudge. */
+                        int lastCallPercent, int lastCallHours) {}
 
     /**
      * pointsPerKwacha: points earned per K1 of order subtotal.

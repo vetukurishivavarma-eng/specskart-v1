@@ -2,6 +2,7 @@ package com.specskart.admin;
 
 import com.specskart.campaign.Campaign;
 import com.specskart.lead.Lead;
+import com.specskart.lead.LeadScoring;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -10,11 +11,12 @@ final class AdminMapper {
     private AdminMapper() {}
 
     static AdminDtos.LeadRow row(Lead l, String campaignName) {
+        LeadScoring.Score score = LeadScoring.of(l);
         return new AdminDtos.LeadRow(l.getId(), l.getName(), l.getWhatsappNumber(),
                 l.getAcquisitionSource().name(), l.getCampaignId(), campaignName, l.getFaceShape(),
                 l.getRecommendedFrameCategories(), l.getStatus().name(), l.getCreatedAt(),
                 l.getLastContactAt(), l.getAssignedToUserId(), l.getArchivedAt(),
-                l.getPoints(), l.getReferralCode());
+                l.getPoints(), l.getReferralCode(), score.points(), score.temperature().name());
     }
 
     static Map<String, Object> attribution(Lead l) {

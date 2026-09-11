@@ -44,6 +44,9 @@ specskart:
   promo:
     face-analysis-percent: ${PROMO_FACE_ANALYSIS_PERCENT:10}
     face-analysis-hours: ${PROMO_FACE_ANALYSIS_HOURS:48}
+    # One bigger, shorter-lived offer for a lead who's ignored the whole nurture sequence.
+    last-call-percent: ${PROMO_LAST_CALL_PERCENT:20}
+    last-call-hours: ${PROMO_LAST_CALL_HOURS:24}
   loyalty:
     points-per-kwacha: ${LOYALTY_POINTS_PER_KWACHA:1}   # 1 point per K1 spent
     point-value-minor: ${LOYALTY_POINT_VALUE_MINOR:10}  # 1 point = K0.10 off

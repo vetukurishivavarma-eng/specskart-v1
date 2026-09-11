@@ -8,8 +8,13 @@ const STATUSES = ['', 'NEW', 'CONTACTED', 'ENGAGED', 'FACE_ANALYSIS_STARTED', 'F
 type Row = {
   id: string; name: string | null; whatsappNumber: string; source: string; campaignName: string | null
   faceShape: string | null; recommendedFrames: string[]; status: string; createdAt: string; lastContactAt: string | null
+  leadScore: number; leadTemperature: 'HOT' | 'WARM' | 'COLD'
 }
 type Page = { content: Row[]; page: number; totalPages: number; totalElements: number }
+
+const TEMP_STYLE: Record<Row['leadTemperature'], string> = {
+  HOT: 'bg-clay/15 text-clay', WARM: 'bg-amber-100 text-amber-700', COLD: 'bg-ink/10 text-ink/50',
+}
 
 export default function Leads() {
   const [status, setStatus] = useState('')
@@ -39,7 +44,7 @@ export default function Leads() {
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="text-left text-ink/50">
-            <tr>{['Customer', 'WhatsApp', 'Source', 'Campaign', 'Face shape', 'Recommended', 'Status', 'Created'].map((h) => <th key={h} className="py-2 pr-4">{h}</th>)}</tr>
+            <tr>{['Customer', 'WhatsApp', 'Source', 'Campaign', 'Face shape', 'Recommended', 'Status', 'Score', 'Created'].map((h) => <th key={h} className="py-2 pr-4">{h}</th>)}</tr>
           </thead>
           <tbody>
             {isLoading && <tr><td className="py-4">Loading…</td></tr>}
@@ -52,6 +57,11 @@ export default function Leads() {
                 <td className="py-2 pr-4">{r.faceShape ?? '—'}</td>
                 <td className="py-2 pr-4 text-ink/60">{r.recommendedFrames?.slice(0, 3).join(', ') || '—'}</td>
                 <td className="py-2 pr-4"><span className="rounded-full bg-ink/10 px-2 py-0.5 text-xs">{r.status}</span></td>
+                <td className="py-2 pr-4">
+                  <span className={`rounded-full px-2 py-0.5 text-xs ${TEMP_STYLE[r.leadTemperature]}`}>
+                    {r.leadTemperature} · {r.leadScore}
+                  </span>
+                </td>
                 <td className="py-2 pr-4 text-ink/50">{new Date(r.createdAt).toLocaleDateString()}</td>
               </tr>
             ))}
