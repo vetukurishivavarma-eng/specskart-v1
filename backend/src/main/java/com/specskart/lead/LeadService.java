@@ -45,16 +45,19 @@ public class LeadService {
     private final CampaignRepository campaigns;
     private final AttributionResolver attribution;
     private final AnalyticsService analytics;
+    private final com.specskart.config.AppProperties props;
 
     @jakarta.persistence.PersistenceContext
     private jakarta.persistence.EntityManager em;
 
     public LeadService(LeadRepository leads, CampaignRepository campaigns,
-                       AttributionResolver attribution, AnalyticsService analytics) {
+                       AttributionResolver attribution, AnalyticsService analytics,
+                       com.specskart.config.AppProperties props) {
         this.leads = leads;
         this.campaigns = campaigns;
         this.attribution = attribution;
         this.analytics = analytics;
+        this.props = props;
     }
 
     /** Find-or-create a lead from a WhatsApp identity, applying attribution only on first contact. */
@@ -125,8 +128,11 @@ public class LeadService {
      */
     @Transactional
     public Lead onWebOrder(String phone, String name) {
-        String digits = phone == null ? "" : phone.replaceAll("\\D", "");
-        if (digits.length() < 8) return null;
+        // Normalized to a real wa_id (country code first) — a web form takes whatever the
+        // customer types (often local format with a trunk "0"), and sending WhatsApp to that
+        // as-is is accepted by Meta but never delivered, with no error at send time.
+        String digits = com.specskart.shared.PhoneNumbers.normalize(phone, props.whatsapp().defaultCountryCode());
+        if (digits == null || digits.length() < 8) return null;
         Lead lead = leads.findByWhatsappWaId(digits)
                 .or(() -> leads.findByWhatsappNumber(phone))
                 .or(() -> leads.findByWhatsappNumber(digits))

@@ -24,7 +24,8 @@ class LeadStatusTransitionTest {
         when(leads.save(any())).thenAnswer(i -> i.getArgument(0));
         return new LeadService(leads, mock(CampaignRepository.class),
                 mock(com.specskart.attribution.AttributionResolver.class),
-                mock(com.specskart.analytics.AnalyticsService.class));
+                mock(com.specskart.analytics.AnalyticsService.class),
+                mock(com.specskart.config.AppProperties.class));
     }
 
     @Test

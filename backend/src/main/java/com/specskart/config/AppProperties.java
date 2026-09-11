@@ -75,7 +75,10 @@ public record AppProperties(
                            /** Absolute base URL that serves product images publicly (this API's own
                             *  origin, e.g. https://specskart-api.onrender.com). Blank = nurture messages
                             *  go text-only. */
-                           String assetBaseUrl) {
+                           String assetBaseUrl,
+                           /** Digits-only country code assumed for a web-checkout phone number
+                            *  that doesn't already carry one, e.g. "260" for Zambia. */
+                           String defaultCountryCode) {
 
         public List<String> staffNumbers() {
             return staffNumbers == null ? List.of() : staffNumbers;

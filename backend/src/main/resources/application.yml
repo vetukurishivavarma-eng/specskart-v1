@@ -94,6 +94,10 @@ specskart:
     # This API's own public origin, used to build absolute product-image URLs for WhatsApp
     # (Meta must be able to GET the image). e.g. https://specskart-api.onrender.com
     asset-base-url: ${WHATSAPP_ASSET_BASE_URL:}
+    # Country code assumed for a checkout phone number typed without one (e.g. "0977123456").
+    # Wrong digits here means the WhatsApp send is accepted by Meta but never delivered — no
+    # error, it just silently never arrives. 260 = Zambia.
+    default-country-code: ${WHATSAPP_DEFAULT_COUNTRY_CODE:260}
   payments:
     provider: ${PAYMENTS_PROVIDER:mock}   # mock | flutterwave
     flutterwave:
