@@ -101,6 +101,10 @@ specskart:
     # Wrong digits here means the WhatsApp send is accepted by Meta but never delivered — no
     # error, it just silently never arrives. 260 = Zambia.
     default-country-code: ${WHATSAPP_DEFAULT_COUNTRY_CODE:260}
+    # Approved template to deliver the lens-inquiry verify link to a number that's never
+    # messaged the business before (ad -> website, no open 24h window). {{1}} = the link.
+    # Blank = plain text (only reaches an already-open WhatsApp session).
+    lens-verify-template: ${WHATSAPP_LENS_VERIFY_TEMPLATE:}
   payments:
     provider: ${PAYMENTS_PROVIDER:mock}   # mock | flutterwave
     flutterwave:

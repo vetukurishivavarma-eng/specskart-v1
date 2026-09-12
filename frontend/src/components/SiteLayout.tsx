@@ -1,5 +1,4 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
-import CartIcon from './CartIcon'
 
 const WA = import.meta.env.VITE_WA_LINK ?? 'https://wa.me/260000000000'
 
@@ -9,14 +8,15 @@ export default function SiteLayout() {
       <header className="border-b border-ink/10">
         <div className="container-x flex h-16 items-center justify-between">
           <Link to="/" className="font-display text-xl font-semibold">Specskart</Link>
+          {/* Frames nav (Store/Cart/Frame Finder) hidden while the lens-only funnel is live —
+              routes and CartIcon stay in the code, just unlinked. See App.tsx. */}
           <nav className="hidden items-center gap-8 text-sm md:flex">
-            {[['/how-it-works', 'How it works'], ['/store', 'Store'], ['/contact', 'Contact']].map(([to, label]) => (
+            {[['/how-it-works', 'How it works'], ['/contact', 'Contact']].map(([to, label]) => (
               <NavLink key={to} to={to} className={({ isActive }) => isActive ? 'text-ink' : 'text-ink/55 hover:text-ink'}>{label}</NavLink>
             ))}
           </nav>
           <div className="flex items-center gap-2">
-            <CartIcon />
-            <Link to="/frame-finder" className="btn-primary !px-4 !py-2 text-xs">Find My Frame</Link>
+            <Link to="/lens" className="btn-primary !px-4 !py-2 text-xs">Configure Lenses</Link>
           </div>
         </div>
       </header>

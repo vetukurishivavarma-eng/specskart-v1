@@ -38,6 +38,7 @@ public class WhatsAppBotService {
     static final String BTN_RESULTS_FRAMES = "RESULTS_SHOW_FRAMES";
     static final String BTN_RESULTS_NOT_NOW = "RESULTS_NOT_NOW";
     static final String BTN_HELP_CHOOSE = "HELP_CHOOSE";
+    static final String BTN_EXPLORE_LENS = "EXPLORE_LENS";
     static final String BTN_BUDGET_LOW = "BUDGET_LOW";
     static final String BTN_BUDGET_MED = "BUDGET_MED";
     static final String BTN_BUDGET_HIGH = "BUDGET_HIGH";
@@ -99,6 +100,7 @@ public class WhatsAppBotService {
             case FIND_FRAMES -> sendFrameFinderLink(lead);
             case EXPLORE_FRAMES -> sendShop(lead, "Our full collection is here — every style, buy online:\n");
             case VISIT_WEBSITE -> sendText(lead, "Here's our website: " + props.frontendBaseUrl());
+            case EXPLORE_LENS -> sendLensLink(lead);
             case HELP_CHOOSE -> sendBudgetPrompt(lead);
             case BUDGET_LOW -> sendBudgetPicks(lead, "low");
             case BUDGET_MED -> sendBudgetPicks(lead, "mid");
@@ -116,16 +118,21 @@ public class WhatsAppBotService {
         }
     }
 
+    // ponytail: frames welcome buttons (FIND/EXPLORE/HELP_CHOOSE) are unused below while the
+    // client's lens-only funnel is live — their handlers stay wired in handleInbound/classify
+    // so re-enabling this is a one-line change, not a rebuild.
     public void sendWelcome(Lead lead) {
         String name = lead.getName() != null ? " " + lead.getName().split(" ")[0] : "";
         provider.sendButtons(waId(lead),
-                "Hi" + name + " 👋\nWelcome to " + props.storeName()
-                        + ".\n\nI can help you find frames that complement your face. What would you like to do?",
-                List.of(new WhatsAppProvider.Button(BTN_FIND, "Find Frames For My Face"),
-                        new WhatsAppProvider.Button(BTN_EXPLORE, "Explore Frames"),
-                        new WhatsAppProvider.Button(BTN_HELP_CHOOSE, "Help Me Choose")));
+                "Hi" + name + " 👋\nWelcome to " + props.storeName() + ".",
+                List.of(new WhatsAppProvider.Button(BTN_EXPLORE_LENS, "Explore Lens 🔍")));
         logOutbound(lead.getId(), "interactive", "welcome");
         analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
+    }
+
+    private void sendLensLink(Lead lead) {
+        sendText(lead, "Take a look and configure your lenses here — clear or photochromatic, "
+                + "with or without blue-block:\n" + props.frontendBaseUrl() + "/lens");
     }
 
     /** Personal-shopper entry point: one question (budget), then picks — no LLM, just a
@@ -255,6 +262,7 @@ public class WhatsAppBotService {
                     case BTN_RESULTS_FRAMES -> BotIntent.RESULTS_SHOW_FRAMES;
                     case BTN_RESULTS_NOT_NOW -> BotIntent.RESULTS_NOT_NOW;
                     case BTN_HELP_CHOOSE -> BotIntent.HELP_CHOOSE;
+                    case BTN_EXPLORE_LENS -> BotIntent.EXPLORE_LENS;
                     case BTN_BUDGET_LOW -> BotIntent.BUDGET_LOW;
                     case BTN_BUDGET_MED -> BotIntent.BUDGET_MED;
                     case BTN_BUDGET_HIGH -> BotIntent.BUDGET_HIGH;
@@ -265,6 +273,7 @@ public class WhatsAppBotService {
         String t = text == null ? "" : text.toLowerCase().trim();
         if (t.isBlank()) return BotIntent.GREETING;
         if (t.matches(".*(hi|hello|hey|start|namaste).*") && t.length() < 15) return BotIntent.GREETING;
+        if (t.contains("lens")) return BotIntent.EXPLORE_LENS;
         if (t.contains("help") || t.contains("choose") || t.contains("recommend") || t.contains("suggest")) return BotIntent.HELP_CHOOSE;
         if (t.contains("face") || t.contains("suit") || t.contains("frame finder") || t.equals("1")) return BotIntent.FIND_FRAMES;
         if (t.contains("explore") || t.contains("latest") || t.contains("catalog") || t.equals("2")) return BotIntent.EXPLORE_FRAMES;

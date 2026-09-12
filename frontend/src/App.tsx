@@ -10,6 +10,8 @@ import Checkout from './pages/Checkout'
 import OrderTracking from './pages/OrderTracking'
 import Privacy from './pages/Privacy'
 import FrameFinder from './pages/FrameFinder'
+import LensConfigurator from './pages/LensConfigurator'
+import LensVerify from './pages/LensVerify'
 import AdminLayout from './admin/AdminLayout'
 import Login from './admin/Login'
 import Dashboard from './admin/Dashboard'
@@ -42,7 +44,10 @@ export default function App() {
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/order/:orderNo" element={<OrderTracking />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/lens" element={<LensConfigurator />} />
       </Route>
+      <Route path="/lens/verify/:token" element={<LensVerify />} />
+      {/* Frames flow — kept working, just not linked anywhere while the lens-only funnel is live. */}
       <Route path="/frame-finder" element={<FrameFinder />} />
 
       <Route path="/admin/login" element={<Login />} />

@@ -5,7 +5,9 @@ import SocialProof from '../components/SocialProof'
 
 const WA = import.meta.env.VITE_WA_LINK ?? 'https://wa.me/260000000000'
 
-function ForYou() {
+// Exported (not just called locally) so it stays live code, not dead code the
+// build would flag as unused, while it's unlinked from the page below.
+export function ForYou() {
   const face = rememberedFace()
   const { data } = useQuery({
     queryKey: ['for-you', face],
@@ -44,14 +46,13 @@ export default function Home() {
     <div>
       <section className="container-x grid gap-10 py-20 md:grid-cols-2 md:items-center">
         <div>
-          <p className="label">AI Frame Finder</p>
-          <h1 className="mt-3 text-5xl leading-[1.05] md:text-6xl">Find frames that fit more than your face.</h1>
+          <p className="label">Lenses, made for you</p>
+          <h1 className="mt-3 text-5xl leading-[1.05] md:text-6xl">Describe your prescription. We'll take it from there.</h1>
           <p className="mt-5 max-w-md text-lg text-ink/70">
-            Take a quick selfie. We read your facial proportions and recommend frame styles that genuinely complement you.
+            Clear or photochromatic, with or without blue-light block — configure your lenses in a couple of minutes, verified on WhatsApp.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link to="/frame-finder" className="btn-primary">Find My Frame</Link>
-            <Link to="/store" className="btn-ghost">Shop frames</Link>
+            <Link to="/lens" className="btn-primary">Configure my lenses</Link>
           </div>
           <SocialProof className="mt-5" />
           <a href={WA} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm text-ink/50 underline">Or chat with us on WhatsApp</a>
@@ -61,16 +62,17 @@ export default function Home() {
         </div>
       </section>
 
-      <ForYou />
+      {/* Frames "for you" strip — hidden while the lens-only funnel is live; component kept. */}
+      {/* <ForYou /> */}
 
       <section className="border-y border-ink/10 bg-white py-16">
         <div className="container-x">
-          <p className="label">How the Frame Finder works</p>
+          <p className="label">How it works</p>
           <div className="mt-8 grid gap-8 md:grid-cols-3">
             {[
-              ['01', 'Take a selfie', 'In your browser — the photo never leaves your device.'],
-              ['02', 'We read the proportions', 'Forehead, cheekbones, jaw and face length become simple ratios.'],
-              ['03', 'Discover your styles', 'A shortlist of frame shapes chosen for your face, ready on WhatsApp.'],
+              ['01', 'Pick your lens', 'Clear or photochromatic, blue-light block optional.'],
+              ['02', 'Verify on WhatsApp', 'One tap on a link we send you — keeps your order safe.'],
+              ['03', 'Add your prescription', 'Sph, Cyl, Axis and Add — we handle the rest.'],
             ].map(([n, t, d]) => (
               <div key={n}>
                 <div className="font-display text-3xl text-clay">{n}</div>
@@ -85,11 +87,11 @@ export default function Home() {
       <section className="container-x py-16">
         <div className="card flex flex-col items-start gap-4 p-8 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="label">Online store</p>
-            <h3 className="mt-2 text-2xl">Shop frames, fitted with your lenses.</h3>
-            <p className="mt-1 text-ink/65">Delivered across Zambia. Pay by card or mobile money.</p>
+            <p className="label">Lens configurator</p>
+            <h3 className="mt-2 text-2xl">Get your price in a couple of minutes.</h3>
+            <p className="mt-1 text-ink/65">We'll confirm and arrange delivery on WhatsApp.</p>
           </div>
-          <Link to="/store" className="btn-primary">Shop now</Link>
+          <Link to="/lens" className="btn-primary">Get started</Link>
         </div>
       </section>
     </div>

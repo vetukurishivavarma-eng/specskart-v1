@@ -81,7 +81,12 @@ public record AppProperties(
                            String assetBaseUrl,
                            /** Digits-only country code assumed for a web-checkout phone number
                             *  that doesn't already carry one, e.g. "260" for Zambia. */
-                           String defaultCountryCode) {
+                           String defaultCountryCode,
+                           /** Approved template to deliver the lens-inquiry WhatsApp-verification
+                            *  link to a number that's never messaged the business before (ad ->
+                            *  website flow, no open 24h window yet). {{1}} = the verify link.
+                            *  Blank = plain text (only reaches numbers with an open session). */
+                           String lensVerifyTemplate) {
 
         public List<String> staffNumbers() {
             return staffNumbers == null ? List.of() : staffNumbers;
@@ -123,6 +128,11 @@ public record AppProperties(
         /** Approved template for the post-delivery "thanks + come back" message (params: name, promo code). */
         public boolean postPurchaseConfigured() {
             return postPurchaseTemplate != null && !postPurchaseTemplate.isBlank();
+        }
+
+        /** Approved template configured for the lens-inquiry verification link. */
+        public boolean lensVerifyConfigured() {
+            return lensVerifyTemplate != null && !lensVerifyTemplate.isBlank();
         }
     }
 }
