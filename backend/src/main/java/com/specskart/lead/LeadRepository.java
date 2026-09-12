@@ -22,6 +22,10 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
     /** Cold leads never enrolled in the nurture sequence, for the one-time backfill. */
     List<Lead> findTop100ByFollowUpStateIsNullAndArchivedAtIsNullAndStatusInAndCreatedAtAfter(
             java.util.Collection<LeadStatus> statuses, Instant since);
+
+    /** Broadcast candidate pool — bounded so an admin blast can never accidentally table-scan
+     *  a huge lead base. Further filtered (opt-out, face shape, has a WhatsApp id) in-memory. */
+    List<Lead> findTop1000ByArchivedAtIsNullOrderByLastContactAtDesc();
     Optional<Lead> findByWhatsappNumber(String number);
     Optional<Lead> findByReferralCode(String referralCode);
     boolean existsByReferralCode(String referralCode);

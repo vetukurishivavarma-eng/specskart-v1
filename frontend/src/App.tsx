@@ -22,6 +22,7 @@ import Orders from './admin/Orders'
 import OrderDetail from './admin/OrderDetail'
 import Promos from './admin/Promos'
 import StoreSettings from './admin/StoreSettings'
+import Broadcast from './admin/Broadcast'
 import { auth } from './lib/auth'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -57,6 +58,7 @@ export default function App() {
         <Route path="orders/:id" element={<OrderDetail />} />
         <Route path="promos" element={<Promos />} />
         <Route path="store" element={<StoreSettings />} />
+        <Route path="broadcast" element={<Broadcast />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
