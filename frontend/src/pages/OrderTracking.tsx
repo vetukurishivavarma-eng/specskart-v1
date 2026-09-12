@@ -84,8 +84,12 @@ export default function OrderTracking() {
       </div>
 
       <div className="card mt-4 p-5 text-sm">
-        <h2 className="text-lg">Delivery</h2>
-        <p className="mt-2 text-ink/70">{order.customerName}<br />{order.shipAddress}, {order.shipCity}<br />{order.customerPhone}</p>
+        <h2 className="text-lg">{order.deliveryMethod === 'PICKUP' ? 'Pickup' : 'Delivery'}</h2>
+        {order.deliveryMethod === 'PICKUP' ? (
+          <p className="mt-2 text-ink/70">{order.customerName}<br />Collect at: {order.pickupPoint}<br />{order.shipCity}<br />{order.customerPhone}</p>
+        ) : (
+          <p className="mt-2 text-ink/70">{order.customerName}<br />{order.shipAddress}, {order.shipCity}<br />{order.customerPhone}</p>
+        )}
       </div>
 
       {(order.pointsEarned > 0 || order.pointsBalance > 0 || order.referralCode) && (

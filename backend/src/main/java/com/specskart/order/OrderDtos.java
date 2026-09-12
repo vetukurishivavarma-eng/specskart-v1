@@ -31,10 +31,20 @@ public final class OrderDtos {
     public record CheckoutRequest(String customerName, String customerPhone, String customerEmail,
                                   String shipAddress, String shipCity,
                                   Integer redeemPoints, String referralCode,
-                                  Boolean payOnDelivery) {
+                                  Boolean payOnDelivery,
+                                  /** "DOOR" (default) or "PICKUP" — an intercity bus parcel service, the
+                                   *  standard cheap way to reach a customer outside Lusaka. */
+                                  String deliveryMethod, String pickupPoint) {
         public CheckoutRequest(String customerName, String customerPhone, String customerEmail,
                                String shipAddress, String shipCity, Integer redeemPoints, String referralCode) {
-            this(customerName, customerPhone, customerEmail, shipAddress, shipCity, redeemPoints, referralCode, false);
+            this(customerName, customerPhone, customerEmail, shipAddress, shipCity, redeemPoints, referralCode,
+                    false, "DOOR", null);
+        }
+        public CheckoutRequest(String customerName, String customerPhone, String customerEmail,
+                               String shipAddress, String shipCity, Integer redeemPoints, String referralCode,
+                               Boolean payOnDelivery) {
+            this(customerName, customerPhone, customerEmail, shipAddress, shipCity, redeemPoints, referralCode,
+                    payOnDelivery, "DOOR", null);
         }
     }
 
@@ -51,7 +61,8 @@ public final class OrderDtos {
                             List<OrderLine> lines, List<StatusEvent> timeline,
                             int pointsEarned, int pointsRedeemed, int pointsBalance, String referralCode,
                             String lensType, long lensAddMinor, String rxJson, boolean hasPrescription,
-                            String paymentMethod, long cashDueMinor) {}
+                            String paymentMethod, long cashDueMinor,
+                            String deliveryMethod, String pickupPoint) {}
 
     public record StatusEvent(String status, String note, Instant at) {}
 

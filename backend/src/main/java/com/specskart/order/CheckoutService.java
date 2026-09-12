@@ -127,6 +127,10 @@ public class CheckoutService {
         order.setCustomerEmail(req.customerEmail() == null ? null : req.customerEmail().trim());
         order.setShipAddress(req.shipAddress().trim());
         order.setShipCity(req.shipCity().trim());
+        if ("PICKUP".equals(req.deliveryMethod()) && req.pickupPoint() != null && !req.pickupPoint().isBlank()) {
+            order.setDeliveryMethod("PICKUP");
+            order.setPickupPoint(req.pickupPoint().trim());
+        }
         order.setSubtotalMinor(subtotal);
         order.setDiscountMinor(discountMinor);
         order.setShippingMinor(view.shippingMinor());

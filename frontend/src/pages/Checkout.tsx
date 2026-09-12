@@ -12,10 +12,14 @@ export default function Checkout() {
   const [usePoints, setUsePoints] = useState(false)
   const [referral, setReferral] = useState('')
   const [method, setMethod] = useState<'ONLINE' | 'COD'>('ONLINE')
+  const [delivery, setDelivery] = useState<'DOOR' | 'PICKUP'>('DOOR')
+  const [pickupPoint, setPickupPoint] = useState('')
 
   const points = cart?.pointsAvailable ?? 0
   const pointsDiscount = usePoints ? points * (cart?.pointValueMinor ?? 0) : 0
   const cod = method === 'COD'
+  const outOfLusaka = f.shipCity.trim() !== '' && !f.shipCity.trim().toLowerCase().includes('lusaka')
+  const pickup = outOfLusaka && delivery === 'PICKUP'
 
   const pay = useMutation({
     mutationFn: () => shop.checkout({
@@ -23,6 +27,8 @@ export default function Checkout() {
       redeemPoints: usePoints ? points : undefined,
       referralCode: referral.trim() || undefined,
       payOnDelivery: cod,
+      deliveryMethod: pickup ? 'PICKUP' : 'DOOR',
+      pickupPoint: pickup ? pickupPoint.trim() : undefined,
     }),
     onSuccess: (r) => { r.checkoutUrl ? (window.location.href = r.checkoutUrl) : navigate(`/order/${r.orderNo}`) },
   })
@@ -36,6 +42,7 @@ export default function Checkout() {
   )
 
   const valid = f.customerName.trim() && f.customerPhone.trim() && f.shipAddress.trim() && f.shipCity.trim()
+    && (!pickup || pickupPoint.trim())
 
   return (
     <div className="container-x grid gap-10 py-12 lg:grid-cols-2">
@@ -47,6 +54,25 @@ export default function Checkout() {
           <Field label="Email (optional)" value={f.customerEmail} onChange={on('customerEmail')} type="email" />
           <Field label="Delivery address" value={f.shipAddress} onChange={on('shipAddress')} />
           <Field label="City / town" value={f.shipCity} onChange={on('shipCity')} />
+
+          {outOfLusaka && (
+            <fieldset className="space-y-2">
+              <span className="text-xs font-medium uppercase tracking-widest text-ink/50">How should it reach you?</span>
+              <label className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${!pickup ? 'border-ink bg-ink/5' : 'border-ink/20'}`}>
+                <input type="radio" name="delivery" checked={delivery === 'DOOR'} onChange={() => setDelivery('DOOR')} className="mt-0.5" />
+                <span><b>Door delivery</b> — courier to the address above.</span>
+              </label>
+              <label className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${pickup ? 'border-ink bg-ink/5' : 'border-ink/20'}`}>
+                <input type="radio" name="delivery" checked={delivery === 'PICKUP'} onChange={() => setDelivery('PICKUP')} className="mt-0.5" />
+                <span><b>Bus station pickup</b> — often cheaper &amp; faster outside Lusaka. Collect it yourself when it arrives.</span>
+              </label>
+              {pickup && (
+                <input value={pickupPoint} onChange={(e) => setPickupPoint(e.target.value)}
+                  placeholder="Which bus company / terminal? e.g. Power Tools, Kitwe"
+                  className="w-full rounded-lg border border-ink/20 px-3 py-2 text-sm" />
+              )}
+            </fieldset>
+          )}
 
           {!cart.promoCode && (
             <label className="block">

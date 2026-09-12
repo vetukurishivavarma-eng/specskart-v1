@@ -117,8 +117,10 @@ export default function OrderDetail() {
       <aside className="card h-fit p-4 text-sm">
         <div className="label">Customer</div>
         <p className="mt-2">{o.customerName}<br />{o.customerPhone}<br />{o.customerEmail ?? '—'}</p>
-        <div className="label mt-4">Deliver to</div>
-        <p className="mt-2">{o.shipAddress}<br />{o.shipCity}</p>
+        <div className="label mt-4">{o.deliveryMethod === 'PICKUP' ? 'Bus station pickup' : 'Deliver to'}</div>
+        <p className="mt-2">
+          {o.deliveryMethod === 'PICKUP' ? <><b>{o.pickupPoint}</b><br />{o.shipCity}</> : <>{o.shipAddress}<br />{o.shipCity}</>}
+        </p>
       </aside>
     </div>
   )

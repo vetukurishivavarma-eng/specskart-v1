@@ -34,6 +34,13 @@ public class Order extends BaseEntity {
     @Column(nullable = false)
     private String shipCity;
 
+    /** DOOR (courier to the address above) or PICKUP (intercity bus parcel service — the
+     *  standard cheap way to reach a customer outside Lusaka). */
+    @Column(nullable = false)
+    private String deliveryMethod = "DOOR";
+    /** The bus company / terminal the customer will collect from, when deliveryMethod=PICKUP. */
+    private String pickupPoint;
+
     @Column(nullable = false)
     private long subtotalMinor;
     @Column(nullable = false)

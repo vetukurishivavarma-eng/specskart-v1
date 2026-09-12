@@ -110,6 +110,7 @@ export type OrderView = {
   pointsEarned: number; pointsRedeemed: number; pointsBalance: number; referralCode: string | null
   lensType: string | null; lensAddMinor: number; rxJson: string | null; hasPrescription: boolean
   paymentMethod: 'ONLINE' | 'COD'; cashDueMinor: number
+  deliveryMethod: 'DOOR' | 'PICKUP'; pickupPoint: string | null
 }
 
 export type StoreConfig = {

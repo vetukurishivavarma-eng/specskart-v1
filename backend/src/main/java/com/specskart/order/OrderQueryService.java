@@ -62,6 +62,7 @@ public class OrderQueryService {
                 o.getCurrency(), o.getPromoCode(), o.getPaidAt(), o.getCreatedAt(), lines, timeline,
                 o.getPointsEarned(), o.getPointsRedeemed(), balance, referralCode,
                 o.getLensType(), o.getLensAddMinor(), o.getRxJson(), o.getPrescriptionFileId() != null,
-                o.isCod() ? "COD" : "ONLINE", o.cashStillDue() ? o.getTotalMinor() : 0);
+                o.isCod() ? "COD" : "ONLINE", o.cashStillDue() ? o.getTotalMinor() : 0,
+                o.getDeliveryMethod(), o.getPickupPoint());
     }
 }
