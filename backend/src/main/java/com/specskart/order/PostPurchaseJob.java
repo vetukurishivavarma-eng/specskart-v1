@@ -25,6 +25,10 @@ import java.util.List;
  * If WHATSAPP_POST_PURCHASE_TEMPLATE is set it goes out as that approved template (works
  * outside the 24-hour window); otherwise it's a plain message — delivered only while the
  * customer's service window is still open.
+ *
+ * Either way, a bare "1"-"5" reply afterwards is captured as a star rating (see
+ * ReviewCaptureService / WhatsAppBotService) — the plain message spells that out; the
+ * templated one won't unless its own approved wording asks for it too.
  */
 @Component
 class PostPurchaseJob {
@@ -41,10 +45,12 @@ class PostPurchaseJob {
     private final OrderNotificationService notifications;
     private final AnalyticsService analytics;
     private final AppProperties props;
+    private final ReviewCaptureService reviewCapture;
 
     PostPurchaseJob(OrderRepository orders, OrderEventRepository orderEvents, LeadRepository leads,
                     PromoCodeRepository promos, CartService carts, WhatsAppProvider whatsapp,
-                    OrderNotificationService notifications, AnalyticsService analytics, AppProperties props) {
+                    OrderNotificationService notifications, AnalyticsService analytics, AppProperties props,
+                    ReviewCaptureService reviewCapture) {
         this.orders = orders;
         this.orderEvents = orderEvents;
         this.leads = leads;
@@ -54,6 +60,7 @@ class PostPurchaseJob {
         this.notifications = notifications;
         this.analytics = analytics;
         this.props = props;
+        this.reviewCapture = reviewCapture;
     }
 
     @Scheduled(fixedDelayString = "PT1H", initialDelayString = "PT3M")
@@ -85,6 +92,7 @@ class PostPurchaseJob {
                 }
                 notifications.logSent(order.getLeadId(), "order-post-purchase");
                 analytics.record(LeadEventType.REVIEW_REQUESTED, order.getLeadId(), null);
+                reviewCapture.markPending(order.getLeadId(), order.getId());
                 log.info("post-purchase message sent for order {}", order.getOrderNo());
             } catch (Exception e) {
                 log.warn("post-purchase message failed for order {}: {}", order.getOrderNo(), e.getMessage());
@@ -105,6 +113,7 @@ class PostPurchaseJob {
         }
         sb.append("\n\nTrack this order or ask us anything right here:\n")
                 .append(props.frontendBaseUrl()).append("/order/").append(order.getOrderNo());
+        sb.append("\n\n⭐ Quick one — how would you rate it? Just reply with a number, 1 to 5.");
         return sb.toString();
     }
 

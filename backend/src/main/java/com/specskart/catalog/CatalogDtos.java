@@ -13,14 +13,16 @@ public final class CatalogDtos {
                               String colour, String material, String gender,
                               long priceMinor, Long compareAtMinor, String currency,
                               boolean inStock, boolean featured, String imageUrl,
-                              java.time.Instant dropsAt, boolean limitedEdition, String tryOnImageUrl) {}
+                              java.time.Instant dropsAt, boolean limitedEdition, String tryOnImageUrl,
+                              Double avgRating, int reviewCount, int stockQty) {}
 
     public record ProductDetail(UUID id, String slug, String name, String description,
                                 String frameCategoryCode, String colour, String material, String gender,
                                 long priceMinor, Long compareAtMinor, String currency,
                                 int stockQty, boolean inStock, boolean lensable, boolean featured,
                                 List<ImageDto> images,
-                                java.time.Instant dropsAt, boolean limitedEdition, String tryOnImageUrl) {}
+                                java.time.Instant dropsAt, boolean limitedEdition, String tryOnImageUrl,
+                                Double avgRating, int reviewCount) {}
 
     public record StoreConfigDto(String heroTitle, String heroSubtitle, String heroImageUrl,
                                  long shippingFeeMinor, Long freeShippingOverMinor,

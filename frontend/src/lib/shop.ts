@@ -76,6 +76,7 @@ export type ProductCard = {
   inStock: boolean; featured: boolean; imageUrl: string | null
   dropsAt: string | null; limitedEdition: boolean
   tryOnImageUrl: string | null
+  avgRating: number | null; reviewCount: number; stockQty: number
 }
 
 export type ProductDetail = ProductCard & {

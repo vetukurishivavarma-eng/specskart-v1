@@ -99,6 +99,12 @@ export default function ProductDetail() {
           <h1 className="text-3xl">{p.name}</h1>
           {p.limitedEdition && <span className="rounded-full bg-clay/15 px-2 py-0.5 text-xs text-clay">Limited edition</span>}
         </div>
+        {p.reviewCount > 0 && (
+          <p className="mt-1 text-sm text-ink/60">★ {p.avgRating?.toFixed(1)} · {p.reviewCount} review{p.reviewCount === 1 ? '' : 's'}</p>
+        )}
+        {p.inStock && p.stockQty > 0 && p.stockQty <= 3 && (
+          <p className="mt-1 text-sm font-medium text-clay">Only {p.stockQty} left in stock</p>
+        )}
         <div className="mt-2 flex items-center gap-3">
           <span className="text-xl font-medium">{money(p.priceMinor, p.currency)}</span>
           {p.compareAtMinor && p.compareAtMinor > p.priceMinor && (

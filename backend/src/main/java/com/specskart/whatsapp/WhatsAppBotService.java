@@ -8,6 +8,7 @@ import com.specskart.config.AppProperties;
 import com.specskart.framefinder.FrameFinderService;
 import com.specskart.order.CartService;
 import com.specskart.order.OrderNotificationService;
+import com.specskart.order.ReviewCaptureService;
 import com.specskart.lead.Lead;
 import com.specskart.lead.LeadFollowUpService;
 import com.specskart.lead.LeadService;
@@ -53,11 +54,13 @@ public class WhatsAppBotService {
     private final CatalogService catalog;
     private final CartService carts;
     private final LeadFollowUpService followUp;
+    private final ReviewCaptureService reviewCapture;
 
     public WhatsAppBotService(WhatsAppProvider provider, WhatsAppMessageRepository messages,
                               FrameFinderService frameFinder, LeadService leadService,
                               AnalyticsService analytics, AppProperties props,
-                              CatalogService catalog, CartService carts, LeadFollowUpService followUp) {
+                              CatalogService catalog, CartService carts, LeadFollowUpService followUp,
+                              ReviewCaptureService reviewCapture) {
         this.provider = provider;
         this.messages = messages;
         this.frameFinder = frameFinder;
@@ -67,12 +70,21 @@ public class WhatsAppBotService {
         this.catalog = catalog;
         this.carts = carts;
         this.followUp = followUp;
+        this.reviewCapture = reviewCapture;
     }
 
     @Transactional
     public void handleInbound(Lead lead, String text, String buttonId, String waMessageId) {
         logInbound(lead.getId(), waMessageId, text, buttonId);
         followUp.onInbound(lead.getId(), text); // opt-out keyword, or defer the automated touches
+
+        // A bare "1".."5" only means a star rating when a post-purchase ask is pending —
+        // otherwise it falls through to the ordinary welcome-menu shortcuts below.
+        if (buttonId == null && text != null && text.trim().matches("[1-5]")
+                && reviewCapture.pendingOrderId(lead) != null) {
+            handleReview(lead, Integer.parseInt(text.trim()));
+            return;
+        }
 
         // "BUY 1/2/3" against the picks just shown — a freeform reply, not a button, and
         // its meaning depends on what was last sent, so it's resolved before classify().
@@ -143,6 +155,16 @@ public class WhatsAppBotService {
         sb.append("\n\nReply *BUY 1*, *BUY 2* or *BUY 3* and I'll add it to your bag with a checkout link"
                 + " — pay online or cash on delivery.");
         sendText(lead, sb.toString());
+    }
+
+    /** A star rating in reply to the post-purchase ask — applied to every product in that order. */
+    private void handleReview(Lead lead, int rating) {
+        int recorded = reviewCapture.recordAndClear(lead.getId(), rating);
+        String stars = "⭐".repeat(rating);
+        String thanks = recorded > 0
+                ? "Thanks for the " + stars + " rating! It helps other shoppers pick the right frame."
+                : "Thanks for the rating!";
+        sendText(lead, thanks);
     }
 
     /** Resolve a "BUY n" reply against the picks last shown, add it to a fresh lead-linked

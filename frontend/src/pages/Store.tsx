@@ -108,6 +108,9 @@ function Tile({ p }: { p: ProductCard }) {
         {p.limitedEdition && (
           <span className="absolute left-2 top-2 rounded-full bg-clay px-2 py-0.5 text-[10px] font-medium text-bone">Limited</span>
         )}
+        {p.inStock && p.stockQty > 0 && p.stockQty <= 3 && (
+          <span className="absolute right-2 top-2 rounded-full bg-ink px-2 py-0.5 text-[10px] font-medium text-bone">Only {p.stockQty} left</span>
+        )}
       </div>
       <div className="mt-3">
         <div className="flex items-baseline justify-between gap-2">
@@ -118,6 +121,9 @@ function Tile({ p }: { p: ProductCard }) {
           {p.colour}{p.colour && p.material ? ' · ' : ''}{p.material}
           {!p.inStock && <span className="text-clay"> · sold out</span>}
         </p>
+        {p.reviewCount > 0 && (
+          <p className="text-xs text-ink/60">★ {p.avgRating?.toFixed(1)} · {p.reviewCount} review{p.reviewCount === 1 ? '' : 's'}</p>
+        )}
       </div>
     </Link>
   )

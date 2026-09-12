@@ -21,18 +21,21 @@ public class CatalogService {
     private final StoreConfigRepository storeConfig;
     private final RecommendationService recommendations;
     private final StockAlertRepository stockAlerts;
+    private final ReviewRepository reviews;
 
     private final com.specskart.config.AppProperties props;
 
     public CatalogService(ProductRepository products, ProductImageRepository images, PromoCodeRepository promos,
                           StoreConfigRepository storeConfig, RecommendationService recommendations,
-                          StockAlertRepository stockAlerts, com.specskart.config.AppProperties props) {
+                          StockAlertRepository stockAlerts, ReviewRepository reviews,
+                          com.specskart.config.AppProperties props) {
         this.products = products;
         this.images = images;
         this.promos = promos;
         this.storeConfig = storeConfig;
         this.recommendations = recommendations;
         this.stockAlerts = stockAlerts;
+        this.reviews = reviews;
         this.props = props;
     }
 
@@ -61,17 +64,19 @@ public class CatalogService {
         };
 
         Map<java.util.UUID, String> firstImage = firstImageByProduct();
+        Map<java.util.UUID, ReviewRepository.RatingAgg> ratings = ratingsByProduct();
         return stream.sorted(cmp)
-                .map(p -> card(p, firstImage.get(p.getId())))
+                .map(p -> card(p, firstImage.get(p.getId()), ratings.get(p.getId())))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<CatalogDtos.ProductCard> featured() {
         Map<java.util.UUID, String> firstImage = firstImageByProduct();
+        Map<java.util.UUID, ReviewRepository.RatingAgg> ratings = ratingsByProduct();
         return products.findByStatusAndFeaturedTrueOrderByCreatedAtDesc("ACTIVE").stream()
                 .filter(p -> !p.isUpcoming())
-                .map(p -> card(p, firstImage.get(p.getId()))).toList();
+                .map(p -> card(p, firstImage.get(p.getId()), ratings.get(p.getId()))).toList();
     }
 
     /**
@@ -144,11 +149,14 @@ public class CatalogService {
                 .orElseThrow(() -> ApiException.notFound("PRODUCT_NOT_FOUND", "No such product: " + slug));
         var imgs = images.findByProductIdOrderBySortAsc(p.getId()).stream()
                 .map(i -> new CatalogDtos.ImageDto(i.getId(), i.getUrl(), i.getAlt())).toList();
+        var agg = ratingsByProduct().get(p.getId());
         return new CatalogDtos.ProductDetail(p.getId(), p.getSlug(), p.getName(), p.getDescription(),
                 p.getFrameCategoryCode(), p.getColour(), p.getMaterial(), p.getGender(),
                 p.getPriceMinor(), p.getCompareAtMinor(), p.getCurrency(),
                 p.getStockQty(), p.inStock(), p.isLensable(), p.isFeatured(), imgs,
-                p.getDropsAt(), p.isLimitedEdition(), p.getTryOnImageUrl());
+                p.getDropsAt(), p.isLimitedEdition(), p.getTryOnImageUrl(),
+                agg == null ? null : Math.round(agg.getAvgRating() * 10) / 10.0,
+                agg == null ? 0 : agg.getCnt().intValue());
     }
 
     /** Register a "notify me" request for a product (sold out, or a scheduled drop). Idempotent. */
@@ -209,11 +217,18 @@ public class CatalogService {
         return out;
     }
 
-    private CatalogDtos.ProductCard card(Product p, String imageUrl) {
+    private Map<java.util.UUID, ReviewRepository.RatingAgg> ratingsByProduct() {
+        return reviews.aggregateAll().stream()
+                .collect(Collectors.toMap(ReviewRepository.RatingAgg::getProductId, a -> a));
+    }
+
+    private CatalogDtos.ProductCard card(Product p, String imageUrl, ReviewRepository.RatingAgg rating) {
         return new CatalogDtos.ProductCard(p.getId(), p.getSlug(), p.getName(), p.getFrameCategoryCode(),
                 p.getColour(), p.getMaterial(), p.getGender(),
                 p.getPriceMinor(), p.getCompareAtMinor(), p.getCurrency(),
                 p.inStock(), p.isFeatured(), imageUrl,
-                p.getDropsAt(), p.isLimitedEdition(), p.getTryOnImageUrl());
+                p.getDropsAt(), p.isLimitedEdition(), p.getTryOnImageUrl(),
+                rating == null ? null : Math.round(rating.getAvgRating() * 10) / 10.0,
+                rating == null ? 0 : rating.getCnt().intValue(), p.getStockQty());
     }
 }
