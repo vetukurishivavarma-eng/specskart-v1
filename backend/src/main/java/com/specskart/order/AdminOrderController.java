@@ -1,6 +1,8 @@
 package com.specskart.order;
 
 import com.specskart.shared.ApiException;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -12,10 +14,28 @@ public class AdminOrderController {
 
     private final OrderQueryService query;
     private final CheckoutService checkout;
+    private final OrderRepository orders;
+    private final PrescriptionFileRepository prescriptionFiles;
 
-    public AdminOrderController(OrderQueryService query, CheckoutService checkout) {
+    public AdminOrderController(OrderQueryService query, CheckoutService checkout,
+                                OrderRepository orders, PrescriptionFileRepository prescriptionFiles) {
         this.query = query;
         this.checkout = checkout;
+        this.orders = orders;
+        this.prescriptionFiles = prescriptionFiles;
+    }
+
+    /** The customer's uploaded prescription photo/PDF for this order. Auth-gated — this is
+     *  personal medical-ish data, never served on the public API. */
+    @GetMapping("/{id}/prescription")
+    public ResponseEntity<byte[]> prescription(@PathVariable UUID id) {
+        Order o = orders.findById(id).orElseThrow(() -> ApiException.notFound("ORDER_NOT_FOUND", "No such order."));
+        if (o.getPrescriptionFileId() == null) {
+            throw ApiException.notFound("NO_PRESCRIPTION", "No prescription was uploaded for this order.");
+        }
+        PrescriptionFile f = prescriptionFiles.findById(o.getPrescriptionFileId())
+                .orElseThrow(() -> ApiException.notFound("NO_PRESCRIPTION", "That file is no longer available."));
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(f.getContentType())).body(f.getBytes());
     }
 
     @GetMapping

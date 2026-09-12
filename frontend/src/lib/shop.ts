@@ -97,6 +97,7 @@ export type CartView = {
   currency: string; deliveryEta: string; holdExpiresAt: string | null
   pointsAvailable: number; pointValueMinor: number
   lensType: string | null; lensAddMinor: number; suggestions: Suggestion[]
+  hasPrescription: boolean
 }
 
 export type OrderView = {
@@ -107,7 +108,7 @@ export type OrderView = {
   lines: { productName: string; productSlug: string | null; qty: number; unitPriceMinor: number; lineTotalMinor: number }[]
   timeline: { status: string; note: string | null; at: string }[]
   pointsEarned: number; pointsRedeemed: number; pointsBalance: number; referralCode: string | null
-  lensType: string | null; lensAddMinor: number; rxJson: string | null
+  lensType: string | null; lensAddMinor: number; rxJson: string | null; hasPrescription: boolean
   paymentMethod: 'ONLINE' | 'COD'; cashDueMinor: number
 }
 
@@ -143,6 +144,11 @@ export const shop = {
     cartCall('/public/cart/promo', { method: 'POST', body: JSON.stringify({ code }) }),
   setLens: (lensType: string | null, rxJson?: string | null) =>
     cartCall('/public/cart/lens', { method: 'POST', body: JSON.stringify({ lensType, rxJson: rxJson ?? null }) }),
+  uploadPrescription: (file: File) => {
+    const body = new FormData()
+    body.append('file', file)
+    return cartCall<CartView>(`/public/cart/prescription${sParam()}`, { method: 'POST', headers: headers(), body })
+  },
 
   checkout: (body: Record<string, string | number | boolean | undefined>) =>
     cartCall<{ orderNo: string; checkoutUrl: string | null; totalMinor: number; currency: string }>(

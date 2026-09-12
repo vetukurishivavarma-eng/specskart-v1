@@ -36,4 +36,8 @@ public class Cart extends BaseEntity {
     private long lensAddMinor = 0;
     @Column(columnDefinition = "text")
     private String rxJson;
+
+    /** A photo/PDF of the customer's prescription, uploaded at checkout instead of it being
+     *  chased down manually over WhatsApp. Optional. */
+    private UUID prescriptionFileId;
 }

@@ -43,11 +43,13 @@ public class CartService {
 
     private final OrderRepository orders;
     private final ProductViewRepository views;
+    private final PrescriptionFileRepository prescriptionFiles;
 
     public CartService(CartRepository carts, CartItemRepository items, ProductRepository products,
                        ProductImageRepository images, PromoCodeRepository promos, StoreConfigRepository storeConfig,
                        com.specskart.lead.LeadRepository leads, com.specskart.config.AppProperties props,
-                       OrderRepository orders, ProductViewRepository views) {
+                       OrderRepository orders, ProductViewRepository views,
+                       PrescriptionFileRepository prescriptionFiles) {
         this.carts = carts;
         this.items = items;
         this.products = products;
@@ -58,6 +60,37 @@ public class CartService {
         this.props = props;
         this.orders = orders;
         this.views = views;
+        this.prescriptionFiles = prescriptionFiles;
+    }
+
+    private static final long MAX_PRESCRIPTION_BYTES = 8_000_000;
+
+    /** A photo/PDF of the customer's prescription, so a lens order doesn't need a manual
+     *  WhatsApp back-and-forth to collect it. Replaces any previous upload on this cart. */
+    @Transactional
+    public OrderDtos.CartView uploadPrescription(String token, org.springframework.web.multipart.MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw ApiException.badRequest("EMPTY_FILE", "Choose a photo of your prescription first.");
+        }
+        if (file.getSize() > MAX_PRESCRIPTION_BYTES) {
+            throw ApiException.badRequest("FILE_TOO_LARGE", "That file's too big — please upload a photo under 8MB.");
+        }
+        String ct = file.getContentType();
+        if (ct == null || !(ct.startsWith("image/") || ct.equals("application/pdf"))) {
+            throw ApiException.badRequest("BAD_FILE_TYPE", "Upload a photo (JPG/PNG) or PDF of your prescription.");
+        }
+        Cart cart = getOrCreate(token);
+        PrescriptionFile f = new PrescriptionFile();
+        f.setContentType(ct);
+        try {
+            f.setBytes(file.getBytes());
+        } catch (java.io.IOException e) {
+            throw ApiException.badRequest("UPLOAD_FAILED", "Could not read that file — please try again.");
+        }
+        f = prescriptionFiles.save(f);
+        cart.setPrescriptionFileId(f.getId());
+        carts.save(cart);
+        return view(cart);
     }
 
     /**
@@ -263,7 +296,7 @@ public class CartService {
         return new OrderDtos.CartView(cart.getToken(), out, promoCode, subtotal, discount, shipping, total,
                 sc.getCurrency(), sc.getDeliveryEta(), earliestHold,
                 points, props.loyalty().pointValueMinor(),
-                cart.getLensType(), lensAdd, suggestions);
+                cart.getLensType(), lensAdd, suggestions, cart.getPrescriptionFileId() != null);
     }
 
     /** Set the prescription-lens choice + optional Rx for the lensable frames in this cart. */

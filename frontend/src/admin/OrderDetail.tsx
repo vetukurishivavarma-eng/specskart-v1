@@ -3,6 +3,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { money, type OrderView } from '../lib/shop'
 
+async function viewPrescription(orderId: string) {
+  const token = localStorage.getItem('specskart_token')
+  const base = import.meta.env.VITE_API_BASE ?? '/api'
+  const res = await fetch(`${base}/admin/orders/${orderId}/prescription`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) return
+  window.open(URL.createObjectURL(await res.blob()), '_blank')
+}
+
 const NEXT: Record<string, string[]> = {
   PENDING_PAYMENT: ['PAID', 'CANCELLED'],
   CONFIRMED: ['PACKED', 'CANCELLED'],
@@ -72,7 +82,12 @@ export default function OrderDetail() {
           {o.lensType && (
             <p className="mt-3 rounded bg-ink/5 p-2 text-xs">
               Lenses: <strong>{o.lensType.replace('_', ' ')}</strong>{o.lensAddMinor > 0 ? ` (+${money(o.lensAddMinor, o.currency)})` : ''}
-              {o.rxJson ? <><br />Rx: {o.rxJson}</> : <><br /><span className="text-clay">Prescription not yet collected — contact the customer on WhatsApp.</span></>}
+              {o.rxJson && <><br />Rx: {o.rxJson}</>}
+              {o.hasPrescription ? (
+                <><br /><button className="underline" onClick={() => viewPrescription(id!)}>View uploaded prescription 📄</button></>
+              ) : !o.rxJson && (
+                <><br /><span className="text-clay">Prescription not yet collected — contact the customer on WhatsApp.</span></>
+              )}
             </p>
           )}
           <dl className="mt-3 space-y-1 border-t border-ink/10 pt-3 text-sm">

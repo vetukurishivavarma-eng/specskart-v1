@@ -68,6 +68,8 @@ public class Order extends BaseEntity {
     @Column(columnDefinition = "text")
     private String rxJson;
 
+    private UUID prescriptionFileId;
+
     /** True for a cash / pay-on-delivery order. */
     public boolean isCod() {
         return "COD".equalsIgnoreCase(paymentProvider);

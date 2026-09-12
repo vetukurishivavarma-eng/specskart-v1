@@ -17,10 +17,14 @@ function authHeader(): Record<string, string> {
 
 export async function api<T>(path: string, opts: RequestInit & { auth?: boolean } = {}): Promise<T> {
   const { auth, ...rest } = opts
+  // A FormData body needs the browser to set its own multipart Content-Type (with boundary) —
+  // forcing application/json here would send the file upload with the wrong header and it'd
+  // never parse server-side.
+  const isFormData = typeof FormData !== 'undefined' && rest.body instanceof FormData
   const res = await fetch(`${BASE}${path}`, {
     ...rest,
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(auth ? authHeader() : {}),
       ...(rest.headers ?? {}),
     },

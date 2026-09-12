@@ -64,6 +64,14 @@ public class StorefrontController {
         return cart.setLens(token, body.lensType(), body.rxJson());
     }
 
+    /** A photo/PDF of the customer's prescription, so lens orders don't need a manual
+     *  WhatsApp back-and-forth to collect it. */
+    @PostMapping("/cart/prescription")
+    public OrderDtos.CartView prescription(@RequestHeader(value = "X-Cart-Token", required = false) String token,
+                                           @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return cart.uploadPrescription(token, file);
+    }
+
     @PostMapping("/checkout")
     public OrderDtos.CheckoutResult checkout(@RequestHeader(value = "X-Cart-Token", required = false) String token,
                                              @RequestParam(value = "s", required = false) String frameFinderToken,

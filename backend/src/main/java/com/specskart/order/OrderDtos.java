@@ -19,7 +19,8 @@ public final class OrderDtos {
                            long subtotalMinor, long discountMinor, long shippingMinor, long totalMinor,
                            String currency, String deliveryEta, java.time.Instant holdExpiresAt,
                            int pointsAvailable, int pointValueMinor,
-                           String lensType, long lensAddMinor, List<Suggestion> suggestions) {}
+                           String lensType, long lensAddMinor, List<Suggestion> suggestions,
+                           boolean hasPrescription) {}
 
     public record AddItem(UUID productId, Integer qty) {}
     public record SetQty(int qty) {}
@@ -49,7 +50,7 @@ public final class OrderDtos {
                             String currency, String promoCode, Instant paidAt, Instant createdAt,
                             List<OrderLine> lines, List<StatusEvent> timeline,
                             int pointsEarned, int pointsRedeemed, int pointsBalance, String referralCode,
-                            String lensType, long lensAddMinor, String rxJson,
+                            String lensType, long lensAddMinor, String rxJson, boolean hasPrescription,
                             String paymentMethod, long cashDueMinor) {}
 
     public record StatusEvent(String status, String note, Instant at) {}

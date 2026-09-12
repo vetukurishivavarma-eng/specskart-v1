@@ -47,6 +47,7 @@ export default function Cart() {
   const applyPromo = useMutation({ mutationFn: () => shop.applyPromo(promo), onSuccess: () => { setPromo(''); refresh() } })
   const clearPromo = useMutation({ mutationFn: () => shop.applyPromo(''), onSuccess: refresh })
   const setLens = useMutation({ mutationFn: (t: string | null) => shop.setLens(t), onSuccess: refresh })
+  const uploadRx = useMutation({ mutationFn: (f: File) => shop.uploadPrescription(f), onSuccess: refresh })
   const addSuggestion = useMutation({ mutationFn: (id: string) => shop.addItem(id, 1), onSuccess: refresh })
 
   if (isLoading) return <div className="container-x py-16 text-ink/50">Loading your bag…</div>
@@ -112,7 +113,24 @@ export default function Cart() {
               ))}
             </div>
             {cart.lensAddMinor > 0 && (
-              <p className="mt-2 text-xs text-ink/60">+ {money(cart.lensAddMinor, cart.currency)} for lenses. We’ll confirm your prescription by WhatsApp after you order.</p>
+              <p className="mt-2 text-xs text-ink/60">+ {money(cart.lensAddMinor, cart.currency)} for lenses.</p>
+            )}
+            {(cart.lensType === 'SINGLE_VISION' || cart.lensType === 'PROGRESSIVE') && (
+              <div className="mt-3 border-t border-ink/10 pt-3">
+                {cart.hasPrescription ? (
+                  <p className="text-sm text-moss">✓ Prescription uploaded</p>
+                ) : (
+                  <p className="text-xs text-ink/50 mb-2">
+                    Have your prescription handy? Upload it now and skip the back-and-forth — or we’ll confirm it with you on WhatsApp after you order.
+                  </p>
+                )}
+                <label className="btn-ghost inline-block cursor-pointer !px-3 !py-1.5 text-xs">
+                  {uploadRx.isPending ? 'Uploading…' : cart.hasPrescription ? 'Replace prescription photo' : 'Upload prescription photo'}
+                  <input type="file" accept="image/*,.pdf" className="hidden" disabled={uploadRx.isPending}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadRx.mutate(f); e.target.value = '' }} />
+                </label>
+                {uploadRx.isError && <p className="mt-1 text-xs text-clay">{(uploadRx.error as Error).message}</p>}
+              </div>
             )}
           </div>
         )}

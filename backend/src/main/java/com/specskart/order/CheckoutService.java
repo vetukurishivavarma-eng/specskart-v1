@@ -139,6 +139,7 @@ public class CheckoutService {
         order.setLensType(cart.getLensType());
         order.setLensAddMinor(view.lensAddMinor());
         order.setRxJson(cart.getRxJson());
+        order.setPrescriptionFileId(cart.getPrescriptionFileId());
         orders.save(order);
 
         for (CartItem ci : lines) {
