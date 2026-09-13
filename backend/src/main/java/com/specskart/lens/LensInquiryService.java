@@ -33,14 +33,17 @@ public class LensInquiryService {
     private final WhatsAppProvider whatsapp;
     private final TokenGenerator tokens;
     private final AppProperties props;
+    private final LensPricing pricing;
 
     public LensInquiryService(LensInquiryRepository inquiries, LeadService leadService,
-                              WhatsAppProvider whatsapp, TokenGenerator tokens, AppProperties props) {
+                              WhatsAppProvider whatsapp, TokenGenerator tokens, AppProperties props,
+                              LensPricing pricing) {
         this.inquiries = inquiries;
         this.leadService = leadService;
         this.whatsapp = whatsapp;
         this.tokens = tokens;
         this.props = props;
+        this.pricing = pricing;
     }
 
     @Transactional
@@ -116,7 +119,7 @@ public class LensInquiryService {
     @Transactional
     public LensDtos.InquiryView quote(UUID id) {
         LensInquiry q = requireVerified(get(id));
-        q.setPriceMinor(LensPricing.quote(q));
+        q.setPriceMinor(pricing.quote(q));
         q.setStatus("PRICED");
         return view(inquiries.save(q));
     }
@@ -124,7 +127,7 @@ public class LensInquiryService {
     @Transactional
     public LensDtos.InquiryView submit(UUID id) {
         LensInquiry q = requireVerified(get(id));
-        if (q.getPriceMinor() == null) q.setPriceMinor(LensPricing.quote(q));
+        if (q.getPriceMinor() == null) q.setPriceMinor(pricing.quote(q));
         q.setStatus("SUBMITTED");
         inquiries.save(q);
         alertStaff(q);
