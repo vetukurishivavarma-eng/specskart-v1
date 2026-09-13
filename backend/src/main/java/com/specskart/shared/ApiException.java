@@ -25,6 +25,10 @@ public class ApiException extends RuntimeException {
         return new ApiException(HttpStatus.GONE, code, message);
     }
 
+    public static ApiException conflict(String code, String message) {
+        return new ApiException(HttpStatus.CONFLICT, code, message);
+    }
+
     public String getCode() { return code; }
     public HttpStatus getStatus() { return status; }
 }

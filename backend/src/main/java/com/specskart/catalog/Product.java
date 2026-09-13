@@ -41,6 +41,14 @@ public class Product extends BaseEntity {
     @Column(nullable = false)
     private int stockQty = 0;
 
+    /** POS-facing fields — nullable, since online-only products never need them.
+     *  Per-store stock/price overrides live in {@link com.specskart.pos.ProductInventory}/
+     *  {@link com.specskart.pos.ProductStorePrice}; this stockQty/priceMinor stay the
+     *  online-store defaults. */
+    @Column(unique = true)
+    private String sku;
+    private String barcode;
+
     @Column(nullable = false)
     private boolean lensable = false;
 
