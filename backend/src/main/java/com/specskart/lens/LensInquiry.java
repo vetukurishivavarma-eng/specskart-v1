@@ -71,6 +71,11 @@ public class LensInquiry extends BaseEntity {
     private String soldBy;
     private String shopName;
 
+    /** Idempotency key for a walk-in sale from the Specskart POS app's offline queue — a
+     *  retry after a dropped connection can't double-sell. Null for web-originated inquiries. */
+    @Column(unique = true)
+    private String clientReference;
+
     public boolean isPhoneVerified() {
         return phoneVerifiedAt != null;
     }

@@ -30,7 +30,7 @@ public final class LensDtos {
     /** Specskart POS: staff billing a customer at the counter, no WhatsApp step. */
     public record WalkInSale(String customerName, String phone, String lensType, Boolean blueBlock,
                              BigDecimal addPower, String lensStructure,
-                             String paymentMethod, String soldBy, String shopName) {}
+                             String paymentMethod, String soldBy, String shopName, String clientReference) {}
 
     public record CompleteSale(String paymentMethod, String soldBy, String shopName) {}
 

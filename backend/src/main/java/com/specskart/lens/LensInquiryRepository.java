@@ -18,4 +18,6 @@ public interface LensInquiryRepository extends JpaRepository<LensInquiry, UUID> 
     List<LensInquiry> findByStatusOrderByCreatedAtAsc(String status);
 
     List<LensInquiry> findByStatusAndCreatedAtBetweenOrderByCreatedAtDesc(String status, Instant from, Instant to);
+
+    Optional<LensInquiry> findByClientReference(String clientReference);
 }

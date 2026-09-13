@@ -139,6 +139,13 @@ public class LensInquiryService {
      *  same pricing/special-axis rules and sales reporting apply to every sale, web or counter. */
     @Transactional
     public LensDtos.InquiryView walkInSale(LensDtos.WalkInSale d) {
+        // The Specskart POS app's offline queue replays a walk-in sale after a dropped
+        // connection using the same clientReference — a retry must be a no-op, not a
+        // second sale.
+        if (d.clientReference() != null && !d.clientReference().isBlank()) {
+            var existing = inquiries.findByClientReference(d.clientReference());
+            if (existing.isPresent()) return view(existing.get());
+        }
         if (!"CLEAR".equals(d.lensType()) && !"PHOTOCHROMATIC".equals(d.lensType())) {
             throw ApiException.badRequest("BAD_LENS_TYPE", "Choose a lens type first.");
         }
@@ -151,6 +158,7 @@ public class LensInquiryService {
         q.setAddPower(d.addPower());
         q.setLensStructure(d.lensStructure());
         q.setSpecialAxis(false); // no Rx captured at the counter yet — staff enters that separately if needed
+        q.setClientReference(d.clientReference());
         String raw = tokens.newToken();
         q.setVerifyTokenHash(tokens.hash(raw));
         q.setPhoneVerifiedAt(Instant.now());
