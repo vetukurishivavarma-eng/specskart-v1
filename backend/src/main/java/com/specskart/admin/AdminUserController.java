@@ -19,7 +19,9 @@ import java.util.UUID;
 public class AdminUserController {
 
     public record CreateUser(String email, String fullName, String password, String role) {}
-    public record UpdateUser(String fullName, String role, Boolean active) {}
+    /** password is optional — set it to reset a staff member's login (e.g. "forgot password"),
+     *  omit it to just change name/role/active. */
+    public record UpdateUser(String fullName, String role, Boolean active, String password) {}
 
     private final UserRepository users;
     private final PasswordEncoder encoder;
@@ -55,12 +57,18 @@ public class AdminUserController {
         return view(users.save(u));
     }
 
+    @GetMapping("/{id}")
+    public Map<String, Object> get(@PathVariable UUID id) {
+        return view(users.findById(id).orElseThrow(() -> ApiException.notFound("USER_NOT_FOUND", "No such user.")));
+    }
+
     @PatchMapping("/{id}")
     public Map<String, Object> update(@PathVariable UUID id, @RequestBody UpdateUser req) {
         User u = users.findById(id).orElseThrow(() -> ApiException.notFound("USER_NOT_FOUND", "No such user."));
         if (req.fullName() != null) u.setFullName(req.fullName().trim());
         if (req.role() != null) u.setRole("ADMIN".equalsIgnoreCase(req.role()) ? Role.ADMIN : Role.AGENT);
         if (req.active() != null) u.setActive(req.active());
+        if (req.password() != null && !req.password().isBlank()) u.setPasswordHash(encoder.encode(req.password()));
         return view(users.save(u));
     }
 

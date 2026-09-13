@@ -48,6 +48,9 @@ public class Product extends BaseEntity {
     @Column(unique = true)
     private String sku;
     private String barcode;
+    /** Landed cost, for profit analytics — never shown to shoppers. */
+    @Column(nullable = false)
+    private long costPriceMinor = 0;
 
     @Column(nullable = false)
     private boolean lensable = false;

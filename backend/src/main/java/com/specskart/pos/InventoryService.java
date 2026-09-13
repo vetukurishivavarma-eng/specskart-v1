@@ -72,6 +72,41 @@ public class InventoryService {
         movements.save(m);
     }
 
+    /** Bulk stock upload — one line per product, by SKU, setting the ABSOLUTE quantity (a
+     *  fresh physical count), not a delta. Lines with an unknown SKU are skipped and reported
+     *  back rather than failing the whole upload. */
+    @Transactional
+    public List<String> bulkSetBySku(UUID storeId, List<SkuQuantity> lines, UUID userId) {
+        List<String> skipped = new java.util.ArrayList<>();
+        for (SkuQuantity line : lines) {
+            Product p = products.findBySkuIgnoreCase(line.sku()).orElse(null);
+            if (p == null) {
+                skipped.add(line.sku());
+                continue;
+            }
+            int delta = line.quantity() - quantityOf(storeId, p.getId());
+            if (delta != 0) adjust(storeId, p.getId(), delta, "ADJUSTMENT", "bulk-import", "Bulk stock upload", userId);
+        }
+        return skipped;
+    }
+
+    public record SkuQuantity(String sku, int quantity) {}
+
+    public record ReorderLine(UUID productId, String productName, String sku, int quantity,
+                              int reorderLevel, int suggestedQuantity) {}
+
+    /** ponytail: a simple heuristic — restock to double the reorder level, not a sales-
+     *  velocity forecast. Every product at or below its reorder level shows up; good enough
+     *  to flag "buy more of this soon" without needing sales-history modelling. */
+    @Transactional(readOnly = true)
+    public List<ReorderLine> reorderSuggestions(UUID storeId) {
+        return listForStore(storeId).stream()
+                .filter(r -> r.quantity() <= r.reorderLevel())
+                .map(r -> new ReorderLine(r.productId(), r.productName(), r.sku(), r.quantity(),
+                        r.reorderLevel(), Math.max(1, r.reorderLevel() * 2 - r.quantity())))
+                .toList();
+    }
+
     /** Throws INSUFFICIENT_STOCK rather than allowing an in-person sale to oversell — unlike
      *  NG POS's offline tills, this app is online-only, so there's no queued-replay reason to
      *  let stock go negative here. */

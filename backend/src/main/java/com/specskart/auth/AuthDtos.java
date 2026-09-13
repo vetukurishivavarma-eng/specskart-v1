@@ -9,4 +9,5 @@ public class AuthDtos {
     public record LoginRequest(@Email @NotBlank String email, @NotBlank String password,
                                String deviceId, String deviceName, String platform, String appVersion) {}
     public record LoginResponse(String token, String email, String name, String role) {}
+    public record ForgotPasswordRequest(@Email @NotBlank String email) {}
 }

@@ -129,6 +129,74 @@ public class SaleService {
                 .map(this::view).toList();
     }
 
+    @Transactional(readOnly = true)
+    public PosDtos.SaleView getSale(UUID id) {
+        return view(sales.findById(id).orElseThrow(() -> ApiException.notFound("SALE_NOT_FOUND", "No such sale.")));
+    }
+
+    /** A partial or full refund against a specific sale — distinct from {@link #voidSale},
+     *  which cancels the whole thing. Posts as its own reversing sale (sale_type REFUND,
+     *  negative line totals and payment) rather than mutating the original, so the original
+     *  receipt stays exactly as it was printed. ponytail: doesn't track how much of each line
+     *  has already been refunded across multiple partial refunds — just checks against the
+     *  original quantity sold, so refunding the same line twice would go unnoticed. Fine for
+     *  a small shop's volume; add per-line refunded-so-far tracking if that becomes real. */
+    @Transactional
+    public PosDtos.SaleView refund(UUID originalSaleId, List<PosDtos.SaleItemRequest> items, String method,
+                                   String reason, UUID userId) {
+        PosSale original = sales.findById(originalSaleId)
+                .orElseThrow(() -> ApiException.notFound("SALE_NOT_FOUND", "No such sale."));
+        if (original.isVoided()) throw ApiException.badRequest("ALREADY_VOIDED", "This sale was voided, not sold.");
+        if (items == null || items.isEmpty()) throw ApiException.badRequest("EMPTY_REFUND", "Pick at least one item to refund.");
+
+        var originalItems = saleItems.findBySaleId(originalSaleId);
+
+        PosSale refundSale = new PosSale();
+        refundSale.setStoreId(original.getStoreId());
+        refundSale.setSaleType("REFUND");
+        refundSale.setReceiptNumber(nextReceiptNumber(stores.findById(original.getStoreId()).orElseThrow()));
+        refundSale.setCashierId(userId);
+        refundSale.setReversesId(originalSaleId);
+        refundSale.setNotes(reason == null ? "" : reason);
+        sales.save(refundSale);
+
+        long refundTotal = 0;
+        for (PosDtos.SaleItemRequest line : items) {
+            PosSaleItem originalItem = originalItems.stream()
+                    .filter(i -> i.getProductId() != null && i.getProductId().equals(line.productId()))
+                    .findFirst()
+                    .orElseThrow(() -> ApiException.badRequest("NOT_ON_SALE", "That item wasn't on the original sale."));
+            if (line.quantity() <= 0 || line.quantity() > originalItem.getQuantity()) {
+                throw ApiException.badRequest("BAD_QTY", "Refund quantity must be between 1 and what was sold.");
+            }
+            long lineTotal = -(originalItem.getUnitPriceMinor() * line.quantity());
+            refundTotal += lineTotal;
+
+            inventory.adjust(original.getStoreId(), originalItem.getProductId(), line.quantity(), "REFUND",
+                    refundSale.getReceiptNumber(), reason, userId);
+
+            PosSaleItem refundItem = new PosSaleItem();
+            refundItem.setSaleId(refundSale.getId());
+            refundItem.setProductId(originalItem.getProductId());
+            refundItem.setProductName(originalItem.getProductName());
+            refundItem.setSku(originalItem.getSku());
+            refundItem.setQuantity(line.quantity());
+            refundItem.setUnitPriceMinor(originalItem.getUnitPriceMinor());
+            refundItem.setLineTotalMinor(lineTotal);
+            saleItems.save(refundItem);
+        }
+
+        PosPayment refundPayment = new PosPayment();
+        refundPayment.setSaleId(refundSale.getId());
+        refundPayment.setMethod(method == null ? "CASH" : method);
+        refundPayment.setAmountMinor(refundTotal);
+        payments.save(refundPayment);
+
+        refundSale.setSubtotalMinor(refundTotal);
+        refundSale.setTotalMinor(refundTotal);
+        return view(sales.save(refundSale));
+    }
+
     /** ponytail: increments within the enclosing transaction rather than SELECT ... FOR
      *  UPDATE — fine for one till posting at a time; the receipt_number unique constraint
      *  is the fail-safe if two ever collide. Upgrade to row-locking if concurrent registers

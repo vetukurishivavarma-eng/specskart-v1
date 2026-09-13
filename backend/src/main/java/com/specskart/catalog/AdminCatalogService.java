@@ -305,6 +305,7 @@ public class AdminCatalogService {
         if (in.kind() != null) p.setKind("ACCESSORY".equalsIgnoreCase(in.kind()) ? "ACCESSORY" : "FRAME");
         if (in.sku() != null) p.setSku(in.sku().isBlank() ? null : in.sku().trim());
         if (in.barcode() != null) p.setBarcode(in.barcode().isBlank() ? null : in.barcode().trim());
+        if (in.costPriceMinor() != null) p.setCostPriceMinor(Math.max(0, in.costPriceMinor()));
     }
 
     /** Replace the external-URL images. Uploaded photos are managed via add/deleteImage, not here. */
@@ -334,7 +335,7 @@ public class AdminCatalogService {
                 p.getPriceMinor(), p.getCompareAtMinor(), p.getCurrency(), p.getStockQty(),
                 p.isLensable(), p.getStatus(), p.isFeatured(), imgs,
                 p.getDropsAt(), p.isLimitedEdition(), p.getTryOnImageUrl(), p.getKind(),
-                p.getSku(), p.getBarcode());
+                p.getSku(), p.getBarcode(), p.getCostPriceMinor());
     }
 
     // ---- promos ----

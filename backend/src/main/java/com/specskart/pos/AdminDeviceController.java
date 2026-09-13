@@ -33,6 +33,13 @@ public class AdminDeviceController {
         return devices.forUser(id).stream().map(AdminDeviceController::view).toList();
     }
 
+    /** Any admin can inspect any staff member's devices — the Staff screen's "view devices"
+     *  action, e.g. checking why someone can't sign in. */
+    @GetMapping("/user/{userId}")
+    public List<DeviceView> forUser(@PathVariable UUID userId) {
+        return devices.forUser(userId).stream().map(AdminDeviceController::view).toList();
+    }
+
     @PostMapping("/{sessionId}/release")
     public void release(@PathVariable UUID sessionId, @RequestBody(required = false) ReleaseRequest req, Authentication auth) {
         devices.release(sessionId, currentUser.idOf(auth), req == null ? null : req.reason());

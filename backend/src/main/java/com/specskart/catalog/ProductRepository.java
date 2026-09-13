@@ -24,6 +24,8 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     Optional<Product> findBySlug(String slug);
 
+    Optional<Product> findBySkuIgnoreCase(String sku);
+
     boolean existsBySlug(String slug);
 
     List<Product> findByStatusOrderByCreatedAtDesc(String status);

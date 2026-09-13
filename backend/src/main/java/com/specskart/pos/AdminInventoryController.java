@@ -31,4 +31,12 @@ public class AdminInventoryController {
                        @RequestBody PosDtos.AdjustStock req, Authentication auth) {
         inventory.adjust(storeId, productId, req.delta(), "ADJUSTMENT", null, req.note(), currentUser.idOf(auth));
     }
+
+    /** Bulk stock upload — one row per product (by SKU), each setting the absolute quantity
+     *  from a fresh physical count. Returns any SKUs that didn't match a product. */
+    @PostMapping("/import")
+    public List<String> bulkImport(@PathVariable UUID storeId, @RequestBody List<InventoryService.SkuQuantity> lines,
+                                   Authentication auth) {
+        return inventory.bulkSetBySku(storeId, lines, currentUser.idOf(auth));
+    }
 }
