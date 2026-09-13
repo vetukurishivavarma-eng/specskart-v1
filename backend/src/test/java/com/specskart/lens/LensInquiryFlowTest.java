@@ -80,4 +80,35 @@ class LensInquiryFlowTest {
         assertThat(quoted.status()).isEqualTo("PRICED");
         assertThat(quoted.priceMinor()).isEqualTo(45_000L + 8_000L + 35_000L);
     }
+
+    @Test
+    void walkInSaleSkipsWhatsappAndIsBilledImmediately() {
+        var sale = service.walkInSale(new LensDtos.WalkInSale(
+                "Counter Customer", null, "CLEAR", true, null, null,
+                "CASH", "Staff A", "Main Store"));
+
+        assertThat(sale.status()).isEqualTo("SOLD");
+        assertThat(sale.priceMinor()).isEqualTo(25_000L + 8_000L);
+
+        var today = service.salesOn(java.time.LocalDate.now());
+        assertThat(today).anySatisfy(s -> {
+            assertThat(s.customerName()).isEqualTo("Counter Customer");
+            assertThat(s.walkIn()).isTrue();
+            assertThat(s.paymentMethod()).isEqualTo("CASH");
+        });
+        assertThat(service.summaryOn(java.time.LocalDate.now()).totalMinor()).isGreaterThanOrEqualTo(33_000L);
+    }
+
+    @Test
+    void completingAWebOrderMovesItFromPendingToSold() {
+        UUID id = service.start(phone(), "CLEAR", false);
+        service.verify(tokenFromLastOutbound());
+        service.submit(id);
+
+        assertThat(service.pendingWebOrders()).anySatisfy(s -> assertThat(s.id()).isEqualTo(id));
+
+        var sold = service.completeSale(id, new LensDtos.CompleteSale("MOBILE", "Staff B", "Main Store"));
+        assertThat(sold.status()).isEqualTo("SOLD");
+        assertThat(service.pendingWebOrders()).noneSatisfy(s -> assertThat(s.id()).isEqualTo(id));
+    }
 }

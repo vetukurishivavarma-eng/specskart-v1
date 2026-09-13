@@ -134,6 +134,74 @@ public class LensInquiryService {
         return view(q);
     }
 
+    /** Specskart POS: staff bills a walk-in customer directly, no WhatsApp verification —
+     *  the staff member is standing in front of them. Reuses the LensInquiry pipeline so the
+     *  same pricing/special-axis rules and sales reporting apply to every sale, web or counter. */
+    @Transactional
+    public LensDtos.InquiryView walkInSale(LensDtos.WalkInSale d) {
+        if (!"CLEAR".equals(d.lensType()) && !"PHOTOCHROMATIC".equals(d.lensType())) {
+            throw ApiException.badRequest("BAD_LENS_TYPE", "Choose a lens type first.");
+        }
+        LensInquiry q = new LensInquiry();
+        q.setWalkIn(true);
+        q.setCustomerName(d.customerName());
+        q.setPhoneRaw(d.phone() == null ? "" : d.phone());
+        q.setLensType(d.lensType());
+        q.setBlueBlock(Boolean.TRUE.equals(d.blueBlock()));
+        q.setAddPower(d.addPower());
+        q.setLensStructure(d.lensStructure());
+        q.setSpecialAxis(false); // no Rx captured at the counter yet — staff enters that separately if needed
+        String raw = tokens.newToken();
+        q.setVerifyTokenHash(tokens.hash(raw));
+        q.setPhoneVerifiedAt(Instant.now());
+        q.setStatus("VERIFIED");
+        q.setPriceMinor(pricing.quote(q));
+        return completeSale(inquiries.save(q).getId(),
+                new LensDtos.CompleteSale(d.paymentMethod(), d.soldBy(), d.shopName()));
+    }
+
+    /** Specskart POS: finish billing on a web order the customer already verified and
+     *  submitted — staff collect payment, mark it SOLD. */
+    @Transactional
+    public LensDtos.InquiryView completeSale(UUID id, LensDtos.CompleteSale d) {
+        LensInquiry q = requireVerified(get(id));
+        if (q.getPriceMinor() == null) q.setPriceMinor(pricing.quote(q));
+        q.setPaymentMethod(d.paymentMethod());
+        q.setSoldBy(d.soldBy());
+        q.setShopName(d.shopName());
+        q.setStatus("SOLD");
+        return view(inquiries.save(q));
+    }
+
+    @Transactional(readOnly = true)
+    public List<LensDtos.SaleView> pendingWebOrders() {
+        return inquiries.findByStatusOrderByCreatedAtAsc("SUBMITTED").stream()
+                .map(LensInquiryService::saleView).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<LensDtos.SaleView> salesOn(java.time.LocalDate day) {
+        Instant from = day.atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+        Instant to = from.plus(java.time.Duration.ofDays(1));
+        return inquiries.findByStatusAndCreatedAtBetweenOrderByCreatedAtDesc("SOLD", from, to).stream()
+                .map(LensInquiryService::saleView).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public LensDtos.DaySummary summaryOn(java.time.LocalDate day) {
+        List<LensDtos.SaleView> sales = salesOn(day);
+        long total = sales.stream().mapToLong(LensDtos.SaleView::priceMinor).sum();
+        String currency = sales.isEmpty() ? "ZMW" : sales.get(0).currency();
+        return new LensDtos.DaySummary(total, sales.size(), currency);
+    }
+
+    private static LensDtos.SaleView saleView(LensInquiry q) {
+        return new LensDtos.SaleView(q.getId(), q.getCustomerName(), q.getLensType(), q.isBlueBlock(),
+                q.getLensStructure(), q.isSpecialAxis(), q.getPriceMinor() == null ? 0 : q.getPriceMinor(),
+                q.getCurrency(), q.getPaymentMethod(), q.getSoldBy(), q.getShopName(), q.isWalkIn(),
+                q.getCreatedAt());
+    }
+
     private void alertStaff(LensInquiry q) {
         List<String> staff = props.whatsapp().staffNumbers();
         if (staff.isEmpty()) return;

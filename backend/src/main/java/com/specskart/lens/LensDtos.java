@@ -26,4 +26,19 @@ public final class LensDtos {
                               Integer axisRight, Integer axisLeft,
                               BigDecimal addPower, String lensStructure,
                               boolean specialAxis, Long priceMinor, String currency) {}
+
+    /** Specskart POS: staff billing a customer at the counter, no WhatsApp step. */
+    public record WalkInSale(String customerName, String phone, String lensType, Boolean blueBlock,
+                             BigDecimal addPower, String lensStructure,
+                             String paymentMethod, String soldBy, String shopName) {}
+
+    public record CompleteSale(String paymentMethod, String soldBy, String shopName) {}
+
+    /** One row in the POS's sales list / day summary. */
+    public record SaleView(UUID id, String customerName, String lensType, boolean blueBlock,
+                           String lensStructure, boolean specialAxis, long priceMinor, String currency,
+                           String paymentMethod, String soldBy, String shopName, boolean walkIn,
+                           java.time.Instant createdAt) {}
+
+    public record DaySummary(long totalMinor, int count, String currency) {}
 }

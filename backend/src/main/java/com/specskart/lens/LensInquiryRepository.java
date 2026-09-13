@@ -13,4 +13,9 @@ public interface LensInquiryRepository extends JpaRepository<LensInquiry, UUID> 
     /** Verified but never reached SUBMITTED, never nudged, old enough to chase — the
      *  abandoned-lens-form recovery job's candidate pool. */
     List<LensInquiry> findTop50ByStatusAndNudgedAtIsNullAndCreatedAtBefore(String status, Instant before);
+
+    /** Specskart POS: web orders ready for staff to collect payment on and hand over. */
+    List<LensInquiry> findByStatusOrderByCreatedAtAsc(String status);
+
+    List<LensInquiry> findByStatusAndCreatedAtBetweenOrderByCreatedAtDesc(String status, Instant from, Instant to);
 }

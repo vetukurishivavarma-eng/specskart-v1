@@ -59,8 +59,17 @@ public class LensInquiry extends BaseEntity {
     @Column(nullable = false)
     private String currency = "ZMW";
     @Column(nullable = false)
-    private String status = "DRAFT"; // DRAFT | VERIFIED | PRICED | SUBMITTED
+    private String status = "DRAFT"; // DRAFT | VERIFIED | PRICED | SUBMITTED | SOLD
     private Instant nudgedAt;
+
+    /** True for a counter sale entered directly by staff in the Specskart POS app —
+     *  no WhatsApp verification step, the staff member vouches for the customer in person. */
+    @Column(nullable = false)
+    private boolean walkIn = false;
+    /** CASH | CARD | MOBILE — set when {@link #status} reaches SOLD. */
+    private String paymentMethod;
+    private String soldBy;
+    private String shopName;
 
     public boolean isPhoneVerified() {
         return phoneVerifiedAt != null;
