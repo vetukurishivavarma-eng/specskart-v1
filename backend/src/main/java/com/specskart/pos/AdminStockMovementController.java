@@ -1,6 +1,8 @@
 package com.specskart.pos;
 
 import com.specskart.catalog.ProductRepository;
+import com.specskart.shared.CurrentUser;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,14 +21,17 @@ public class AdminStockMovementController {
 
     private final StockMovementRepository movements;
     private final ProductRepository products;
+    private final CurrentUser currentUser;
 
-    public AdminStockMovementController(StockMovementRepository movements, ProductRepository products) {
+    public AdminStockMovementController(StockMovementRepository movements, ProductRepository products, CurrentUser currentUser) {
         this.movements = movements;
         this.products = products;
+        this.currentUser = currentUser;
     }
 
     @GetMapping
-    public List<MovementView> list(@PathVariable UUID storeId) {
+    public List<MovementView> list(@PathVariable UUID storeId, Authentication auth) {
+        currentUser.assertStoreAccess(auth, storeId);
         return movements.findByStoreIdOrderByCreatedAtDesc(storeId).stream()
                 .limit(200)
                 .map(m -> new MovementView(m.getProductId(),

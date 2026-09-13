@@ -26,4 +26,8 @@ public class User extends BaseEntity {
 
     @Column(nullable = false)
     private boolean active = true;
+
+    /** Which shop this login is scoped to -- null means unscoped (sees/touches every shop;
+     *  every ADMIN account is null). See CurrentUser.assertStoreAccess. */
+    private java.util.UUID storeId;
 }

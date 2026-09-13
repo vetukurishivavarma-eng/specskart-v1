@@ -34,14 +34,21 @@ public class AdminDeviceController {
     }
 
     /** Any admin can inspect any staff member's devices — the Staff screen's "view devices"
-     *  action, e.g. checking why someone can't sign in. */
+     *  action, e.g. checking why someone can't sign in. Not for a shop-scoped login: staff
+     *  only ever see their own devices, via /me above. */
     @GetMapping("/user/{userId}")
-    public List<DeviceView> forUser(@PathVariable UUID userId) {
+    public List<DeviceView> forUser(@PathVariable UUID userId, Authentication auth) {
+        if (!currentUser.isAdmin(auth)) throw ApiException.forbidden("ADMIN_ONLY", "Admin only.");
         return devices.forUser(userId).stream().map(AdminDeviceController::view).toList();
     }
 
     @PostMapping("/{sessionId}/release")
     public void release(@PathVariable UUID sessionId, @RequestBody(required = false) ReleaseRequest req, Authentication auth) {
+        // Anyone can release their own device; only an admin can release someone else's.
+        if (!currentUser.isAdmin(auth)) {
+            boolean mine = devices.forUser(currentUser.idOf(auth)).stream().anyMatch(s -> s.getId().equals(sessionId));
+            if (!mine) throw ApiException.forbidden("NOT_YOUR_DEVICE", "You can only release your own device.");
+        }
         devices.release(sessionId, currentUser.idOf(auth), req == null ? null : req.reason());
     }
 

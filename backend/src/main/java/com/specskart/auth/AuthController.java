@@ -2,6 +2,7 @@ package com.specskart.auth;
 
 import com.specskart.config.AppProperties;
 import com.specskart.pos.DeviceSessionService;
+import com.specskart.pos.StoreRepository;
 import com.specskart.shared.ApiException;
 import com.specskart.whatsapp.WhatsAppProvider;
 import jakarta.validation.Valid;
@@ -21,15 +22,17 @@ public class AuthController {
     private final PasswordEncoder encoder;
     private final JwtService jwt;
     private final DeviceSessionService deviceSessions;
+    private final StoreRepository stores;
     private final WhatsAppProvider whatsapp;
     private final AppProperties props;
 
     public AuthController(UserRepository users, PasswordEncoder encoder, JwtService jwt, DeviceSessionService deviceSessions,
-                          WhatsAppProvider whatsapp, AppProperties props) {
+                          StoreRepository stores, WhatsAppProvider whatsapp, AppProperties props) {
         this.users = users;
         this.encoder = encoder;
         this.jwt = jwt;
         this.deviceSessions = deviceSessions;
+        this.stores = stores;
         this.whatsapp = whatsapp;
         this.props = props;
     }
@@ -46,7 +49,10 @@ public class AuthController {
         if (req.deviceId() != null && !req.deviceId().isBlank()) {
             deviceSessions.claim(user.getId(), req.deviceId(), req.deviceName(), req.platform(), req.appVersion());
         }
-        return new AuthDtos.LoginResponse(jwt.issue(user), user.getEmail(), user.getFullName(), user.getRole().name());
+        String storeName = user.getStoreId() == null ? null
+                : stores.findById(user.getStoreId()).map(s -> s.getName()).orElse(null);
+        return new AuthDtos.LoginResponse(jwt.issue(user), user.getEmail(), user.getFullName(), user.getRole().name(),
+                user.getStoreId(), storeName);
     }
 
     /** No email/SMS infra here — a forgotten password gets an admin notified over WhatsApp

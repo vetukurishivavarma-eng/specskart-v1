@@ -1,5 +1,9 @@
 package com.specskart.pos;
 
+import com.specskart.audit.AuditLogService;
+import com.specskart.shared.ApiException;
+import com.specskart.shared.CurrentUser;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,9 +20,13 @@ public class AdminAppReleaseController {
                                  String downloadUrl, String notes, boolean mandatory) {}
 
     private final AppReleaseRepository releases;
+    private final CurrentUser currentUser;
+    private final AuditLogService audit;
 
-    public AdminAppReleaseController(AppReleaseRepository releases) {
+    public AdminAppReleaseController(AppReleaseRepository releases, CurrentUser currentUser, AuditLogService audit) {
         this.releases = releases;
+        this.currentUser = currentUser;
+        this.audit = audit;
     }
 
     @GetMapping
@@ -27,7 +35,8 @@ public class AdminAppReleaseController {
     }
 
     @PostMapping
-    public AppRelease publish(@RequestBody PublishRelease req) {
+    public AppRelease publish(@RequestBody PublishRelease req, Authentication auth) {
+        if (!currentUser.isAdmin(auth)) throw ApiException.forbidden("ADMIN_ONLY", "Admin only.");
         AppRelease r = new AppRelease();
         r.setPlatform(req.platform() == null ? "android" : req.platform());
         r.setVersion(req.version());
@@ -36,6 +45,9 @@ public class AdminAppReleaseController {
         r.setDownloadUrl(req.downloadUrl());
         r.setNotes(req.notes() == null ? "" : req.notes());
         r.setMandatory(req.mandatory());
-        return releases.save(r);
+        releases.save(r);
+        audit.record("APP_RELEASE", r.getId().toString(), "PUBLISH", currentUser.idOf(auth), currentUser.nameOf(auth),
+                null, "v" + r.getVersion() + " build " + r.getBuildNumber());
+        return r;
     }
 }
