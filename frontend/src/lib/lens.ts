@@ -2,7 +2,7 @@ import { api } from './api'
 
 export type LensInquiry = {
   id: string
-  status: 'DRAFT' | 'VERIFIED' | 'PRICED' | 'SUBMITTED'
+  status: 'DRAFT' | 'VERIFIED' | 'PRICED' | 'SUBMITTED' | 'SOLD'
   verified: boolean
   lensType: 'CLEAR' | 'PHOTOCHROMATIC' | null
   blueBlock: boolean
