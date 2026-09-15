@@ -5,7 +5,11 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
-/** A sellable frame. Money is stored in minor units (ngwee) as a long. */
+/** A sellable frame. Money is stored in minor units (ngwee) as a long.
+ *  DynamicUpdate: stockQty is moved by atomic UPDATE queries (cart holds, POS mirror) while a
+ *  managed copy may be open elsewhere in the same transaction — only dirty columns get written,
+ *  so saving that copy for an unrelated change can't put a stale stock count back. */
+@org.hibernate.annotations.DynamicUpdate
 @Entity
 @Table(name = "products")
 @Getter

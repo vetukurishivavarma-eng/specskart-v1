@@ -43,6 +43,7 @@ public class CheckoutService {
     private final com.specskart.lead.LeadFollowUpService followUp;
     private final LoyaltyService loyalty;
     private final AppProperties props;
+    private final com.specskart.pos.InventoryService inventory;
 
     public CheckoutService(CartRepository carts, CartItemRepository cartItems, OrderRepository orders,
                            OrderItemRepository orderItems, OrderEventRepository orderEvents,
@@ -50,7 +51,8 @@ public class CheckoutService {
                            CartService cartService, OrderNotificationService notifications,
                            AnalyticsService analytics, LeadService leadService,
                            com.specskart.lead.LeadFollowUpService followUp, LoyaltyService loyalty,
-                           AppProperties props) {
+                           AppProperties props, com.specskart.pos.InventoryService inventory) {
+        this.inventory = inventory;
         this.carts = carts;
         this.cartItems = cartItems;
         this.orders = orders;
@@ -144,6 +146,15 @@ public class CheckoutService {
         order.setLensAddMinor(view.lensAddMinor());
         order.setRxJson(cart.getRxJson());
         order.setPrescriptionFileId(cart.getPrescriptionFileId());
+        Double lat = coord(req.latitude(), 90), lng = coord(req.longitude(), 180);
+        if (lat != null && lng != null) {
+            order.setDeliveryLat(lat);
+            order.setDeliveryLng(lng);
+        }
+        // ship from the nearest shop that has it: the browser pin, else the city typed
+        var allocation = inventory.allocate(quantities(lines), order.getDeliveryLat(), order.getDeliveryLng(),
+                order.getShipCity());
+        if (allocation != null) order.setFulfilStoreId(allocation.primary().getId());
         orders.save(order);
 
         for (CartItem ci : lines) {
@@ -155,9 +166,14 @@ public class CheckoutService {
             oi.setProductSlug(p.getSlug());
             oi.setQty(ci.getQty());
             oi.setUnitPriceMinor(ci.getUnitPriceMinor());
+            if (allocation != null) oi.setStoreId(allocation.byProduct().get(p.getId()).getId());
             orderItems.save(oi);
-            // stock is already off the shelf (reserved at add-to-cart / re-grabbed above); the
-            // reservation becomes permanent once the cart is marked ordered. Released on CANCELLED.
+            // stock is already off the website count (reserved at add-to-cart / re-grabbed above);
+            // the reservation becomes permanent once the cart is marked ordered. Released on
+            // CANCELLED. The physical unit leaves the chosen shop's POS shelf now.
+            if (oi.getStoreId() != null) {
+                inventory.adjustForWebOrder(oi.getStoreId(), p.getId(), -ci.getQty(), "WEB_ORDER", order.getOrderNo());
+            }
         }
         if (view.promoCode() != null) {
             promos.findByCodeIgnoreCase(view.promoCode()).ifPresent(pc -> {
@@ -275,7 +291,11 @@ public class CheckoutService {
 
     private void restock(Order order) {
         for (OrderItem oi : orderItems.findByOrderId(order.getId())) {
-            if (oi.getProductId() != null) products.release(oi.getProductId(), oi.getQty());
+            if (oi.getProductId() == null) continue;
+            products.release(oi.getProductId(), oi.getQty());
+            if (oi.getStoreId() != null) {
+                inventory.adjustForWebOrder(oi.getStoreId(), oi.getProductId(), oi.getQty(), "WEB_CANCEL", order.getOrderNo());
+            }
         }
     }
 
@@ -285,6 +305,26 @@ public class CheckoutService {
         e.setStatus(status);
         e.setNote(note);
         orderEvents.save(e);
+    }
+
+    /** Checkout's "ships from" line: which shop this bag would leave from for this location. */
+    @Transactional(readOnly = true)
+    public OrderDtos.ShipsFrom shipsFrom(String cartToken, Double lat, Double lng, String city) {
+        Cart cart = cartToken == null ? null : carts.findByToken(cartToken).orElse(null);
+        var a = cart == null ? null
+                : inventory.allocate(quantities(cartItems.findByCartId(cart.getId())), coord(lat, 90), coord(lng, 180), city);
+        if (a == null) return new OrderDtos.ShipsFrom(null, null, null, false);
+        Double km = a.primaryDistanceKm() == null ? null : Math.round(a.primaryDistanceKm() * 10) / 10.0;
+        return new OrderDtos.ShipsFrom(a.primary().getName(), a.primary().getCity(), km, a.split());
+    }
+
+    private static java.util.Map<UUID, Integer> quantities(List<CartItem> lines) {
+        return lines.stream().collect(java.util.stream.Collectors.toMap(
+                CartItem::getProductId, CartItem::getQty, Integer::sum, java.util.LinkedHashMap::new));
+    }
+
+    private static Double coord(Double v, double max) {
+        return v == null || v.isNaN() || Math.abs(v) > max ? null : v;
     }
 
     // Unguessable: the tracking page (address + phone) is reachable by order number alone.

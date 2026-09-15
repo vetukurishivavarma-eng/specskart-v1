@@ -16,12 +16,16 @@ public class MockWhatsAppProvider implements WhatsAppProvider {
     private static final Logger log = LoggerFactory.getLogger(MockWhatsAppProvider.class);
 
     public record Sent(String toWaId, String text, List<Button> buttons,
-                       String templateName, List<String> templateParams, String imageUrl) {
+                       String templateName, List<String> templateParams, String imageUrl, String documentUrl) {
         public Sent(String toWaId, String text, List<Button> buttons) {
-            this(toWaId, text, buttons, null, List.of(), null);
+            this(toWaId, text, buttons, null, List.of(), null, null);
         }
         public Sent(String toWaId, String text, List<Button> buttons, String templateName, List<String> templateParams) {
-            this(toWaId, text, buttons, templateName, templateParams, null);
+            this(toWaId, text, buttons, templateName, templateParams, null, null);
+        }
+        public Sent(String toWaId, String text, List<Button> buttons, String templateName,
+                    List<String> templateParams, String imageUrl) {
+            this(toWaId, text, buttons, templateName, templateParams, imageUrl, null);
         }
     }
 
@@ -63,6 +67,19 @@ public class MockWhatsAppProvider implements WhatsAppProvider {
         outbox.add(new Sent(toWaId, null, List.of(), templateName, List.copyOf(bodyParams), headerImageUrl));
         log.info("[MOCK-WA] -> {} : mediaTemplate={} lang={} header={} params={}",
                 toWaId, templateName, languageCode, headerImageUrl, bodyParams);
+    }
+
+    @Override
+    public synchronized void sendDocument(String toWaId, String documentUrl, String filename, String caption) {
+        outbox.add(new Sent(toWaId, caption, List.of(), null, List.of(), null, documentUrl));
+        log.info("[MOCK-WA] -> {} : document={} ({}) caption={}", toWaId, documentUrl, filename, caption);
+    }
+
+    @Override
+    public synchronized void sendDocumentTemplate(String toWaId, String templateName, String languageCode,
+                                                  String documentUrl, String filename, List<String> bodyParams) {
+        outbox.add(new Sent(toWaId, null, List.of(), templateName, List.copyOf(bodyParams), null, documentUrl));
+        log.info("[MOCK-WA] -> {} : documentTemplate={} doc={} params={}", toWaId, templateName, documentUrl, bodyParams);
     }
 
     public synchronized List<Sent> outbox() {

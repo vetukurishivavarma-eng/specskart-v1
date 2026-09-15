@@ -102,14 +102,18 @@ public class LeadFollowUpService {
     @Transactional
     public void onInbound(UUID leadId, String text) {
         Lead lead = leads.findById(leadId).orElse(null);
-        if (lead == null || lead.getFollowUpState() != FollowUpState.ACTIVE) return;
+        if (lead == null) return;
         String t = text == null ? "" : text.toLowerCase().trim();
-        if (t.matches(".*\\b(stop|unsubscribe|opt ?out|opt-out|no more|don'?t message)\\b.*")) {
+        // STOP works for every lead, not just ones mid-nurture — walk-in offer subscribers too.
+        if (lead.getFollowUpState() != FollowUpState.OPTED_OUT
+                && t.matches(".*\\b(stop|unsubscribe|opt ?out|opt-out|no more|don'?t message)\\b.*")) {
+            lead.setMarketingOptInAt(null);
             end(lead, FollowUpState.OPTED_OUT);
             safeSend(() -> whatsapp.sendText(waId(lead),
-                    "Done — no more follow-ups. Message us any time you'd like a hand picking frames."));
+                    "Done — no more offers or follow-ups. Message us any time you'd like a hand picking frames."));
             return;
         }
+        if (lead.getFollowUpState() != FollowUpState.ACTIVE) return;
         // they're engaging — hold off on the automated touches for a few days
         lead.setFollowUpNextAt(Instant.now().plus(Duration.ofDays(3)));
         leads.save(lead);

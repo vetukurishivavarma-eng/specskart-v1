@@ -32,11 +32,14 @@ public class AdminCatalogService {
     private final StoreConfigRepository storeConfig;
 
     private final com.specskart.config.AppProperties props;
+    private final com.specskart.pos.InventoryService inventory;
 
     public AdminCatalogService(ProductRepository products, ProductImageRepository images,
                                ProductImageFileRepository imageFiles,
                                PromoCodeRepository promos, StoreConfigRepository storeConfig,
-                               com.specskart.config.AppProperties props) {
+                               com.specskart.config.AppProperties props,
+                               com.specskart.pos.InventoryService inventory) {
+        this.inventory = inventory;
         this.products = products;
         this.images = images;
         this.imageFiles = imageFiles;
@@ -251,6 +254,7 @@ public class AdminCatalogService {
         Product p = new Product();
         applyProduct(p, in, true);
         products.save(p);
+
         replaceImages(p.getId(), in.images());
         return toAdmin(p);
     }
@@ -295,7 +299,8 @@ public class AdminCatalogService {
         if (in.gender() != null) p.setGender(in.gender().toUpperCase(Locale.ROOT));
         if (in.priceMinor() != null) p.setPriceMinor(Math.max(0, in.priceMinor()));
         p.setCompareAtMinor(in.compareAtMinor());
-        if (in.stockQty() != null) p.setStockQty(Math.max(0, in.stockQty()));
+        // once shops have map pins, online stock IS their POS shelves (InventoryService) — not editable here
+        if (in.stockQty() != null && !inventory.stockComesFromShops()) p.setStockQty(Math.max(0, in.stockQty()));
         if (in.lensable() != null) p.setLensable(in.lensable());
         if (in.status() != null) p.setStatus(in.status().toUpperCase(Locale.ROOT));
         if (in.featured() != null) p.setFeatured(in.featured());

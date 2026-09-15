@@ -8,7 +8,8 @@ import java.util.UUID;
 public final class PosDtos {
     private PosDtos() {}
 
-    public record StoreView(UUID id, String name, String code, String city, boolean active) {}
+    public record StoreView(UUID id, String name, String code, String city, boolean active,
+                            Double latitude, Double longitude) {}
     public record CreateStore(String name, String code, String city) {}
 
     public record InventoryRow(UUID productId, String productName, String sku, int quantity,

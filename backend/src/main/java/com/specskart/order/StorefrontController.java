@@ -81,6 +81,15 @@ public class StorefrontController {
         return checkout.start(view.token(), body);
     }
 
+    /** Which shop this bag ships from, for checkout's "Ships from our Kitwe shop · 3 km" line. */
+    @GetMapping("/cart/ships-from")
+    public OrderDtos.ShipsFrom shipsFrom(@RequestHeader(value = "X-Cart-Token", required = false) String token,
+                                         @RequestParam(required = false) Double lat,
+                                         @RequestParam(required = false) Double lng,
+                                         @RequestParam(required = false) String city) {
+        return checkout.shipsFrom(token, lat, lng, city);
+    }
+
     @GetMapping("/orders/{orderNo}")
     public OrderDtos.OrderView track(@PathVariable String orderNo) {
         return orderQuery.byOrderNo(orderNo);

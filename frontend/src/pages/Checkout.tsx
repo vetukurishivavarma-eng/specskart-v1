@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { shop, money } from '../lib/shop'
@@ -15,6 +15,26 @@ export default function Checkout() {
   const [delivery, setDelivery] = useState<'DOOR' | 'PICKUP'>('DOOR')
   const [pickupPoint, setPickupPoint] = useState('')
 
+  // Nearest-shop fulfilment: ask the browser once. The pin picks the shop the frames ship from
+  // and goes on the staff alert so the courier finds the door. Denied = we fall back to the city.
+  const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null)
+  const [locState, setLocState] = useState<'asking' | 'ok' | 'denied' | 'unsupported'>('asking')
+  const askLocation = () => {
+    if (!navigator.geolocation) { setLocState('unsupported'); return }
+    setLocState('asking')
+    navigator.geolocation.getCurrentPosition(
+      (p) => { setPin({ lat: p.coords.latitude, lng: p.coords.longitude }); setLocState('ok') },
+      () => setLocState('denied'),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 300000 })
+  }
+  useEffect(askLocation, [])
+  const cityForShop = pin ? '' : f.shipCity.trim()
+  const { data: shipsFrom } = useQuery({
+    queryKey: ['shipsFrom', pin?.lat, pin?.lng, cityForShop],
+    queryFn: () => shop.shipsFrom(pin, cityForShop),
+    enabled: !!cart?.lines.length && locState !== 'asking',
+  })
+
   const points = cart?.pointsAvailable ?? 0
   const pointsDiscount = usePoints ? points * (cart?.pointValueMinor ?? 0) : 0
   const cod = method === 'COD'
@@ -29,6 +49,8 @@ export default function Checkout() {
       payOnDelivery: cod,
       deliveryMethod: pickup ? 'PICKUP' : 'DOOR',
       pickupPoint: pickup ? pickupPoint.trim() : undefined,
+      latitude: pin?.lat,
+      longitude: pin?.lng,
     }),
     onSuccess: (r) => { r.checkoutUrl ? (window.location.href = r.checkoutUrl) : navigate(`/order/${r.orderNo}`) },
   })
@@ -54,6 +76,25 @@ export default function Checkout() {
           <Field label="Email (optional)" value={f.customerEmail} onChange={on('customerEmail')} type="email" />
           <Field label="Delivery address" value={f.shipAddress} onChange={on('shipAddress')} />
           <Field label="City / town" value={f.shipCity} onChange={on('shipCity')} />
+
+          <div className="rounded-lg bg-ink/5 px-3 py-2 text-sm">
+            {locState === 'asking' ? 'Finding the Specskart shop nearest you…'
+              : shipsFrom?.shopName ? (
+                <span>
+                  📦 Ships from our <b>{shipsFrom.shopName}</b> shop
+                  {shipsFrom.distanceKm != null && <> · {shipsFrom.distanceKm} km from you</>}
+                  {shipsFrom.split && ' (some items from another shop)'}
+                </span>
+              )
+              : locState === 'ok' ? '📍 Location saved to help the courier find you.'
+              : null}
+            {(locState === 'denied' || locState === 'unsupported') && (
+              <p className="mt-1 text-ink/60">
+                Allow location so we send your order from the nearest shop and the courier finds you faster.{' '}
+                {locState === 'denied' && <button type="button" onClick={askLocation} className="underline">Try again</button>}
+              </p>
+            )}
+          </div>
 
           {outOfLusaka && (
             <fieldset className="space-y-2">

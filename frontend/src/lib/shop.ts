@@ -152,6 +152,13 @@ export const shop = {
     return cartCall<CartView>(`/public/cart/prescription${sParam()}`, { method: 'POST', headers: headers(), body })
   },
 
+  shipsFrom: (pin: { lat: number; lng: number } | null, city: string) => {
+    const q = new URLSearchParams()
+    if (pin) { q.set('lat', String(pin.lat)); q.set('lng', String(pin.lng)) }
+    if (city) q.set('city', city)
+    return api<{ shopName: string | null; city: string | null; distanceKm: number | null; split: boolean }>(
+      `/public/cart/ships-from?${q.toString()}`, { headers: headers() })
+  },
   checkout: (body: Record<string, string | number | boolean | undefined>) =>
     cartCall<{ orderNo: string; checkoutUrl: string | null; totalMinor: number; currency: string }>(
       `/public/checkout${sParam()}`, { method: 'POST', body: JSON.stringify(body) }),

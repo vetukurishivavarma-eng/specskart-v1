@@ -7,4 +7,8 @@ import java.util.UUID;
 
 public interface StoreRepository extends JpaRepository<Store, UUID> {
     List<Store> findAllByOrderByNameAsc();
+
+    java.util.Optional<Store> findByCodeIgnoreCase(String code);
+
+    List<Store> findByActiveTrueAndLatitudeIsNotNullAndLongitudeIsNotNull();
 }

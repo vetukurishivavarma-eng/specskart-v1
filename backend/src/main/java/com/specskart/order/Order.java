@@ -41,6 +41,12 @@ public class Order extends BaseEntity {
     /** The bus company / terminal the customer will collect from, when deliveryMethod=PICKUP. */
     private String pickupPoint;
 
+    /** Customer's map pin from their browser at checkout (with permission) — for the courier. */
+    private Double deliveryLat;
+    private Double deliveryLng;
+    /** The shop the order ships from (nearest holding it); a split order's lines record their own. */
+    private UUID fulfilStoreId;
+
     @Column(nullable = false)
     private long subtotalMinor;
     @Column(nullable = false)

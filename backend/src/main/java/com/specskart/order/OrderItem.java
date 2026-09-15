@@ -20,6 +20,9 @@ public class OrderItem extends BaseEntity {
 
     private UUID productId;
 
+    /** The shop this line's stock came off (web orders, once shops have map pins). */
+    private UUID storeId;
+
     @Column(nullable = false)
     private String productName;
     private String productSlug;

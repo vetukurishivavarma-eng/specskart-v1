@@ -25,4 +25,8 @@ public class Store extends BaseEntity {
 
     @Column(nullable = false)
     private boolean active = true;
+
+    /** Map pin. Set on an active shop = its stock sells online and it ships web orders (nearest wins). */
+    private Double latitude;
+    private Double longitude;
 }

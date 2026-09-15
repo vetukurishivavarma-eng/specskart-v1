@@ -47,7 +47,7 @@ class DailyReportTest {
                 List.of(new PosDtos.PaymentRequest("CARD", 60_000, null)),
                 null, null, "", null), null, "Cashier B");
 
-        var report = reportService.generate(store.getId(), LocalDate.now());
+        var report = reportService.generate(store.getId(), LocalDate.now(java.time.ZoneOffset.UTC));
 
         assertThat(report.saleCount()).isEqualTo(2);
         assertThat(report.grossTotalMinor()).isEqualTo(90_000);
@@ -78,7 +78,7 @@ class DailyReportTest {
                 null, null, "", null), null, "Cashier A");
         saleService.voidSale(sale.id(), "test void", null);
 
-        var report = reportService.generate(store.getId(), LocalDate.now());
+        var report = reportService.generate(store.getId(), LocalDate.now(java.time.ZoneOffset.UTC));
         assertThat(report.saleCount()).isZero();
         assertThat(report.grossTotalMinor()).isZero();
     }

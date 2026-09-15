@@ -142,6 +142,37 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
                 "template", template));
     }
 
+    @Override
+    public void sendDocument(String toWaId, String documentUrl, String filename, String caption) {
+        var doc = new java.util.LinkedHashMap<String, Object>();
+        doc.put("link", documentUrl);
+        doc.put("filename", filename);
+        if (caption != null && !caption.isBlank()) doc.put("caption", caption);
+        post(Map.of(
+                "messaging_product", "whatsapp",
+                "to", toWaId,
+                "type", "document",
+                "document", doc));
+    }
+
+    @Override
+    public void sendDocumentTemplate(String toWaId, String templateName, String languageCode,
+                                     String documentUrl, String filename, List<String> bodyParams) {
+        var components = new java.util.ArrayList<Map<String, Object>>();
+        components.add(Map.of("type", "header", "parameters", List.of(Map.of("type", "document",
+                "document", Map.of("link", documentUrl, "filename", filename)))));
+        if (bodyParams != null && !bodyParams.isEmpty()) {
+            components.add(Map.of("type", "body", "parameters", bodyParams.stream()
+                    .map(p -> Map.of("type", "text", "text", p == null ? "" : p)).toList()));
+        }
+        post(Map.of(
+                "messaging_product", "whatsapp",
+                "to", toWaId,
+                "type", "template",
+                "template", Map.of("name", templateName, "language", Map.of("code", languageCode),
+                        "components", components)));
+    }
+
     private static String cap(String s) {
         return s.length() > 20 ? s.substring(0, 20) : s;
     }

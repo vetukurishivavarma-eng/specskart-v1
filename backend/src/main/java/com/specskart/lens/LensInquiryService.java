@@ -3,6 +3,10 @@ package com.specskart.lens;
 import com.specskart.config.AppProperties;
 import com.specskart.lead.Lead;
 import com.specskart.lead.LeadService;
+import com.specskart.order.OrderNotificationService;
+import com.specskart.order.StaffDocController;
+import com.specskart.shared.SignedLinks;
+import com.specskart.whatsapp.StaffAlerts;
 import com.specskart.shared.ApiException;
 import com.specskart.shared.PhoneNumbers;
 import com.specskart.shared.TokenGenerator;
@@ -34,10 +38,14 @@ public class LensInquiryService {
     private final TokenGenerator tokens;
     private final AppProperties props;
     private final LensPricing pricing;
+    private final StaffAlerts staffAlerts;
+    private final SignedLinks links;
 
     public LensInquiryService(LensInquiryRepository inquiries, LeadService leadService,
                               WhatsAppProvider whatsapp, TokenGenerator tokens, AppProperties props,
-                              LensPricing pricing) {
+                              LensPricing pricing, StaffAlerts staffAlerts, SignedLinks links) {
+        this.staffAlerts = staffAlerts;
+        this.links = links;
         this.inquiries = inquiries;
         this.leadService = leadService;
         this.whatsapp = whatsapp;
@@ -211,16 +219,62 @@ public class LensInquiryService {
     }
 
     private void alertStaff(LensInquiry q) {
-        List<String> staff = props.whatsapp().staffNumbers();
-        if (staff.isEmpty()) return;
-        String msg = "👓 New lens order — " + q.getLensType()
-                + (q.isBlueBlock() ? " + blue block" : "")
-                + (q.isSpecialAxis() ? "\n⚠ Special axis — needs a manual check, not a stock lens" : "")
-                + "\nCustomer: " + (q.getCustomerName() != null ? q.getCustomerName() : "—")
-                + "\nWhatsApp: " + q.getWaId();
-        for (String to : staff) {
-            try { whatsapp.sendText(to.trim(), msg); } catch (Exception e) { log.warn("lens staff alert failed: {}", e.getMessage()); }
+        if (props.whatsapp().staffNumbers().isEmpty()) return;
+        String base = props.whatsapp().absoluteAsset("/api/public/staff-docs/lens/" + q.getId());
+        String pdfUrl = base == null ? null : base + ".pdf" + links.query("lens/" + q.getId(), StaffDocController.TTL);
+        String price = q.getPriceMinor() == null ? "—" : OrderNotificationService.money(q.getPriceMinor(), q.getCurrency());
+        String who = q.getCustomerName() == null || q.getCustomerName().isBlank() ? "+" + q.getWaId() : q.getCustomerName();
+        staffAlerts.send(staffLines(q), pdfUrl, ref(q) + ".pdf",
+                List.of(ref(q), price, who, pdfUrl == null ? props.frontendBaseUrl() : pdfUrl), null);
+    }
+
+    /** Everything the lens lab needs — drawn into the staff PDF and used as the WhatsApp caption. */
+    public static List<String> staffLines(LensInquiry q) {
+        List<String> out = new java.util.ArrayList<>();
+        out.add("# 👓 New lens order " + ref(q));
+        out.add("Placed: " + OrderNotificationService.STAFF_TIME.format(q.getCreatedAt()));
+        out.add("");
+        out.add("# Customer");
+        out.add("Name: " + dash(q.getCustomerName()));
+        out.add("WhatsApp: " + (q.getWaId() == null ? dash(q.getPhoneRaw()) : "+" + q.getWaId())
+                + (q.isPhoneVerified() && !q.isWalkIn() ? " (verified)" : ""));
+        if (q.getAge() != null || q.getGender() != null) {
+            out.add("Age / gender: " + (q.getAge() == null ? "—" : q.getAge()) + " / " + dash(q.getGender()));
         }
+        out.add("");
+        out.add("# Lens");
+        out.add("Type: " + dash(q.getLensType()) + (q.isBlueBlock() ? " + blue block" : ""));
+        out.add("Structure: " + dash(q.getLensStructure()));
+        out.add("");
+        out.add("# Prescription");
+        out.add("` " + String.format("%-5s%-9s%-9s%s", "Eye", "SPH", "CYL", "AXIS"));
+        out.add("` " + String.format("%-5s%-9s%-9s%s", "R", power(q.getSphRight()), power(q.getCylRight()), axis(q.getAxisRight())));
+        out.add("` " + String.format("%-5s%-9s%-9s%s", "L", power(q.getSphLeft()), power(q.getCylLeft()), axis(q.getAxisLeft())));
+        out.add("ADD: " + power(q.getAddPower()));
+        if (q.isSpecialAxis()) out.add("⚠ SPECIAL AXIS — not a stock lens, needs a manual check");
+        out.add("");
+        out.add("Quoted price: " + (q.getPriceMinor() == null ? "—"
+                : OrderNotificationService.money(q.getPriceMinor(), q.getCurrency())));
+        return out;
+    }
+
+    /** Short human reference for a lens order (the id is a UUID). */
+    public static String ref(LensInquiry q) {
+        return "LENS-" + q.getId().toString().substring(0, 8).toUpperCase(java.util.Locale.ROOT);
+    }
+
+    private static String power(java.math.BigDecimal v) {
+        if (v == null) return "-";
+        String s = v.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString();
+        return v.signum() > 0 ? "+" + s : s;
+    }
+
+    private static String axis(Integer v) {
+        return v == null ? "-" : v + "°";
+    }
+
+    private static String dash(String s) {
+        return s == null || s.isBlank() ? "—" : s;
     }
 
     /** The client's own rule: axis away from the 90°/180° bands (±10°) needs a special,

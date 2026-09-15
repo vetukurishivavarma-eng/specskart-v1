@@ -13,13 +13,20 @@ import java.util.UUID;
 @RequestMapping("/api/admin/pos/stores")
 public class AdminStoreController {
 
-    public record UpdateStore(String name, String city, Boolean active) {}
+    /** location: "lat, lng" (or a pasted Google Maps link) sets the shop's pin, "" removes it. */
+    public record UpdateStore(String name, String city, Boolean active, String location) {}
+
+    private static final java.util.regex.Pattern LAT_LNG =
+            java.util.regex.Pattern.compile("(-?\\d{1,2}(?:\\.\\d+)?)\\s*,\\s*(-?\\d{1,3}(?:\\.\\d+)?)");
 
     private final StoreRepository stores;
     private final CurrentUser currentUser;
     private final AuditLogService audit;
+    private final InventoryService inventory;
 
-    public AdminStoreController(StoreRepository stores, CurrentUser currentUser, AuditLogService audit) {
+    public AdminStoreController(StoreRepository stores, CurrentUser currentUser, AuditLogService audit,
+                                InventoryService inventory) {
+        this.inventory = inventory;
         this.stores = stores;
         this.currentUser = currentUser;
         this.audit = audit;
@@ -60,9 +67,27 @@ public class AdminStoreController {
         if (req.name() != null) s.setName(req.name());
         if (req.city() != null) s.setCity(req.city());
         if (req.active() != null) s.setActive(req.active());
+        if (req.location() != null) {
+            double[] ll = parseLocation(req.location());
+            s.setLatitude(ll == null ? null : ll[0]);
+            s.setLongitude(ll == null ? null : ll[1]);
+        }
         stores.save(s);
+        // a shop starting/stopping online selling changes what the website has in stock
+        if (req.active() != null || req.location() != null) inventory.resyncWebStock();
         audit.record("STORE", id.toString(), "UPDATE", currentUser.idOf(auth), currentUser.nameOf(auth), id, s.getName());
         return view(s);
+    }
+
+    static double[] parseLocation(String raw) {
+        if (raw.isBlank()) return null;
+        var m = LAT_LNG.matcher(raw);
+        if (m.find()) {
+            double lat = Double.parseDouble(m.group(1)), lng = Double.parseDouble(m.group(2));
+            if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return new double[]{lat, lng};
+        }
+        throw ApiException.badRequest("BAD_LOCATION",
+                "Paste the shop's coordinates from Google Maps, e.g. -15.4167, 28.2833");
     }
 
     private void requireAdmin(Authentication auth) {
@@ -70,6 +95,7 @@ public class AdminStoreController {
     }
 
     private static PosDtos.StoreView view(Store s) {
-        return new PosDtos.StoreView(s.getId(), s.getName(), s.getCode(), s.getCity(), s.isActive());
+        return new PosDtos.StoreView(s.getId(), s.getName(), s.getCode(), s.getCity(), s.isActive(),
+                s.getLatitude(), s.getLongitude());
     }
 }

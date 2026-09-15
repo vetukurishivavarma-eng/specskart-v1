@@ -90,13 +90,13 @@ class LensInquiryFlowTest {
         assertThat(sale.status()).isEqualTo("SOLD");
         assertThat(sale.priceMinor()).isEqualTo(25_000L + 8_000L);
 
-        var today = service.salesOn(java.time.LocalDate.now());
+        var today = service.salesOn(java.time.LocalDate.now(java.time.ZoneOffset.UTC));
         assertThat(today).anySatisfy(s -> {
             assertThat(s.customerName()).isEqualTo("Counter Customer");
             assertThat(s.walkIn()).isTrue();
             assertThat(s.paymentMethod()).isEqualTo("CASH");
         });
-        assertThat(service.summaryOn(java.time.LocalDate.now()).totalMinor()).isGreaterThanOrEqualTo(33_000L);
+        assertThat(service.summaryOn(java.time.LocalDate.now(java.time.ZoneOffset.UTC)).totalMinor()).isGreaterThanOrEqualTo(33_000L);
     }
 
     @Test
@@ -122,7 +122,7 @@ class LensInquiryFlowTest {
         var replay = service.walkInSale(req);
 
         assertThat(replay.id()).isEqualTo(first.id());
-        long matching = service.salesOn(java.time.LocalDate.now()).stream()
+        long matching = service.salesOn(java.time.LocalDate.now(java.time.ZoneOffset.UTC)).stream()
                 .filter(s -> "Offline Customer".equals(s.customerName())).count();
         assertThat(matching).isEqualTo(1);
     }

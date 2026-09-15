@@ -91,4 +91,10 @@ public class Lead extends BaseEntity {
 
     /** When the next nurture touch is due. */
     private Instant followUpNextAt;
+
+    /** When the customer explicitly agreed to offers (walk-in QR message). Null = never, or withdrew with STOP. */
+    private Instant marketingOptInAt;
+
+    /** The shop a walk-in customer signed up at. */
+    private UUID homeStoreId;
 }

@@ -30,5 +30,12 @@ public interface WhatsAppProvider {
      */
     void sendTemplate(String toWaId, String templateName, String languageCode, List<String> bodyParams);
 
+    /** A document (PDF) by public link with an optional caption (≤1024 chars). Inside the 24h window only. */
+    void sendDocument(String toWaId, String documentUrl, String filename, String caption);
+
+    /** An approved template with a DOCUMENT header — how a PDF reaches a number outside the 24h window. */
+    void sendDocumentTemplate(String toWaId, String templateName, String languageCode,
+                              String documentUrl, String filename, List<String> bodyParams);
+
     record Button(String id, String title) {}
 }

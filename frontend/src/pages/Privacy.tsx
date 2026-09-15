@@ -9,6 +9,9 @@ export default function Privacy() {
         <p><strong>The selfie is processed entirely in your browser.</strong> Only the resulting measurements
           (ratios and an estimated face shape) and your recommendations are stored, linked to your enquiry.</p>
         <p>By default the original image is never uploaded or retained. Your photo is not shared with advertising platforms.</p>
+        <p><strong>Location at checkout.</strong> If you allow it, your browser shares your location once when you check out.
+          We use it only to send your order from our nearest shop and to help the courier find you. It is saved with that
+          order and never used for advertising.</p>
         <p>We record your consent for camera use and photo processing, with a timestamp and policy version. You can
           ask us to delete your data at any time on WhatsApp.</p>
       </div>

@@ -25,7 +25,8 @@ public class BroadcastService {
     private static final Logger log = LoggerFactory.getLogger(BroadcastService.class);
     private static final int HARD_CAP = 500;
 
-    public record Filter(String faceShape, boolean excludeConverted) {}
+    /** optedInOnly: just customers who explicitly signed up for offers (walk-in QR). */
+    public record Filter(String faceShape, boolean excludeConverted, boolean optedInOnly) {}
     public record SendResult(int sent, int failed, int skippedOverCap) {}
 
     private final LeadRepository leads;
@@ -44,6 +45,7 @@ public class BroadcastService {
                 .filter(l -> waId(l) != null)
                 .filter(l -> f.faceShape() == null || f.faceShape().equalsIgnoreCase(l.getFaceShape()))
                 .filter(l -> !f.excludeConverted() || l.getStatus() != LeadStatus.CONVERTED)
+                .filter(l -> !f.optedInOnly() || l.getMarketingOptInAt() != null)
                 .toList();
     }
 

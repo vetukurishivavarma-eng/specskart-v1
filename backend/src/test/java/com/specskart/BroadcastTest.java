@@ -32,7 +32,7 @@ class BroadcastTest {
 
     @Test
     void requiresATemplate() {
-        assertThatThrownBy(() -> broadcast.send(new BroadcastService.Filter(null, false), null, "en", null, null, 10))
+        assertThatThrownBy(() -> broadcast.send(new BroadcastService.Filter(null, false, false), null, "en", null, null, 10))
                 .hasMessageContaining("template");
     }
 
@@ -44,7 +44,7 @@ class BroadcastTest {
         lead(optedOut, FollowUpState.OPTED_OUT);
 
         int before = ((MockWhatsAppProvider) provider).outbox().size();
-        var result = broadcast.send(new BroadcastService.Filter(null, false), "promo_v1", "en", null,
+        var result = broadcast.send(new BroadcastService.Filter(null, false, false), "promo_v1", "en", null,
                 java.util.List.of("Weekend sale"), 1000);
 
         assertThat(result.sent()).isGreaterThanOrEqualTo(1);
@@ -57,7 +57,7 @@ class BroadcastTest {
     @Test
     void previewCountsWithoutSendingAnything() {
         int before = ((MockWhatsAppProvider) provider).outbox().size();
-        int count = broadcast.previewCount(new BroadcastService.Filter(null, false));
+        int count = broadcast.previewCount(new BroadcastService.Filter(null, false, false));
         assertThat(count).isGreaterThanOrEqualTo(0);
         assertThat(((MockWhatsAppProvider) provider).outbox()).hasSize(before);
     }

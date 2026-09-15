@@ -34,19 +34,31 @@ public final class OrderDtos {
                                   Boolean payOnDelivery,
                                   /** "DOOR" (default) or "PICKUP" — an intercity bus parcel service, the
                                    *  standard cheap way to reach a customer outside Lusaka. */
-                                  String deliveryMethod, String pickupPoint) {
+                                  String deliveryMethod, String pickupPoint,
+                                  /** The browser's location, sent only if the customer allowed it. */
+                                  Double latitude, Double longitude) {
         public CheckoutRequest(String customerName, String customerPhone, String customerEmail,
                                String shipAddress, String shipCity, Integer redeemPoints, String referralCode) {
             this(customerName, customerPhone, customerEmail, shipAddress, shipCity, redeemPoints, referralCode,
-                    false, "DOOR", null);
+                    false, "DOOR", null, null, null);
         }
         public CheckoutRequest(String customerName, String customerPhone, String customerEmail,
                                String shipAddress, String shipCity, Integer redeemPoints, String referralCode,
                                Boolean payOnDelivery) {
             this(customerName, customerPhone, customerEmail, shipAddress, shipCity, redeemPoints, referralCode,
-                    payOnDelivery, "DOOR", null);
+                    payOnDelivery, "DOOR", null, null, null);
+        }
+        /** Without a location — the customer didn't allow it (or an older client). */
+        public CheckoutRequest(String customerName, String customerPhone, String customerEmail,
+                               String shipAddress, String shipCity, Integer redeemPoints, String referralCode,
+                               Boolean payOnDelivery, String deliveryMethod, String pickupPoint) {
+            this(customerName, customerPhone, customerEmail, shipAddress, shipCity, redeemPoints, referralCode,
+                    payOnDelivery, deliveryMethod, pickupPoint, null, null);
         }
     }
+
+    /** Checkout's "ships from" line. shopName null = no shop sells online yet. */
+    public record ShipsFrom(String shopName, String city, Double distanceKm, boolean split) {}
 
     /** checkoutUrl is null for a cash-on-delivery order (nothing to pay online). */
     public record CheckoutResult(String orderNo, String checkoutUrl, long totalMinor, String currency) {}

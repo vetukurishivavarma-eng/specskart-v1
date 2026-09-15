@@ -14,7 +14,7 @@ import java.util.List;
 @RequestMapping("/api/admin/whatsapp/broadcast")
 public class AdminBroadcastController {
 
-    public record Request(String faceShape, Boolean excludeConverted, String templateName,
+    public record Request(String faceShape, Boolean excludeConverted, Boolean optedInOnly, String templateName,
                           String headerImageUrl, List<String> bodyParams, Integer limit) {}
     public record PreviewResponse(int eligible) {}
 
@@ -42,6 +42,7 @@ public class AdminBroadcastController {
     private BroadcastService.Filter filterOf(Request req) {
         return new BroadcastService.Filter(
                 req.faceShape() == null || req.faceShape().isBlank() ? null : req.faceShape(),
-                Boolean.TRUE.equals(req.excludeConverted()));
+                Boolean.TRUE.equals(req.excludeConverted()),
+                Boolean.TRUE.equals(req.optedInOnly()));
     }
 }

@@ -78,7 +78,7 @@ class RefundAndAnalyticsTest {
                 List.of(new PosDtos.PaymentRequest("CASH", 100_000, null)),
                 null, null, "", null), null, "Cashier A");
 
-        var today = LocalDate.now();
+        var today = LocalDate.now(java.time.ZoneOffset.UTC);
         var ranked = analyticsService.topProducts(store.getId(), today, today, "revenue", 5);
 
         assertThat(ranked).hasSize(1);

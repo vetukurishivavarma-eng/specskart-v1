@@ -3,13 +3,14 @@ import { useMutation } from '@tanstack/react-query'
 import { api } from '../lib/api'
 
 type Req = {
-  faceShape?: string; excludeConverted: boolean
+  faceShape?: string; excludeConverted: boolean; optedInOnly: boolean
   templateName: string; headerImageUrl?: string; bodyParams: string[]; limit: number
 }
 
 export default function Broadcast() {
   const [faceShape, setFaceShape] = useState('')
   const [excludeConverted, setExcludeConverted] = useState(true)
+  const [optedInOnly, setOptedInOnly] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [headerImageUrl, setHeaderImageUrl] = useState('')
   const [paramsText, setParamsText] = useState('')
@@ -19,6 +20,7 @@ export default function Broadcast() {
   const body = (): Req => ({
     faceShape: faceShape || undefined,
     excludeConverted,
+    optedInOnly,
     templateName: templateName.trim(),
     headerImageUrl: headerImageUrl.trim() || undefined,
     bodyParams: paramsText.split('\n').map((s) => s.trim()).filter(Boolean),
@@ -89,6 +91,12 @@ export default function Broadcast() {
           <input type="checkbox" checked={excludeConverted}
             onChange={(e) => { setExcludeConverted(e.target.checked); setPreviewed(null) }} />
           Skip leads who've already bought something
+        </label>
+
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={optedInOnly}
+            onChange={(e) => { setOptedInOnly(e.target.checked); setPreviewed(null) }} />
+          Only customers who signed up for offers (shop walk-in QR)
         </label>
       </div>
 

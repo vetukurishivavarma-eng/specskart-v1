@@ -18,8 +18,11 @@ public class WhatsAppInboundService {
     private final WebhookDedupe dedupe;
     private final LeadService leadService;
     private final WhatsAppBotService bot;
+    private final com.specskart.lead.WalkInService walkIns;
 
-    public WhatsAppInboundService(WebhookDedupe dedupe, LeadService leadService, WhatsAppBotService bot) {
+    public WhatsAppInboundService(WebhookDedupe dedupe, LeadService leadService, WhatsAppBotService bot,
+                                  com.specskart.lead.WalkInService walkIns) {
+        this.walkIns = walkIns;
         this.dedupe = dedupe;
         this.leadService = leadService;
         this.bot = bot;
@@ -46,6 +49,7 @@ public class WhatsAppInboundService {
 
         Map<String, Object> referral = in.referral() != null ? in.referral() : Map.of();
         Lead lead = leadService.onWhatsAppContact(in.waId(), in.phoneNumber(), in.profileName(), referral);
+        if (walkIns.tryVerify(lead, in.text())) return; // shop walk-in QR sign-up, not a bot conversation
         bot.handleInbound(lead, in.text(), in.buttonId(), in.waMessageId());
     }
 }
