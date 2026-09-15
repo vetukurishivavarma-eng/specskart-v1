@@ -33,10 +33,13 @@ export default function LensConfigurator() {
   const pollRef = useRef<number | null>(null)
 
   // Resume an inquiry: ?resume= (the follow-up nudge link) beats whatever's in local storage.
+  // A finished one remembered by this browser is not resumed — opening /lens again means a new booking.
   useEffect(() => {
-    const resumeId = params.get('resume') || localStorage.getItem(STORAGE_KEY)
+    const linked = params.get('resume')
+    const resumeId = linked || localStorage.getItem(STORAGE_KEY)
     if (!resumeId) { setLoading(false); return }
     lens.status(resumeId).then((v) => {
+      if (isDone(v) && !linked) { localStorage.removeItem(STORAGE_KEY); return }
       localStorage.setItem(STORAGE_KEY, v.id)
       setQ(v)
       if (!v.verified) startPolling(v.id)
@@ -138,20 +141,34 @@ export default function LensConfigurator() {
         </div>
       )}
 
-      {q && q.verified && q.status !== 'SUBMITTED' && (
+      {q && q.verified && !isDone(q) && (
         <DetailsForm q={q} onPatch={patch} onQuoted={setQ} />
       )}
 
-      {q && q.status === 'SUBMITTED' && (
+      {q && isDone(q) && (
         <div className="mt-8 card p-5">
           <h2 className="text-lg text-moss">Thanks — we've got it! ✅</h2>
           <p className="mt-2 text-sm text-ink/60">
             We'll message you on WhatsApp to confirm your prescription and arrange delivery.
           </p>
+          <button className="btn-primary mt-4" onClick={bookAnother}>Book another pair</button>
         </div>
       )}
     </div>
   )
+
+  function bookAnother() {
+    localStorage.removeItem(STORAGE_KEY)
+    setQ(null)
+    setLensType('')
+    setBlueBlock(false)
+    setError(null)
+  }
+}
+
+// submitted online, or already billed at the counter — either way this booking is finished
+function isDone(q: LensInquiry) {
+  return q.status === 'SUBMITTED' || q.status === 'SOLD'
 }
 
 function LensOption({ selected, onClick, title, desc, swatch }: {
