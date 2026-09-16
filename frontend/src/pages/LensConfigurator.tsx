@@ -4,7 +4,9 @@ import { lens, type LensDetails, type LensInquiry } from '../lib/lens'
 import { money } from '../lib/shop'
 
 const STORAGE_KEY = 'specskart_lens_inquiry'
-const COUNTRY_CODE = '+260'
+const DEFAULT_COUNTRY_CODE = '+260'
+// Digits only, '+'-prefixed — the backend keeps a '+'-prefixed number as typed.
+export const cleanCc = (v: string) => '+' + v.replace(/\D/g, '').slice(0, 4)
 const DIOPTERS = Array.from({ length: 25 }, (_, i) => (i * 0.25).toFixed(2)) // 0.00 .. 6.00
 const ADDS = Array.from({ length: 17 }, (_, i) => (1 + i * 0.25).toFixed(2)) // 1.00 .. 5.00
 
@@ -28,6 +30,7 @@ export default function LensConfigurator() {
   const [lensType, setLensType] = useState<'CLEAR' | 'PHOTOCHROMATIC' | ''>('')
   const [blueBlock, setBlueBlock] = useState(false)
   const [phone, setPhone] = useState('')
+  const [cc, setCc] = useState(DEFAULT_COUNTRY_CODE)
   const [sending, setSending] = useState(false)
 
   const pollRef = useRef<number | null>(null)
@@ -62,11 +65,11 @@ export default function LensConfigurator() {
 
   async function sendVerification() {
     const digits = phone.replace(/\D/g, '')
-    if (digits.length < 8 || !lensType) return
+    if (digits.length < 8 || cleanCc(cc).length < 2 || !lensType) return
     setSending(true)
     setError(null)
     try {
-      const { inquiryId } = await lens.start(COUNTRY_CODE + digits, lensType, blueBlock)
+      const { inquiryId } = await lens.start(cleanCc(cc) + digits, lensType, blueBlock)
       localStorage.setItem(STORAGE_KEY, inquiryId)
       const v = await lens.status(inquiryId)
       setQ(v)
@@ -120,7 +123,9 @@ export default function LensConfigurator() {
               <h2 className="text-lg">2. Verify your WhatsApp number</h2>
               <p className="mt-1 text-xs text-ink/50">We'll send a link to confirm it's really you — tap it to continue.</p>
               <div className="mt-3 flex gap-2">
-                <span className="flex items-center rounded-lg border border-ink/20 px-3 py-2 text-sm text-ink/60">{COUNTRY_CODE}</span>
+                <input value={cc} onChange={(e) => setCc(cleanCc(e.target.value))}
+                  aria-label="Country code" inputMode="tel"
+                  className="w-20 rounded-lg border border-ink/20 px-3 py-2 text-sm" />
                 <input value={phone} onChange={(e) => setPhone(e.target.value)}
                   onBlur={() => phone.replace(/\D/g, '').length >= 8 && !sending && sendVerification()}
                   placeholder="977123456" inputMode="tel"
@@ -135,7 +140,7 @@ export default function LensConfigurator() {
 
       {q && !q.verified && (
         <div className="mt-8 card p-5 text-sm">
-          <p>We sent a WhatsApp message to <b>{COUNTRY_CODE}{phone.replace(/\D/g, '')}</b>.</p>
+          <p>We sent a WhatsApp message to <b>{cleanCc(cc)}{phone.replace(/\D/g, '')}</b>.</p>
           <p className="mt-2 text-ink/60">Tap the link in that message to verify — this page updates automatically, no need to refresh.</p>
           <p className="mt-3 text-xs text-ink/45">Please verify your WhatsApp number before continuing.</p>
         </div>
