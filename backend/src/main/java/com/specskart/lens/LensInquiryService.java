@@ -73,13 +73,22 @@ public class LensInquiryService {
         inquiries.save(q);
 
         String link = props.frontendBaseUrl() + "/lens/verify/" + raw;
-        try {
-            if (props.whatsapp().lensVerifyConfigured()) {
+        String text = "Tap to verify your number and continue configuring your lenses:\n" + link;
+        if (props.whatsapp().lensVerifyConfigured()) {
+            try {
                 whatsapp.sendTemplate(waId, props.whatsapp().lensVerifyTemplate(),
                         props.whatsapp().followUpTemplateLang(), List.of(link));
-            } else {
-                whatsapp.sendText(waId, "Tap to verify your number and continue configuring your lenses:\n" + link);
+                return q.getId();
+            } catch (Exception e) {
+                // A template that is missing, paused or in the wrong locale used to drop the link
+                // silently. Free-form only reaches someone who messaged us in the last 24h, so this
+                // is a partial rescue -- but it beats sending nothing.
+                log.warn("lens verify template {} failed for inquiry {}, falling back to text: {}",
+                        props.whatsapp().lensVerifyTemplate(), q.getId(), e.getMessage());
             }
+        }
+        try {
+            whatsapp.sendText(waId, text);
         } catch (Exception e) {
             log.warn("lens verification send failed for inquiry {}: {}", q.getId(), e.getMessage());
         }
@@ -224,8 +233,10 @@ public class LensInquiryService {
         String pdfUrl = base == null ? null : base + ".pdf" + links.query("lens/" + q.getId(), StaffDocController.TTL);
         String price = q.getPriceMinor() == null ? "—" : OrderNotificationService.money(q.getPriceMinor(), q.getCurrency());
         String who = q.getCustomerName() == null || q.getCustomerName().isBlank() ? "+" + q.getWaId() : q.getCustomerName();
-        staffAlerts.send(staffLines(q), pdfUrl, ref(q) + ".pdf",
+        List<String> failures = staffAlerts.send(staffLines(q), pdfUrl, ref(q) + ".pdf",
                 List.of(ref(q), price, who, pdfUrl == null ? props.frontendBaseUrl() : pdfUrl), null);
+        // No order timeline to hang these on, as there is for web orders -- at least say it out loud.
+        for (String failure : failures) log.warn("lens {} staff alert to {}", ref(q), failure);
     }
 
     /** Everything the lens lab needs — drawn into the staff PDF and used as the WhatsApp caption. */

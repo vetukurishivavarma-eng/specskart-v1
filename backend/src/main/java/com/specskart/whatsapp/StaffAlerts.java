@@ -14,6 +14,10 @@ import java.util.stream.Collectors;
  * staff template with the PDF as its header (the only thing Meta delivers outside the 24h window),
  * else the PDF as a plain document captioned with the full details, else plain text — then the
  * customer's own uploaded prescription, if there is one. Best-effort per number.
+ *
+ * <p>A template send that Meta rejects (missing, paused, wrong locale) falls through to the
+ * plain document rather than losing the alert, and is reported in the returned failures so the
+ * misconfiguration is visible instead of silent.
  */
 @Service
 public class StaffAlerts {
@@ -45,13 +49,25 @@ public class StaffAlerts {
             String to = raw.trim();
             if (to.isEmpty()) continue;
             try {
+                boolean sent = false;
                 if (pdfUrl != null && props.whatsapp().staffOrderConfigured()) {
-                    whatsapp.sendDocumentTemplate(to, props.whatsapp().staffOrderTemplate(),
-                            props.whatsapp().followUpTemplateLang(), pdfUrl, pdfName, templateParams);
-                } else if (pdfUrl != null) {
-                    whatsapp.sendDocument(to, pdfUrl, pdfName, caption(text));
-                } else {
-                    whatsapp.sendText(to, text);
+                    try {
+                        whatsapp.sendDocumentTemplate(to, props.whatsapp().staffOrderTemplate(),
+                                props.whatsapp().followUpTemplateLang(), pdfUrl, pdfName, templateParams);
+                        sent = true;
+                    } catch (Exception e) {
+                        // A template that is missing, paused or in the wrong locale used to lose the
+                        // alert outright. Drop to a plain document, which still reaches anyone who
+                        // messaged us in the last 24h, and say so in the caller's timeline.
+                        log.warn("staff order template {} failed for {}, falling back to a plain document: {}",
+                                props.whatsapp().staffOrderTemplate(), mask(to), e.getMessage());
+                        failures.add(mask(to) + " (template " + props.whatsapp().staffOrderTemplate()
+                                + "): " + e.getMessage());
+                    }
+                }
+                if (!sent) {
+                    if (pdfUrl != null) whatsapp.sendDocument(to, pdfUrl, pdfName, caption(text));
+                    else whatsapp.sendText(to, text);
                 }
                 if (prescription != null) {
                     if (prescription.image()) whatsapp.sendImage(to, prescription.url(), "Customer's prescription");
