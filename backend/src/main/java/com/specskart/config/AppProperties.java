@@ -86,7 +86,13 @@ public record AppProperties(
                             *  link to a number that's never messaged the business before (ad ->
                             *  website flow, no open 24h window yet). {{1}} = the verify link.
                             *  Blank = plain text (only reaches numbers with an open session). */
-                           String lensVerifyTemplate) {
+                           String lensVerifyTemplate,
+                           /** Approved template for the yearly eye-test recall. {{1}} = first name,
+                            *  {{2}} = months since their last pair, {{3}} = the offer line, {{4}} = shop link.
+                            *  Blank = plain text (only reaches numbers with an open session). */
+                           String recallTemplate,
+                           /** How long after a delivered order to nudge them for an eye test. */
+                           Integer recallAfterMonths) {
 
         public List<String> staffNumbers() {
             return staffNumbers == null ? List.of() : staffNumbers;
@@ -128,6 +134,16 @@ public record AppProperties(
         /** Approved template for the post-delivery "thanks + come back" message (params: name, promo code). */
         public boolean postPurchaseConfigured() {
             return postPurchaseTemplate != null && !postPurchaseTemplate.isBlank();
+        }
+
+        /** Approved template configured for the yearly eye-test recall. */
+        public boolean recallConfigured() {
+            return recallTemplate != null && !recallTemplate.isBlank();
+        }
+
+        /** Months between a delivered order and its eye-test recall (and between repeat recalls). */
+        public int recallMonths() {
+            return recallAfterMonths == null || recallAfterMonths < 1 ? 12 : recallAfterMonths;
         }
 
         /** Approved template configured for the lens-inquiry verification link. */

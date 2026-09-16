@@ -97,4 +97,7 @@ public class Lead extends BaseEntity {
 
     /** The shop a walk-in customer signed up at. */
     private UUID homeStoreId;
+
+    /** When we last nudged them for an eye test. Null = never; a year on from this we nudge again. */
+    private Instant eyeTestRecalledAt;
 }

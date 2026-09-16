@@ -15,6 +15,25 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
 
     Optional<Lead> findByWhatsappWaId(String waId);
 
+    /**
+     * Customers due an eye-test recall: their last delivered order is older than the cutoff, they
+     * haven't opted out, and we either never nudged them or last did so before the cutoff too.
+     * Ordered oldest-first so a backlog drains in the order people actually bought.
+     */
+    @Query("""
+            select distinct l from Lead l
+            where exists (
+                    select 1 from com.specskart.order.Order o
+                    where o.leadId = l.id
+                      and o.status = com.specskart.order.OrderStatus.DELIVERED
+                      and o.createdAt <= :cutoff)
+              and l.archivedAt is null
+              and (l.followUpState is null or l.followUpState <> com.specskart.lead.FollowUpState.OPTED_OUT)
+              and (l.eyeTestRecalledAt is null or l.eyeTestRecalledAt <= :cutoff)
+            order by l.firstContactAt asc
+            """)
+    List<Lead> findDueForEyeTestRecall(@Param("cutoff") Instant cutoff, Pageable page);
+
     /** Leads whose next nurture touch is due (job picks these up each hour). */
     List<Lead> findTop50ByFollowUpStateAndFollowUpNextAtLessThanEqualOrderByFollowUpNextAtAsc(
             FollowUpState state, Instant when);

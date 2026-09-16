@@ -24,5 +24,6 @@ public enum LeadEventType {
     ORDER_PAID,
     ORDER_DELIVERED,
     REVIEW_REQUESTED,
+    EYE_TEST_RECALL_SENT,
     LEAD_CONVERTED
 }

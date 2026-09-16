@@ -62,6 +62,26 @@ public class PromoIssuer {
                 });
     }
 
+    /** The offer that rides along with a yearly eye-test recall. Longer-lived than the nurture
+     *  codes on purpose -- a recall is a "come in when you can", not a flash sale, and a code that
+     *  dies in 24h just annoys someone who was going to visit at the weekend. */
+    @Transactional
+    public PromoCode forRecall(UUID leadId) {
+        Instant now = Instant.now();
+        return promos.findFirstByLeadIdAndActiveTrueAndExpiresAtAfterOrderByCreatedAtDesc(leadId, now)
+                .orElseGet(() -> {
+                    PromoCode p = new PromoCode();
+                    p.setLeadId(leadId);
+                    p.setCode(freshCode());
+                    p.setDiscountType("PERCENT");
+                    p.setDiscountValue(Math.max(1, props.promo().faceAnalysisPercent()));
+                    p.setMaxRedemptions(1);
+                    p.setExpiresAt(now.plus(14, ChronoUnit.DAYS));
+                    p.setActive(true);
+                    return promos.save(p);
+                });
+    }
+
     private String freshCode() {
         for (int i = 0; i < 12; i++) {
             StringBuilder sb = new StringBuilder("FIT-");

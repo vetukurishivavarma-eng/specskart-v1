@@ -109,6 +109,9 @@ specskart:
     # messaged the business before (ad -> website, no open 24h window). {{1}} = the link.
     # Blank = plain text (only reaches an already-open WhatsApp session).
     lens-verify-template: ${WHATSAPP_LENS_VERIFY_TEMPLATE:}
+    # Yearly eye-test recall for customers who already bought.
+    recall-template: ${WHATSAPP_RECALL_TEMPLATE:}
+    recall-after-months: ${WHATSAPP_RECALL_AFTER_MONTHS:12}
   payments:
     provider: ${PAYMENTS_PROVIDER:mock}   # mock | flutterwave
     flutterwave:

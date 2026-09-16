@@ -41,6 +41,10 @@ interface OrderRepository extends JpaRepository<Order, UUID> {
     long countByPaidAtAfter(Instant since);
 
     List<Order> findTop6ByPaidAtIsNotNullOrderByPaidAtDesc();
+
+    List<Order> findByFulfilStoreIdAndStatusInOrderByCreatedAtDesc(UUID fulfilStoreId, java.util.Collection<OrderStatus> statuses);
+
+    List<Order> findByStatusInOrderByCreatedAtDesc(java.util.Collection<OrderStatus> statuses);
 }
 
 interface OrderItemRepository extends JpaRepository<OrderItem, UUID> {

@@ -200,8 +200,9 @@ public class OrderNotificationService {
         return switch (status) {
             case CONFIRMED -> "Order confirmed — pay cash when it arrives";
             case PAID -> "Payment received — we're preparing your frames";
+            case ACCEPTED -> "Your shop has your order — we're getting your frames ready";
             case PACKED -> "Packed and ready for dispatch";
-            case SHIPPED -> "Handed to the courier — on its way to you";
+            case SHIPPED -> "Out for delivery — on its way to you";
             case DELIVERED -> "Delivered — enjoy your new frames!";
             case CANCELLED -> "Your order has been cancelled";
             case REFUNDED -> "Your refund has been processed";

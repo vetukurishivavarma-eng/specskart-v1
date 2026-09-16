@@ -82,4 +82,12 @@ public final class OrderDtos {
                                 long totalMinor, String currency, Instant createdAt, Instant paidAt) {}
 
     public record StatusUpdate(String status, String note) {}
+
+    /** One row on the POS app's Delivery screen: everything a packer needs without opening the order. */
+    public record DeliveryRow(UUID id, String orderNo, String status, String customerName,
+                              String customerPhone, String deliveryMethod, String pickupPoint,
+                              String shipAddress, String shipCity, Double deliveryLat, Double deliveryLng,
+                              String lensType, boolean hasPrescription, boolean cashOnDelivery,
+                              long totalMinor, String currency, UUID fulfilStoreId, String fulfilStoreName,
+                              Instant createdAt, Instant paidAt) {}
 }
