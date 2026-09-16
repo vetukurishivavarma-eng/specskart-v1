@@ -2,11 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { lens, type LensDetails, type LensInquiry } from '../lib/lens'
 import { money } from '../lib/shop'
+import { DEFAULT_COUNTRY_CODE, cleanCc } from '../lib/phone'
 
 const STORAGE_KEY = 'specskart_lens_inquiry'
-const DEFAULT_COUNTRY_CODE = '+260'
-// Digits only, '+'-prefixed — the backend keeps a '+'-prefixed number as typed.
-export const cleanCc = (v: string) => '+' + v.replace(/\D/g, '').slice(0, 4)
 const DIOPTERS = Array.from({ length: 25 }, (_, i) => (i * 0.25).toFixed(2)) // 0.00 .. 6.00
 const ADDS = Array.from({ length: 17 }, (_, i) => (1 + i * 0.25).toFixed(2)) // 1.00 .. 5.00
 
@@ -127,10 +125,14 @@ export default function LensConfigurator() {
                   aria-label="Country code" inputMode="tel"
                   className="w-20 rounded-lg border border-ink/20 px-3 py-2 text-sm" />
                 <input value={phone} onChange={(e) => setPhone(e.target.value)}
-                  onBlur={() => phone.replace(/\D/g, '').length >= 8 && !sending && sendVerification()}
                   placeholder="977123456" inputMode="tel"
                   className="flex-1 rounded-lg border border-ink/20 px-3 py-2 text-sm" />
               </div>
+              <button type="button" onClick={sendVerification}
+                disabled={phone.replace(/\D/g, '').length < 8 || sending}
+                className="btn-primary mt-3 w-full disabled:bg-ink/30">
+                {sending ? 'Sending…' : 'Continue'}
+              </button>
               {sending && <p className="mt-2 text-xs text-ink/50">Sending your verification link…</p>}
               {error && <p className="mt-2 text-sm text-clay">{error}</p>}
             </section>

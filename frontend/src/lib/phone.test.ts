@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cleanCc } from './LensConfigurator'
+import { cleanCc } from '../lib/phone'
 
 describe('cleanCc', () => {
   it('keeps a plain code and tolerates how it is typed', () => {

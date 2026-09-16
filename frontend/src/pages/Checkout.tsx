@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { shop, money } from '../lib/shop'
+import { DEFAULT_COUNTRY_CODE, cleanCc } from '../lib/phone'
 
 export default function Checkout() {
   const navigate = useNavigate()
@@ -9,6 +10,7 @@ export default function Checkout() {
   const { data: cfg } = useQuery({ queryKey: ['storeConfig'], queryFn: shop.storeConfig })
   const [f, setF] = useState({ customerName: '', customerPhone: '', customerEmail: '', shipAddress: '', shipCity: '' })
   const on = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value })
+  const [cc, setCc] = useState(DEFAULT_COUNTRY_CODE)
   const [usePoints, setUsePoints] = useState(false)
   const [referral, setReferral] = useState('')
   const [method, setMethod] = useState<'ONLINE' | 'COD'>('ONLINE')
@@ -44,6 +46,7 @@ export default function Checkout() {
   const pay = useMutation({
     mutationFn: () => shop.checkout({
       ...f,
+      customerPhone: cleanCc(cc) + f.customerPhone.replace(/\D/g, ''),
       redeemPoints: usePoints ? points : undefined,
       referralCode: referral.trim() || undefined,
       payOnDelivery: cod,
@@ -72,7 +75,17 @@ export default function Checkout() {
         <h1 className="text-3xl">Checkout</h1>
         <form className="mt-6 space-y-3" onSubmit={(e) => { e.preventDefault(); if (valid) pay.mutate() }}>
           <Field label="Full name" value={f.customerName} onChange={on('customerName')} />
-          <Field label="WhatsApp / phone number" value={f.customerPhone} onChange={on('customerPhone')} />
+          <label className="block">
+            <span className="text-xs font-medium uppercase tracking-widest text-ink/50">WhatsApp / phone number</span>
+            <div className="mt-1 flex gap-2">
+              <input value={cc} onChange={(e) => setCc(cleanCc(e.target.value))}
+                aria-label="Country code" inputMode="tel"
+                className="w-20 rounded-lg border border-ink/20 px-3 py-2 text-sm" />
+              <input value={f.customerPhone} onChange={on('customerPhone')}
+                inputMode="tel" placeholder="977123456"
+                className="flex-1 rounded-lg border border-ink/20 px-3 py-2 text-sm" />
+            </div>
+          </label>
           <Field label="Email (optional)" value={f.customerEmail} onChange={on('customerEmail')} type="email" />
           <Field label="Delivery address" value={f.shipAddress} onChange={on('shipAddress')} />
           <Field label="City / town" value={f.shipCity} onChange={on('shipCity')} />
