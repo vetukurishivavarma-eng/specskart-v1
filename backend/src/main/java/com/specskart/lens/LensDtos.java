@@ -40,12 +40,16 @@ public final class LensDtos {
 
     public record CompleteSale(String paymentMethod, String soldBy, String shopName) {}
 
+    /** Staff moving a web order one step along the doorstep ladder. Payment details are only
+     *  needed on the last step, where the order is also billed. */
+    public record AdvanceFulfilment(String stage, String paymentMethod, String soldBy, String shopName) {}
+
     /** One row in the POS's sales list / day summary. */
     public record SaleView(UUID id, String customerName, String lensType, boolean blueBlock,
                            String lensStructure, boolean specialAxis, long priceMinor, String currency,
                            String paymentMethod, String soldBy, String shopName, boolean walkIn,
                            String deliveryName, String deliveryAddress, String deliveryArea,
-                           String deliveryLandmark, java.time.Instant createdAt) {}
+                           String deliveryLandmark, String fulfilment, java.time.Instant createdAt) {}
 
     public record DaySummary(long totalMinor, int count, String currency) {}
 }

@@ -25,6 +25,13 @@ class LensInquiryFlowTest {
         return "097" + (7000000 + (int) (Math.random() * 900000));
     }
 
+    /** The mock outbox is shared by every test in the suite, so assertions look for a
+     *  message rather than assuming ours is the last one sent. */
+    private java.util.List<String> sentTexts() {
+        return ((MockWhatsAppProvider) provider).outbox().stream()
+                .map(m -> m.text() == null ? "" : m.text()).toList();
+    }
+
     /** The verify link is only ever sent over WhatsApp (by design — never handed back from
      *  start()), so tests recover the raw token the same way a real shopper would: from the
      *  message that landed in their chat. */
@@ -113,8 +120,7 @@ class LensInquiryFlowTest {
         assertThat(service.pendingWebOrders()).noneSatisfy(s -> assertThat(s.id()).isEqualTo(id));
 
         // the customer hears about it -- they'd had nothing since the lens link
-        var outbox = ((MockWhatsAppProvider) provider).outbox();
-        assertThat(outbox.get(outbox.size() - 1).text()).contains("12 Freedom Way");
+        assertThat(sentTexts()).anySatisfy(t -> assertThat(t).contains("have been delivered"));
     }
 
     @Test
@@ -133,12 +139,40 @@ class LensInquiryFlowTest {
         assertThat(service.submit(id).status()).isEqualTo("SUBMITTED");
 
         // placing the order confirms it to the customer, not just the lab
-        var outbox = ((MockWhatsAppProvider) provider).outbox();
-        assertThat(outbox.get(outbox.size() - 1).text()).contains("got your lens order");
+        assertThat(sentTexts()).anySatisfy(t -> assertThat(t).contains("got your lens order"));
 
         // and the lab's paperwork says where it goes
         assertThat(LensInquiryService.staffLines(inquiries.findById(id).orElseThrow()))
                 .contains("Address: 12 Freedom Way", "Area: Kabulonga", "Landmark: opp. the bank");
+    }
+
+    @Test
+    void aDoorstepOrderWalksTheLadderAndIsBilledOnDelivery() {
+        UUID id = service.start(phone(), "CLEAR", false);
+        service.verify(tokenFromLastOutbound());
+        service.setDelivery(id, new LensDtos.Delivery("Ann", "12 Freedom Way", "Kabulonga", null));
+        service.submit(id);
+        assertThat(inquiries.findById(id).orElseThrow().getFulfilment()).isEqualTo("ORDERED");
+
+        // forward one rung at a time: no skipping straight to delivered
+        assertThatThrownBy(() -> service.advanceFulfilment(id,
+                new LensDtos.AdvanceFulfilment("DELIVERED", "CASH", "Staff B", "Main Store")))
+                .hasMessageContaining("one step at a time");
+
+        service.advanceFulfilment(id, new LensDtos.AdvanceFulfilment("PACKED", null, null, null));
+        var out = service.advanceFulfilment(id,
+                new LensDtos.AdvanceFulfilment("OUT_FOR_DELIVERY", null, null, null));
+        assertThat(out.status()).isEqualTo("SUBMITTED"); // still unpaid — cash on delivery
+        assertThat(sentTexts()).anySatisfy(t -> assertThat(t).contains("out for delivery to 12 Freedom Way"));
+
+        // an in-flight order stays on the staff list the whole way
+        assertThat(service.pendingWebOrders()).anySatisfy(v -> assertThat(v.id()).isEqualTo(id));
+
+        var done = service.advanceFulfilment(id,
+                new LensDtos.AdvanceFulfilment("DELIVERED", "CASH", "Staff B", "Main Store"));
+        assertThat(done.status()).isEqualTo("SOLD"); // delivering it is what bills it
+        assertThat(service.pendingWebOrders()).noneSatisfy(v -> assertThat(v.id()).isEqualTo(id));
+        assertThat(sentTexts()).anySatisfy(t -> assertThat(t).contains("have been delivered"));
     }
 
     @Test

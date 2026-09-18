@@ -71,6 +71,11 @@ public class LensInquiry extends BaseEntity {
     private String soldBy;
     private String shopName;
 
+    /** Doorstep delivery stage — ORDERED | PACKED | OUT_FOR_DELIVERY | DELIVERED. Separate
+     *  from {@link #status}, which is the billing state: with cash on delivery a lens is
+     *  normally out for delivery while still unpaid. Null for a walk-in. */
+    private String fulfilment;
+
     /** Where the finished lens is delivered. Captured on the /lens page after the quote and
      *  required before submit — a web order with no address is one the lab can't fulfil.
      *  Null for a walk-in: the customer is standing at the counter. */

@@ -31,6 +31,11 @@ public class AdminLensSalesController {
         return service.completeSale(id, req);
     }
 
+    @PostMapping("/{id}/fulfilment")
+    public LensDtos.InquiryView advance(@PathVariable UUID id, @RequestBody LensDtos.AdvanceFulfilment req) {
+        return service.advanceFulfilment(id, req);
+    }
+
     @PostMapping("/walk-in")
     public LensDtos.InquiryView walkIn(@RequestBody LensDtos.WalkInSale req) {
         return service.walkInSale(req);

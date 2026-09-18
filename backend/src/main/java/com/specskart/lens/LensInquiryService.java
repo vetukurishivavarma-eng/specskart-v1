@@ -32,6 +32,10 @@ public class LensInquiryService {
 
     private static final Logger log = LoggerFactory.getLogger(LensInquiryService.class);
 
+    /** The doorstep ladder, in order. Staff move an order one rung at a time; the last rung
+     *  also bills it, because with cash on delivery that is when the money arrives. */
+    static final List<String> FULFILMENT = List.of("ORDERED", "PACKED", "OUT_FOR_DELIVERY", "DELIVERED");
+
     private final LensInquiryRepository inquiries;
     private final LeadService leadService;
     private final WhatsAppProvider whatsapp;
@@ -165,6 +169,7 @@ public class LensInquiryService {
         }
         if (q.getPriceMinor() == null) q.setPriceMinor(pricing.quote(q));
         q.setStatus("SUBMITTED");
+        q.setFulfilment("ORDERED");
         inquiries.save(q);
         alertStaff(q);
         notifyCustomer(q, "we've got your lens order and we're on it");
@@ -215,17 +220,60 @@ public class LensInquiryService {
         q.setSoldBy(d.soldBy());
         q.setShopName(d.shopName());
         q.setStatus("SOLD");
+        // Billing a web order finishes it however staff got here — the doorstep ladder, or
+        // "mark as sold" straight off the list when the customer collected in person.
+        // Otherwise a sold order would sit on the pending list forever.
+        if (!q.isWalkIn()) q.setFulfilment("DELIVERED");
         inquiries.save(q);
-        notifyCustomer(q, blank(q.getDeliveryAddress())
-                ? "your lenses are ready for collection"
-                : "your lenses are ready and on their way to " + q.getDeliveryAddress());
+        notifyCustomer(q, "your lenses have been delivered — enjoy them!");
         return view(q);
     }
 
     @Transactional(readOnly = true)
     public List<LensDtos.SaleView> pendingWebOrders() {
-        return inquiries.findByStatusOrderByCreatedAtAsc("SUBMITTED").stream()
+        return inquiries.findByFulfilmentNotOrderByCreatedAtAsc("DELIVERED").stream()
                 .map(LensInquiryService::saleView).toList();
+    }
+
+    /** Staff moving a web order one rung along the doorstep ladder. Strictly one step at a
+     *  time and forward only — a mis-tap shouldn't silently skip "out for delivery", and
+     *  un-delivering an order is a conversation, not a button. */
+    @Transactional
+    public LensDtos.InquiryView advanceFulfilment(UUID id, LensDtos.AdvanceFulfilment d) {
+        LensInquiry q = requireVerified(get(id));
+        int at = FULFILMENT.indexOf(q.getFulfilment() == null ? "ORDERED" : q.getFulfilment());
+        int to = FULFILMENT.indexOf(d.stage() == null ? "" : d.stage().toUpperCase(java.util.Locale.ROOT));
+        if (to < 0) throw ApiException.badRequest("BAD_STAGE", "Unknown delivery stage.");
+        if (to != at + 1) {
+            throw ApiException.badRequest("BAD_STAGE_ORDER",
+                    "This order is " + label(FULFILMENT.get(Math.max(at, 0))) + " — move it one step at a time.");
+        }
+        q.setFulfilment(FULFILMENT.get(to));
+        inquiries.save(q);
+
+        if ("DELIVERED".equals(q.getFulfilment())) {
+            // Handed over is when it's paid for, cash on delivery or not — bill it here so the
+            // day's sales report matches what actually left the shop. completeSale notifies.
+            return completeSale(id, new LensDtos.CompleteSale(d.paymentMethod(), d.soldBy(), d.shopName()));
+        }
+        notifyCustomer(q, stageLine(q));
+        return view(q);
+    }
+
+    /** What the customer is told at each rung. */
+    private static String stageLine(LensInquiry q) {
+        return switch (q.getFulfilment()) {
+            case "PACKED" -> "your lenses are packed and ready to go";
+            case "OUT_FOR_DELIVERY" -> blank(q.getDeliveryAddress())
+                    ? "your lenses are out for delivery"
+                    : "your lenses are out for delivery to " + q.getDeliveryAddress();
+            default -> "there's an update on your lens order";
+        };
+    }
+
+    /** "OUT_FOR_DELIVERY" -> "out for delivery" */
+    static String label(String stage) {
+        return stage.toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
     }
 
     @Transactional(readOnly = true)
@@ -249,7 +297,7 @@ public class LensInquiryService {
                 q.getLensStructure(), q.isSpecialAxis(), q.getPriceMinor() == null ? 0 : q.getPriceMinor(),
                 q.getCurrency(), q.getPaymentMethod(), q.getSoldBy(), q.getShopName(), q.isWalkIn(),
                 q.getDeliveryName(), q.getDeliveryAddress(), q.getDeliveryArea(), q.getDeliveryLandmark(),
-                q.getCreatedAt());
+                q.getFulfilment(), q.getCreatedAt());
     }
 
     /** Keep the customer in the loop at the two moments that matter to them -- the order
