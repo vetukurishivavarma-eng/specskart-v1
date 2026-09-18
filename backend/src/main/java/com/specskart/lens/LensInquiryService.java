@@ -134,6 +134,19 @@ public class LensInquiryService {
     }
 
     @Transactional
+    public LensDtos.InquiryView setDelivery(UUID id, LensDtos.Delivery d) {
+        LensInquiry q = requireVerified(get(id));
+        if (blank(d.address()) || blank(d.area())) {
+            throw ApiException.badRequest("BAD_ADDRESS", "Enter the street address and the area or city.");
+        }
+        q.setDeliveryName(trim(d.name()));
+        q.setDeliveryAddress(trim(d.address()));
+        q.setDeliveryArea(trim(d.area()));
+        q.setDeliveryLandmark(trim(d.landmark()));
+        return view(inquiries.save(q));
+    }
+
+    @Transactional
     public LensDtos.InquiryView quote(UUID id) {
         LensInquiry q = requireVerified(get(id));
         q.setPriceMinor(pricing.quote(q));
@@ -144,10 +157,17 @@ public class LensInquiryService {
     @Transactional
     public LensDtos.InquiryView submit(UUID id) {
         LensInquiry q = requireVerified(get(id));
+        // An order with nowhere to go is one the lab can't fulfil -- block it here rather
+        // than discover it when someone tries to dispatch.
+        if (!q.isWalkIn() && (blank(q.getDeliveryAddress()) || blank(q.getDeliveryArea()))) {
+            throw ApiException.badRequest("NO_DELIVERY_ADDRESS",
+                    "Add your delivery address before placing the order.");
+        }
         if (q.getPriceMinor() == null) q.setPriceMinor(pricing.quote(q));
         q.setStatus("SUBMITTED");
         inquiries.save(q);
         alertStaff(q);
+        notifyCustomer(q, "we've got your lens order and we're on it");
         return view(q);
     }
 
@@ -195,7 +215,11 @@ public class LensInquiryService {
         q.setSoldBy(d.soldBy());
         q.setShopName(d.shopName());
         q.setStatus("SOLD");
-        return view(inquiries.save(q));
+        inquiries.save(q);
+        notifyCustomer(q, blank(q.getDeliveryAddress())
+                ? "your lenses are ready for collection"
+                : "your lenses are ready and on their way to " + q.getDeliveryAddress());
+        return view(q);
     }
 
     @Transactional(readOnly = true)
@@ -224,7 +248,27 @@ public class LensInquiryService {
         return new LensDtos.SaleView(q.getId(), q.getCustomerName(), q.getLensType(), q.isBlueBlock(),
                 q.getLensStructure(), q.isSpecialAxis(), q.getPriceMinor() == null ? 0 : q.getPriceMinor(),
                 q.getCurrency(), q.getPaymentMethod(), q.getSoldBy(), q.getShopName(), q.isWalkIn(),
+                q.getDeliveryName(), q.getDeliveryAddress(), q.getDeliveryArea(), q.getDeliveryLandmark(),
                 q.getCreatedAt());
+    }
+
+    /** Keep the customer in the loop at the two moments that matter to them -- the order
+     *  landing, and it going out. Reuses the approved order-update template (the only thing
+     *  Meta delivers outside the 24h window); silent for a walk-in, who was handed the lens. */
+    private void notifyCustomer(LensInquiry q, String line) {
+        if (q.isWalkIn() || blank(q.getWaId())) return;
+        String who = blank(q.getCustomerName()) ? "there" : q.getCustomerName().split(" ")[0];
+        try {
+            if (props.whatsapp().orderUpdateConfigured()) {
+                whatsapp.sendTemplate(q.getWaId(), props.whatsapp().orderUpdateTemplate(),
+                        props.whatsapp().followUpTemplateLang(),
+                        List.of(who, line, ref(q), props.frontendBaseUrl() + "/lens"));
+            } else {
+                whatsapp.sendText(q.getWaId(), "Hi " + who + " — " + line + " (" + ref(q) + ").");
+            }
+        } catch (Exception e) {
+            log.warn("lens {} customer notification failed: {}", ref(q), e.getMessage());
+        }
     }
 
     private void alertStaff(LensInquiry q) {
@@ -251,6 +295,16 @@ public class LensInquiryService {
                 + (q.isPhoneVerified() && !q.isWalkIn() ? " (verified)" : ""));
         if (q.getAge() != null || q.getGender() != null) {
             out.add("Age / gender: " + (q.getAge() == null ? "—" : q.getAge()) + " / " + dash(q.getGender()));
+        }
+        if (!q.isWalkIn()) {
+            out.add("");
+            out.add("# Deliver to");
+            out.add("Name: " + dash(q.getDeliveryName() == null ? q.getCustomerName() : q.getDeliveryName()));
+            out.add("Address: " + dash(q.getDeliveryAddress()));
+            out.add("Area: " + dash(q.getDeliveryArea()));
+            if (q.getDeliveryLandmark() != null && !q.getDeliveryLandmark().isBlank()) {
+                out.add("Landmark: " + q.getDeliveryLandmark());
+            }
         }
         out.add("");
         out.add("# Lens");
@@ -282,6 +336,14 @@ public class LensInquiryService {
 
     private static String axis(Integer v) {
         return v == null ? "-" : v + "°";
+    }
+
+    private static boolean blank(String s) {
+        return s == null || s.isBlank();
+    }
+
+    private static String trim(String s) {
+        return blank(s) ? null : s.trim();
     }
 
     private static String dash(String s) {
@@ -319,6 +381,7 @@ public class LensInquiryService {
                 q.getCustomerName(), q.getAge(), q.getGender(),
                 q.getSphRight(), q.getSphLeft(), q.getCylRight(), q.getCylLeft(),
                 q.getAxisRight(), q.getAxisLeft(), q.getAddPower(), q.getLensStructure(),
-                q.isSpecialAxis(), q.getPriceMinor(), q.getCurrency());
+                q.isSpecialAxis(), q.getPriceMinor(), q.getCurrency(),
+                q.getDeliveryName(), q.getDeliveryAddress(), q.getDeliveryArea(), q.getDeliveryLandmark());
     }
 }

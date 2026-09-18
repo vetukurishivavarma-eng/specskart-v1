@@ -71,6 +71,15 @@ public class LensInquiry extends BaseEntity {
     private String soldBy;
     private String shopName;
 
+    /** Where the finished lens is delivered. Captured on the /lens page after the quote and
+     *  required before submit — a web order with no address is one the lab can't fulfil.
+     *  Null for a walk-in: the customer is standing at the counter. */
+    private String deliveryName;
+    @Column(length = 1000)
+    private String deliveryAddress;
+    private String deliveryArea;
+    private String deliveryLandmark;
+
     /** Idempotency key for a walk-in sale from the Specskart POS app's offline queue — a
      *  retry after a dropped connection can't double-sell. Null for web-originated inquiries. */
     @Column(unique = true)

@@ -103,6 +103,7 @@ class LensInquiryFlowTest {
     void completingAWebOrderMovesItFromPendingToSold() {
         UUID id = service.start(phone(), "CLEAR", false);
         service.verify(tokenFromLastOutbound());
+        service.setDelivery(id, new LensDtos.Delivery("Ann", "12 Freedom Way", "Kabulonga", null));
         service.submit(id);
 
         assertThat(service.pendingWebOrders()).anySatisfy(s -> assertThat(s.id()).isEqualTo(id));
@@ -110,6 +111,34 @@ class LensInquiryFlowTest {
         var sold = service.completeSale(id, new LensDtos.CompleteSale("MOBILE", "Staff B", "Main Store"));
         assertThat(sold.status()).isEqualTo("SOLD");
         assertThat(service.pendingWebOrders()).noneSatisfy(s -> assertThat(s.id()).isEqualTo(id));
+
+        // the customer hears about it -- they'd had nothing since the lens link
+        var outbox = ((MockWhatsAppProvider) provider).outbox();
+        assertThat(outbox.get(outbox.size() - 1).text()).contains("12 Freedom Way");
+    }
+
+    @Test
+    void aWebOrderCannotBeSubmittedWithNowhereToDeliverIt() {
+        UUID id = service.start(phone(), "CLEAR", false);
+        service.verify(tokenFromLastOutbound());
+
+        assertThatThrownBy(() -> service.submit(id)).hasMessageContaining("delivery address");
+
+        // area is as required as the street -- an address alone doesn't route a courier
+        assertThatThrownBy(() -> service.setDelivery(id,
+                new LensDtos.Delivery("Ann", "12 Freedom Way", "  ", null)))
+                .hasMessageContaining("area");
+
+        service.setDelivery(id, new LensDtos.Delivery("Ann", "12 Freedom Way", "Kabulonga", "opp. the bank"));
+        assertThat(service.submit(id).status()).isEqualTo("SUBMITTED");
+
+        // placing the order confirms it to the customer, not just the lab
+        var outbox = ((MockWhatsAppProvider) provider).outbox();
+        assertThat(outbox.get(outbox.size() - 1).text()).contains("got your lens order");
+
+        // and the lab's paperwork says where it goes
+        assertThat(LensInquiryService.staffLines(inquiries.findById(id).orElseThrow()))
+                .contains("Address: 12 Freedom Way", "Area: Kabulonga", "Landmark: opp. the bank");
     }
 
     @Test

@@ -16,6 +16,10 @@ public final class LensDtos {
                                 Integer axisRight, Integer axisLeft,
                                 BigDecimal addPower, String lensStructure) {}
 
+    /** Where the lens gets delivered — its own step after the quote, so it stays out of
+     *  the (positional) UpdateDetails record the prescription form uses. */
+    public record Delivery(String name, String address, String area, String landmark) {}
+
     /** Full current state of an inquiry — used to gate the form, resume after a refresh,
      *  and drive the poll-until-verified step. */
     public record InquiryView(UUID id, String status, boolean verified,
@@ -25,7 +29,9 @@ public final class LensDtos {
                               BigDecimal cylRight, BigDecimal cylLeft,
                               Integer axisRight, Integer axisLeft,
                               BigDecimal addPower, String lensStructure,
-                              boolean specialAxis, Long priceMinor, String currency) {}
+                              boolean specialAxis, Long priceMinor, String currency,
+                              String deliveryName, String deliveryAddress,
+                              String deliveryArea, String deliveryLandmark) {}
 
     /** Specskart POS: staff billing a customer at the counter, no WhatsApp step. */
     public record WalkInSale(String customerName, String phone, String lensType, Boolean blueBlock,
@@ -38,7 +44,8 @@ public final class LensDtos {
     public record SaleView(UUID id, String customerName, String lensType, boolean blueBlock,
                            String lensStructure, boolean specialAxis, long priceMinor, String currency,
                            String paymentMethod, String soldBy, String shopName, boolean walkIn,
-                           java.time.Instant createdAt) {}
+                           String deliveryName, String deliveryAddress, String deliveryArea,
+                           String deliveryLandmark, java.time.Instant createdAt) {}
 
     public record DaySummary(long totalMinor, int count, String currency) {}
 }

@@ -156,7 +156,9 @@ export default function LensConfigurator() {
         <div className="mt-8 card p-5">
           <h2 className="text-lg text-moss">Thanks — we've got it! ✅</h2>
           <p className="mt-2 text-sm text-ink/60">
-            We'll message you on WhatsApp to confirm your prescription and arrange delivery.
+            {q.deliveryAddress
+              ? <>We'll message you on WhatsApp when your lenses are on the way to <b>{q.deliveryAddress}</b>{q.deliveryArea ? `, ${q.deliveryArea}` : ''}.</>
+              : <>We'll message you on WhatsApp to confirm your prescription and arrange delivery.</>}
           </p>
           <button className="btn-primary mt-4" onClick={bookAnother}>Book another pair</button>
         </div>
@@ -207,6 +209,12 @@ function DetailsForm({ q, onPatch, onQuoted }: {
   const [structure, setStructure] = useState<'BIFOCAL' | 'PROGRESSIVE'>(q.lensStructure ?? 'BIFOCAL')
   const [quoting, setQuoting] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [dName, setDName] = useState(q.deliveryName ?? q.customerName ?? '')
+  const [dAddress, setDAddress] = useState(q.deliveryAddress ?? '')
+  const [dArea, setDArea] = useState(q.deliveryArea ?? '')
+  const [dLandmark, setDLandmark] = useState(q.deliveryLandmark ?? '')
+  const canDeliver = dAddress.trim().length > 3 && dArea.trim().length > 1
 
   const needsAxisR = parseFloat(cylR.magnitude) > 0
   const needsAxisL = parseFloat(cylL.magnitude) > 0
@@ -235,7 +243,19 @@ function DetailsForm({ q, onPatch, onQuoted }: {
 
   async function buyNow() {
     setSubmitting(true)
-    try { onQuoted(await lens.submit(q.id)) } finally { setSubmitting(false) }
+    setError(null)
+    try {
+      // Save the address first: submit() refuses an order the lab can't deliver.
+      await lens.delivery(q.id, {
+        name: dName.trim() || undefined, address: dAddress.trim(),
+        area: dArea.trim(), landmark: dLandmark.trim() || undefined,
+      })
+      onQuoted(await lens.submit(q.id))
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -299,10 +319,29 @@ function DetailsForm({ q, onPatch, onQuoted }: {
       ) : (
         <div className="card p-5">
           <p className="text-lg font-medium">{money(q.priceMinor ?? 0, q.currency ?? 'ZMW')}</p>
-          <div className="mt-3 flex gap-3">
-            <button className="btn-ghost" onClick={checkPrice} disabled={quoting}>Re-check price</button>
-            <button className="btn-primary" onClick={buyNow} disabled={submitting}>{submitting ? 'Placing…' : 'Buy now'}</button>
-          </div>
+          <button className="btn-ghost mt-3" onClick={checkPrice} disabled={quoting}>Re-check price</button>
+
+          <section className="mt-6 border-t border-ink/10 pt-5">
+            <h2 className="text-lg">Where should we deliver?</h2>
+            <p className="mt-1 text-xs text-ink/50">We'll send your lenses here once they're ready.</p>
+            <div className="mt-3 space-y-3">
+              <TextField label="Name for the delivery" value={dName} onChange={setDName}
+                placeholder="Who receives it" />
+              <TextField label="Street address" value={dAddress} onChange={setDAddress}
+                placeholder="House / plot number and street" required />
+              <TextField label="Area or city" value={dArea} onChange={setDArea}
+                placeholder="e.g. Kabulonga, Lusaka" required />
+              <TextField label="Landmark (optional)" value={dLandmark} onChange={setDLandmark}
+                placeholder="Anything that helps us find you" />
+            </div>
+          </section>
+
+          {error && <p className="mt-3 text-sm text-clay">{error}</p>}
+          <button className="btn-primary mt-4 w-full disabled:bg-ink/30"
+            onClick={buyNow} disabled={submitting || !canDeliver}>
+            {submitting ? 'Placing…' : 'Place order'}
+          </button>
+          {!canDeliver && <p className="mt-2 text-xs text-ink/45">Add your street address and area to place the order.</p>}
         </div>
       )}
     </div>
@@ -316,6 +355,20 @@ function Field({ inputRef, label, type = 'text', defaultValue }: {
     <label className="block">
       <span className="text-xs font-medium uppercase tracking-widest text-ink/50">{label}</span>
       <input ref={inputRef} type={type} defaultValue={defaultValue} className="mt-1 w-full rounded-lg border border-ink/20 px-3 py-2 text-sm" />
+    </label>
+  )
+}
+
+function TextField({ label, value, onChange, placeholder, required }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs font-medium uppercase tracking-widest text-ink/50">
+        {label}{required && <span className="text-clay"> *</span>}
+      </span>
+      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+        className="mt-1 w-full rounded-lg border border-ink/20 px-3 py-2 text-sm" />
     </label>
   )
 }

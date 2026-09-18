@@ -39,6 +39,11 @@ public class LensController {
         return service.update(id, body);
     }
 
+    @PutMapping("/{id}/delivery")
+    public LensDtos.InquiryView delivery(@PathVariable UUID id, @RequestBody LensDtos.Delivery body) {
+        return service.setDelivery(id, body);
+    }
+
     @PostMapping("/{id}/quote")
     public LensDtos.InquiryView quote(@PathVariable UUID id) {
         return service.quote(id);
