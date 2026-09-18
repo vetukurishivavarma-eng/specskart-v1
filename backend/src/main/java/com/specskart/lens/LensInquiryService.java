@@ -10,6 +10,7 @@ import com.specskart.whatsapp.StaffAlerts;
 import com.specskart.shared.ApiException;
 import com.specskart.shared.PhoneNumbers;
 import com.specskart.shared.TokenGenerator;
+import com.specskart.payment.PaymentProvider;
 import com.specskart.whatsapp.WhatsAppProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,6 +35,9 @@ public class LensInquiryService {
 
     /** The doorstep ladder, in order. Staff move an order one rung at a time; the last rung
      *  also bills it, because with cash on delivery that is when the money arrives. */
+    /** tx_ref prefix that marks a gateway reference as a lens order, not a frame order. */
+    private static final String TX_PREFIX = "LENS-";
+
     static final List<String> FULFILMENT = List.of("ORDERED", "PACKED", "OUT_FOR_DELIVERY", "DELIVERED");
 
     private final LensInquiryRepository inquiries;
@@ -44,10 +48,13 @@ public class LensInquiryService {
     private final LensPricing pricing;
     private final StaffAlerts staffAlerts;
     private final SignedLinks links;
+    private final PaymentProvider payments;
 
     public LensInquiryService(LensInquiryRepository inquiries, LeadService leadService,
                               WhatsAppProvider whatsapp, TokenGenerator tokens, AppProperties props,
-                              LensPricing pricing, StaffAlerts staffAlerts, SignedLinks links) {
+                              LensPricing pricing, StaffAlerts staffAlerts, SignedLinks links,
+                              PaymentProvider payments) {
+        this.payments = payments;
         this.staffAlerts = staffAlerts;
         this.links = links;
         this.inquiries = inquiries;
@@ -176,6 +183,54 @@ public class LensInquiryService {
         return view(q);
     }
 
+    /** Send the customer to the gateway for an order they've already placed. The order stands
+     *  whether or not they come back — an abandoned payment is still a lead the shop can chase,
+     *  and they can always pay the courier instead. tx_ref is "LENS-<id>": the full id, not the
+     *  short human ref, so the webhook can find the row without a lookup table. */
+    @Transactional
+    public LensDtos.PayResult startPayment(UUID id) {
+        LensInquiry q = requireVerified(get(id));
+        if (q.isPaid()) throw ApiException.badRequest("ALREADY_PAID", "This order is already paid.");
+        if (q.getPriceMinor() == null) q.setPriceMinor(pricing.quote(q));
+        var payment = payments.start(new PaymentProvider.PaymentRequest(
+                TX_PREFIX + q.getId(), q.getPriceMinor(), q.getCurrency(),
+                blank(q.getDeliveryName()) ? q.getCustomerName() : q.getDeliveryName(),
+                null, q.getWaId(), props.frontendBaseUrl() + "/lens"));
+        q.setPaymentRef(payment.providerRef());
+        inquiries.save(q);
+        return new LensDtos.PayResult(payment.checkoutUrl(), q.getPriceMinor(), q.getCurrency());
+    }
+
+    /** True when this gateway reference belongs to a lens order rather than a frame order. */
+    public static boolean isLensRef(String providerRef) {
+        return providerRef != null && providerRef.startsWith(TX_PREFIX);
+    }
+
+    /** Called from the payment webhook and the return page. Idempotent, and always re-verifies
+     *  with the gateway — a callback on its own proves nothing. */
+    @Transactional
+    public void confirmPayment(String providerRef) {
+        UUID id;
+        try {
+            id = UUID.fromString(providerRef.substring(TX_PREFIX.length()));
+        } catch (IllegalArgumentException e) {
+            log.warn("lens payment ref {} is not one of ours", providerRef);
+            return;
+        }
+        LensInquiry q = inquiries.findById(id).orElse(null);
+        if (q == null || q.getPaidAt() != null) return; // unknown, or already handled
+        if (!payments.verify(q.getPaymentRef() == null ? providerRef : q.getPaymentRef())) {
+            log.warn("lens payment {} did not verify", providerRef);
+            return;
+        }
+        q.setPaidAt(Instant.now());
+        q.setPaymentMethod("ONLINE");
+        inquiries.save(q);
+        log.info("lens {} paid online", ref(q));
+        notifyCustomer(q, "we've received your payment of "
+                + OrderNotificationService.money(q.getPriceMinor(), q.getCurrency()));
+    }
+
     /** Specskart POS: staff bills a walk-in customer directly, no WhatsApp verification —
      *  the staff member is standing in front of them. Reuses the LensInquiry pipeline so the
      *  same pricing/special-axis rules and sales reporting apply to every sale, web or counter. */
@@ -216,7 +271,8 @@ public class LensInquiryService {
     public LensDtos.InquiryView completeSale(UUID id, LensDtos.CompleteSale d) {
         LensInquiry q = requireVerified(get(id));
         if (q.getPriceMinor() == null) q.setPriceMinor(pricing.quote(q));
-        q.setPaymentMethod(d.paymentMethod());
+        // Paid online already — don't let a handover overwrite that with "CASH".
+        if (q.getPaidAt() == null) q.setPaymentMethod(d.paymentMethod());
         q.setSoldBy(d.soldBy());
         q.setShopName(d.shopName());
         q.setStatus("SOLD");
@@ -297,7 +353,7 @@ public class LensInquiryService {
                 q.getLensStructure(), q.isSpecialAxis(), q.getPriceMinor() == null ? 0 : q.getPriceMinor(),
                 q.getCurrency(), q.getPaymentMethod(), q.getSoldBy(), q.getShopName(), q.isWalkIn(),
                 q.getDeliveryName(), q.getDeliveryAddress(), q.getDeliveryArea(), q.getDeliveryLandmark(),
-                q.getFulfilment(), q.getCreatedAt());
+                q.getFulfilment(), q.isPaid(), q.getCreatedAt());
     }
 
     /** Keep the customer in the loop at the two moments that matter to them -- the order
@@ -430,6 +486,7 @@ public class LensInquiryService {
                 q.getSphRight(), q.getSphLeft(), q.getCylRight(), q.getCylLeft(),
                 q.getAxisRight(), q.getAxisLeft(), q.getAddPower(), q.getLensStructure(),
                 q.isSpecialAxis(), q.getPriceMinor(), q.getCurrency(),
-                q.getDeliveryName(), q.getDeliveryAddress(), q.getDeliveryArea(), q.getDeliveryLandmark());
+                q.getDeliveryName(), q.getDeliveryAddress(), q.getDeliveryArea(), q.getDeliveryLandmark(),
+                q.getFulfilment(), q.isPaid());
     }
 }

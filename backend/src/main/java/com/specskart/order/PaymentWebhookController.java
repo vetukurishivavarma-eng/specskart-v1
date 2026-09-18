@@ -16,10 +16,14 @@ public class PaymentWebhookController {
     private static final Logger log = LoggerFactory.getLogger(PaymentWebhookController.class);
 
     private final CheckoutService checkout;
+    private final com.specskart.lens.LensInquiryService lensInquiries;
     private final AppProperties props;
 
-    public PaymentWebhookController(CheckoutService checkout, AppProperties props) {
+    public PaymentWebhookController(CheckoutService checkout,
+                                    com.specskart.lens.LensInquiryService lensInquiries,
+                                    AppProperties props) {
         this.checkout = checkout;
+        this.lensInquiries = lensInquiries;
         this.props = props;
     }
 
@@ -40,7 +44,10 @@ public class PaymentWebhookController {
             return ResponseEntity.ok().build();
         }
         try {
-            checkout.confirmPayment(txRef);
+            // One gateway, two kinds of order. A lens tx_ref is prefixed so it never reaches
+            // CheckoutService, which would only fail to find an Order for it.
+            if (com.specskart.lens.LensInquiryService.isLensRef(txRef)) lensInquiries.confirmPayment(txRef);
+            else checkout.confirmPayment(txRef);
         } catch (Exception e) {
             log.error("payment webhook confirm {} failed: {}", txRef, e.getMessage());
         }

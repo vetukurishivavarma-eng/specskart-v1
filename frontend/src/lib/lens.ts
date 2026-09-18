@@ -21,6 +21,8 @@ export type LensInquiry = {
   deliveryAddress: string | null
   deliveryArea: string | null
   deliveryLandmark: string | null
+  fulfilment: 'ORDERED' | 'PACKED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | null
+  paid: boolean
 }
 
 export type Delivery = { name?: string; address: string; area: string; landmark?: string }
@@ -44,5 +46,8 @@ export const lens = {
   delivery: (id: string, d: Delivery) =>
     api<LensInquiry>(`/public/lens/${id}/delivery`, { method: 'PUT', body: JSON.stringify(d) }),
   quote: (id: string) => api<LensInquiry>(`/public/lens/${id}/quote`, { method: 'POST' }),
+  pay: (id: string) =>
+    api<{ checkoutUrl: string; amountMinor: number; currency: string }>(
+      `/public/lens/${id}/pay`, { method: 'POST' }),
   submit: (id: string) => api<LensInquiry>(`/public/lens/${id}/submit`, { method: 'POST' }),
 }

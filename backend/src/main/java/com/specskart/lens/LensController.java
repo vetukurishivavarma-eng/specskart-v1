@@ -49,6 +49,11 @@ public class LensController {
         return service.quote(id);
     }
 
+    @PostMapping("/{id}/pay")
+    public LensDtos.PayResult pay(@PathVariable UUID id) {
+        return service.startPayment(id);
+    }
+
     @PostMapping("/{id}/submit")
     public LensDtos.InquiryView submit(@PathVariable UUID id) {
         return service.submit(id);

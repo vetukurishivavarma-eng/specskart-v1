@@ -155,6 +155,7 @@ export default function LensConfigurator() {
       {q && isDone(q) && (
         <div className="mt-8 card p-5">
           <h2 className="text-lg text-moss">Thanks — we've got it! ✅</h2>
+          {q.paid && <p className="mt-1 text-sm text-moss">Payment received.</p>}
           <p className="mt-2 text-sm text-ink/60">
             {q.deliveryAddress
               ? <>We'll message you on WhatsApp when your lenses are on the way to <b>{q.deliveryAddress}</b>{q.deliveryArea ? `, ${q.deliveryArea}` : ''}.</>
@@ -241,7 +242,10 @@ function DetailsForm({ q, onPatch, onQuoted }: {
     }
   }
 
-  async function buyNow() {
+  // `online` sends them to the gateway after the order is placed. The order stands either
+  // way — an abandoned payment is still an order the shop can chase, and pay-on-delivery
+  // stays the default for anyone without a card.
+  async function buyNow(online: boolean) {
     setSubmitting(true)
     setError(null)
     try {
@@ -250,10 +254,15 @@ function DetailsForm({ q, onPatch, onQuoted }: {
         name: dName.trim() || undefined, address: dAddress.trim(),
         area: dArea.trim(), landmark: dLandmark.trim() || undefined,
       })
-      onQuoted(await lens.submit(q.id))
+      const placed = await lens.submit(q.id)
+      if (online) {
+        const { checkoutUrl } = await lens.pay(q.id)
+        window.location.href = checkoutUrl
+        return
+      }
+      onQuoted(placed)
     } catch (e) {
       setError((e as Error).message)
-    } finally {
       setSubmitting(false)
     }
   }
@@ -337,10 +346,16 @@ function DetailsForm({ q, onPatch, onQuoted }: {
           </section>
 
           {error && <p className="mt-3 text-sm text-clay">{error}</p>}
-          <button className="btn-primary mt-4 w-full disabled:bg-ink/30"
-            onClick={buyNow} disabled={submitting || !canDeliver}>
-            {submitting ? 'Placing…' : 'Place order'}
-          </button>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <button className="btn-primary w-full disabled:bg-ink/30"
+              onClick={() => buyNow(true)} disabled={submitting || !canDeliver}>
+              {submitting ? 'Placing…' : 'Pay now'}
+            </button>
+            <button className="btn-ghost w-full disabled:opacity-40"
+              onClick={() => buyNow(false)} disabled={submitting || !canDeliver}>
+              Pay on delivery
+            </button>
+          </div>
           {!canDeliver && <p className="mt-2 text-xs text-ink/45">Add your street address and area to place the order.</p>}
         </div>
       )}

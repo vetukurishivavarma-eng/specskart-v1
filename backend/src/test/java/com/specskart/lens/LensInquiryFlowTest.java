@@ -176,6 +176,38 @@ class LensInquiryFlowTest {
     }
 
     @Test
+    void payingOnlineMarksTheOrderPaidAndSurvivesTheHandover() {
+        UUID id = service.start(phone(), "CLEAR", false);
+        service.verify(tokenFromLastOutbound());
+        service.setDelivery(id, new LensDtos.Delivery("Ann", "12 Freedom Way", "Kabulonga", null));
+        service.submit(id);
+
+        var pay = service.startPayment(id);
+        assertThat(pay.checkoutUrl()).isNotBlank();
+        assertThat(pay.amountMinor()).isEqualTo(25_000L);
+
+        String txRef = "LENS-" + id;
+        assertThat(LensInquiryService.isLensRef(txRef)).isTrue();
+        assertThat(LensInquiryService.isLensRef("SK-ABC123")).isFalse();
+
+        service.confirmPayment(txRef);
+        assertThat(service.status(id).paid()).isTrue();
+        assertThat(sentTexts()).anySatisfy(t -> assertThat(t).contains("received your payment"));
+
+        // paying twice is a no-op, and a second charge can't be started
+        service.confirmPayment(txRef);
+        assertThatThrownBy(() -> service.startPayment(id)).hasMessageContaining("already paid");
+
+        // the handover must not overwrite ONLINE with whatever staff tapped
+        service.advanceFulfilment(id, new LensDtos.AdvanceFulfilment("PACKED", null, null, null));
+        service.advanceFulfilment(id, new LensDtos.AdvanceFulfilment("OUT_FOR_DELIVERY", null, null, null));
+        service.advanceFulfilment(id, new LensDtos.AdvanceFulfilment("DELIVERED", "CASH", "Staff B", "Main Store"));
+        assertThat(service.salesOn(java.time.LocalDate.now(java.time.ZoneOffset.UTC)))
+                .filteredOn(v -> v.id().equals(id))
+                .allSatisfy(v -> assertThat(v.paymentMethod()).isEqualTo("ONLINE"));
+    }
+
+    @Test
     void replayingAWalkInSaleWithTheSameClientReferenceDoesNotDoubleSell() {
         String ref = "device-" + UUID.randomUUID();
         var req = new LensDtos.WalkInSale("Offline Customer", null, "CLEAR", false, null, null,

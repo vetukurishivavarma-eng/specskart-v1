@@ -31,7 +31,11 @@ public final class LensDtos {
                               BigDecimal addPower, String lensStructure,
                               boolean specialAxis, Long priceMinor, String currency,
                               String deliveryName, String deliveryAddress,
-                              String deliveryArea, String deliveryLandmark) {}
+                              String deliveryArea, String deliveryLandmark,
+                              String fulfilment, boolean paid) {}
+
+    /** Hosted-checkout hop for a lens order: where to send the shopper, and what they'll pay. */
+    public record PayResult(String checkoutUrl, long amountMinor, String currency) {}
 
     /** Specskart POS: staff billing a customer at the counter, no WhatsApp step. */
     public record WalkInSale(String customerName, String phone, String lensType, Boolean blueBlock,
@@ -49,7 +53,8 @@ public final class LensDtos {
                            String lensStructure, boolean specialAxis, long priceMinor, String currency,
                            String paymentMethod, String soldBy, String shopName, boolean walkIn,
                            String deliveryName, String deliveryAddress, String deliveryArea,
-                           String deliveryLandmark, String fulfilment, java.time.Instant createdAt) {}
+                           String deliveryLandmark, String fulfilment, boolean paid,
+                           java.time.Instant createdAt) {}
 
     public record DaySummary(long totalMinor, int count, String currency) {}
 }
