@@ -31,9 +31,18 @@ class TrackMyOrderTest {
         return "26097" + (200000 + (int) (Math.random() * 700000));
     }
 
-    private String lastText() {
+    private int outboxSize() {
+        return ((MockWhatsAppProvider) provider).outbox().size();
+    }
+
+    /** The outbox is shared across the whole suite, so only look at what this test just sent. */
+    private String replySince(int mark) {
         var outbox = ((MockWhatsAppProvider) provider).outbox();
-        return outbox.get(outbox.size() - 1).text();
+        return outbox.subList(mark, outbox.size()).stream()
+                .map(MockWhatsAppProvider.Sent::text)
+                .filter(t -> t != null)
+                .reduce((a, b) -> a + "\n" + b)
+                .orElse("");
     }
 
     @Test
@@ -52,18 +61,20 @@ class TrackMyOrderTest {
         q.setDeliveryAddress("12 Great East Road");
         inquiries.save(q);
 
+        int mark = outboxSize();
         inbound.process(new InboundMessage(waId, waId, "Tracker", "where is my order", null, "t2", Map.of()));
 
-        assertThat(lastText()).contains("Out for delivery to 12 Great East Road");
+        assertThat(replySince(mark)).contains("Out for delivery to 12 Great East Road");
     }
 
     @Test
     void aLeadWithNoOrderIsPointedAtTheLensPageInsteadOfAnEmptyAnswer() {
         String waId = someNumber();
         inbound.process(new InboundMessage(waId, waId, "Browser", "hi", null, "n1", Map.of()));
+        int mark = outboxSize();
         inbound.process(new InboundMessage(waId, waId, "Browser", "track my order", null, "n2", Map.of()));
 
-        assertThat(lastText()).contains("can't find an order").contains("/lens");
+        assertThat(replySince(mark)).contains("can't find an order").contains("/lens");
     }
 
     @Test
@@ -81,8 +92,9 @@ class TrackMyOrderTest {
         q.setWalkIn(true);
         inquiries.save(q);
 
+        int mark = outboxSize();
         inbound.process(new InboundMessage(waId, waId, "Counter", "track my order", null, "w2", Map.of()));
 
-        assertThat(lastText()).contains("can't find an order");
+        assertThat(replySince(mark)).contains("can't find an order");
     }
 }
