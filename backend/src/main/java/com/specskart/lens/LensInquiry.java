@@ -76,6 +76,9 @@ public class LensInquiry extends BaseEntity {
     private String paymentRef;
     private Instant paidAt;
 
+    /** When the post-purchase thank-you went out. Once-only marker, like orders.followedUpAt. */
+    private Instant postPurchaseAt;
+
     public boolean isPaid() {
         return paidAt != null || "SOLD".equals(status);
     }

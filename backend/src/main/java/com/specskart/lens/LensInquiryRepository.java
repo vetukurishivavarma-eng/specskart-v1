@@ -28,4 +28,8 @@ public interface LensInquiryRepository extends JpaRepository<LensInquiry, UUID> 
     /** The lead's latest web order, for the chatbot's "track my order". Walk-ins are handed
      *  over at the counter, so there is nothing to track. */
     Optional<LensInquiry> findTop1ByLeadIdAndWalkInFalseOrderByCreatedAtDesc(UUID leadId);
+
+    /** Sold a few days ago, lead known, never thanked — the post-purchase job's candidate pool. */
+    List<LensInquiry> findTop50ByStatusAndPostPurchaseAtIsNullAndLeadIdIsNotNullAndUpdatedAtBefore(
+            String status, Instant before);
 }

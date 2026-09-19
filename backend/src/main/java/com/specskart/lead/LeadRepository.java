@@ -16,17 +16,26 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
     Optional<Lead> findByWhatsappWaId(String waId);
 
     /**
-     * Customers due an eye-test recall: their last delivered order is older than the cutoff, they
-     * haven't opted out, and we either never nudged them or last did so before the cutoff too.
-     * Ordered oldest-first so a backlog drains in the order people actually bought.
+     * Customers due an eye-test recall: they bought something older than the cutoff, they haven't
+     * opted out, and we either never nudged them or last did so before the cutoff too. Ordered
+     * oldest-first so a backlog drains in the order people actually bought.
+     *
+     * <p>A "purchase" is a delivered frames order <em>or</em> a sold lens inquiry. Lens buyers are
+     * the ones this matters most for — a prescription is exactly the thing that goes stale in a
+     * year — and they are the whole of the funnel the client currently has switched on.
      */
     @Query("""
             select distinct l from Lead l
-            where exists (
+            where (exists (
                     select 1 from com.specskart.order.Order o
                     where o.leadId = l.id
                       and o.status = com.specskart.order.OrderStatus.DELIVERED
                       and o.createdAt <= :cutoff)
+                or exists (
+                    select 1 from com.specskart.lens.LensInquiry q
+                    where q.leadId = l.id
+                      and q.status = 'SOLD'
+                      and q.createdAt <= :cutoff))
               and l.archivedAt is null
               and (l.followUpState is null or l.followUpState <> com.specskart.lead.FollowUpState.OPTED_OUT)
               and (l.eyeTestRecalledAt is null or l.eyeTestRecalledAt <= :cutoff)

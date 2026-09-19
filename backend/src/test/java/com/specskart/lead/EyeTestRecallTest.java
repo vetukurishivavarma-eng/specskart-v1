@@ -38,6 +38,22 @@ class EyeTestRecallTest {
 
     @Test
     @Transactional
+    void aYearOldLensSaleAlsoMakesItsCustomerDue() {
+        // The lens funnel is the one the client has switched on, and a prescription is exactly
+        // what goes stale in a year — the query used to see delivered frame orders only.
+        Lead lead = customerWithSoldLens(400);
+        assertThat(dueIds()).contains(lead.getId());
+    }
+
+    @Test
+    @Transactional
+    void arecentLensBuyerIsNotDueYet() {
+        Lead lead = customerWithSoldLens(30);
+        assertThat(dueIds()).doesNotContain(lead.getId());
+    }
+
+    @Test
+    @Transactional
     void arecentBuyerIsNotDueYet() {
         Lead lead = customerWithDeliveredOrder(30);
         assertThat(dueIds()).doesNotContain(lead.getId());
@@ -75,6 +91,29 @@ class EyeTestRecallTest {
     private List<UUID> dueIds() {
         em.flush();
         return leads.findDueForEyeTestRecall(CUTOFF, PageRequest.of(0, 100)).stream().map(Lead::getId).toList();
+    }
+
+    private Lead customerWithSoldLens(int daysAgo) {
+        Lead lead = new Lead();
+        lead.setWhatsappWaId("2609" + (long) (Math.random() * 100_000_000L));
+        lead.setName("Chanda Phiri");
+        lead.setFirstContactAt(Instant.now().minus(daysAgo + 1, ChronoUnit.DAYS));
+        leads.saveAndFlush(lead);
+
+        com.specskart.lens.LensInquiry q = new com.specskart.lens.LensInquiry();
+        q.setLeadId(lead.getId());
+        q.setVerifyTokenHash("recall-" + System.nanoTime());
+        q.setPhoneRaw(lead.getWhatsappWaId());
+        q.setWaId(lead.getWhatsappWaId());
+        q.setStatus("SOLD");
+        em.persist(q);
+        em.flush();
+        em.createQuery("update LensInquiry q set q.createdAt = :when where q.id = :id")
+                .setParameter("when", Instant.now().minus(daysAgo, ChronoUnit.DAYS))
+                .setParameter("id", q.getId())
+                .executeUpdate();
+        em.clear();
+        return leads.findById(lead.getId()).orElseThrow();
     }
 
     private Lead customerWithDeliveredOrder(int daysAgo) {
