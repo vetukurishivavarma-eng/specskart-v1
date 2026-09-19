@@ -10,6 +10,7 @@ import com.specskart.whatsapp.StaffAlerts;
 import com.specskart.shared.ApiException;
 import com.specskart.shared.PhoneNumbers;
 import com.specskart.shared.TokenGenerator;
+import com.specskart.membership.MembershipService;
 import com.specskart.shared.TrackUpdate;
 import com.specskart.payment.PaymentProvider;
 import com.specskart.whatsapp.WhatsAppProvider;
@@ -51,11 +52,13 @@ public class LensInquiryService {
     private final StaffAlerts staffAlerts;
     private final SignedLinks links;
     private final PaymentProvider payments;
+    private final MembershipService memberships;
 
     public LensInquiryService(LensInquiryRepository inquiries, LeadService leadService,
                               WhatsAppProvider whatsapp, TokenGenerator tokens, AppProperties props,
                               LensPricing pricing, StaffAlerts staffAlerts, SignedLinks links,
-                              PaymentProvider payments) {
+                              PaymentProvider payments, MembershipService memberships) {
+        this.memberships = memberships;
         this.payments = payments;
         this.staffAlerts = staffAlerts;
         this.links = links;
@@ -407,7 +410,8 @@ public class LensInquiryService {
         String pdfUrl = base == null ? null : base + ".pdf" + links.query("lens/" + q.getId(), StaffDocController.TTL);
         String price = q.getPriceMinor() == null ? "—" : OrderNotificationService.money(q.getPriceMinor(), q.getCurrency());
         String who = q.getCustomerName() == null || q.getCustomerName().isBlank() ? "+" + q.getWaId() : q.getCustomerName();
-        List<String> failures = staffAlerts.send(staffLines(q), pdfUrl, ref(q) + ".pdf",
+        List<String> failures = staffAlerts.send(staffLines(q, memberships.discountPercentFor(q.getLeadId())),
+                pdfUrl, ref(q) + ".pdf",
                 List.of(ref(q), price, who, pdfUrl == null ? props.frontendBaseUrl() : pdfUrl), null);
         // No order timeline to hang these on, as there is for web orders -- at least say it out loud.
         for (String failure : failures) log.warn("lens {} staff alert to {}", ref(q), failure);
@@ -415,6 +419,15 @@ public class LensInquiryService {
 
     /** Everything the lens lab needs — drawn into the staff PDF and used as the WhatsApp caption. */
     public static List<String> staffLines(LensInquiry q) {
+        return staffLines(q, 0);
+    }
+
+    /**
+     * @param memberPercent the Specskart Care discount already baked into the quoted price, or 0.
+     *                      Spelled out on the slip because otherwise the counter sees a price that
+     *                      looks wrong and "corrects" it.
+     */
+    public static List<String> staffLines(LensInquiry q, int memberPercent) {
         List<String> out = new java.util.ArrayList<>();
         out.add("# 👓 New lens order " + ref(q));
         out.add("Placed: " + OrderNotificationService.STAFF_TIME.format(q.getCreatedAt()));
@@ -450,6 +463,10 @@ public class LensInquiryService {
         out.add("");
         out.add("Quoted price: " + (q.getPriceMinor() == null ? "—"
                 : OrderNotificationService.money(q.getPriceMinor(), q.getCurrency())));
+        if (memberPercent > 0) {
+            out.add("⭐ " + com.specskart.membership.MembershipService.NAME + " member — "
+                    + memberPercent + "% already taken off. This price is correct.");
+        }
         return out;
     }
 

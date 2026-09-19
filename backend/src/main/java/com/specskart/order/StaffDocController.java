@@ -30,10 +30,12 @@ public class StaffDocController {
     private final LensInquiryRepository lensInquiries;
     private final OrderNotificationService notifications;
     private final SignedLinks links;
+    private final com.specskart.membership.MembershipService memberships;
 
     public StaffDocController(OrderRepository orders, PrescriptionFileRepository prescriptionFiles,
                               LensInquiryRepository lensInquiries, OrderNotificationService notifications,
-                              SignedLinks links) {
+                              SignedLinks links, com.specskart.membership.MembershipService memberships) {
+        this.memberships = memberships;
         this.orders = orders;
         this.prescriptionFiles = prescriptionFiles;
         this.lensInquiries = lensInquiries;
@@ -65,7 +67,8 @@ public class StaffDocController {
         check("lens/" + id, exp, sig);
         LensInquiry q = lensInquiries.findById(id)
                 .orElseThrow(() -> ApiException.notFound("INQUIRY_NOT_FOUND", "No such lens order."));
-        return pdf(SimplePdf.render(LensInquiryService.staffLines(q)), LensInquiryService.ref(q) + ".pdf");
+        return pdf(SimplePdf.render(LensInquiryService.staffLines(q, memberships.discountPercentFor(q.getLeadId()))),
+                LensInquiryService.ref(q) + ".pdf");
     }
 
     private Order order(String orderNo) {

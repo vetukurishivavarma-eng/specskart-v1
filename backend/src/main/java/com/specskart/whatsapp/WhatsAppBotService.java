@@ -7,6 +7,8 @@ import com.specskart.catalog.Product;
 import com.specskart.config.AppProperties;
 import com.specskart.framefinder.FrameFinderService;
 import com.specskart.lens.LensInquiryService;
+import com.specskart.membership.Membership;
+import com.specskart.membership.MembershipService;
 import com.specskart.order.CartService;
 import com.specskart.order.OrderNotificationService;
 import com.specskart.order.OrderQueryService;
@@ -48,6 +50,7 @@ public class WhatsAppBotService {
     static final String BTN_EXPLORE_LENS = "EXPLORE_LENS";
     static final String BTN_TRACK_ORDER = "TRACK_ORDER";
     static final String BTN_MENU = "MENU";
+    static final String BTN_CARE = "CARE";
     /** A list row that buys one specific product: {@code BUY:<slug>}. */
     static final String ROW_BUY_PREFIX = "BUY:";
     static final String BTN_BUDGET_LOW = "BUDGET_LOW";
@@ -69,15 +72,17 @@ public class WhatsAppBotService {
     private final ReviewCaptureService reviewCapture;
     private final OrderQueryService orderQuery;
     private final LensInquiryService lensInquiries;
+    private final MembershipService memberships;
 
     public WhatsAppBotService(WhatsAppProvider provider, WhatsAppMessageRepository messages,
                               FrameFinderService frameFinder, LeadService leadService,
                               AnalyticsService analytics, AppProperties props,
                               CatalogService catalog, CartService carts, LeadFollowUpService followUp,
                               ReviewCaptureService reviewCapture, OrderQueryService orderQuery,
-                              LensInquiryService lensInquiries) {
+                              LensInquiryService lensInquiries, MembershipService memberships) {
         this.orderQuery = orderQuery;
         this.lensInquiries = lensInquiries;
+        this.memberships = memberships;
         this.provider = provider;
         this.messages = messages;
         this.frameFinder = frameFinder;
@@ -124,6 +129,7 @@ public class WhatsAppBotService {
             case VISIT_WEBSITE -> sendText(lead, "Here's our website: " + props.frontendBaseUrl());
             case EXPLORE_LENS -> sendLensLink(lead);
             case TRACK_ORDER -> sendOrderStatus(lead);
+            case CARE -> sendCare(lead);
             case HELP_CHOOSE -> sendBudgetPrompt(lead);
             case BUDGET_LOW -> sendBudgetPicks(lead, "low");
             case BUDGET_MED -> sendBudgetPicks(lead, "mid");
@@ -167,15 +173,53 @@ public class WhatsAppBotService {
      * here for the same reason it is off the welcome message (see sendWelcome).
      */
     private void sendMenu(Lead lead) {
-        provider.sendList(waId(lead), "What can I help you with?", "Choose an option",
-                List.of(new WhatsAppProvider.Row(BTN_EXPLORE_LENS, "Lenses",
-                                "Clear or photochromatic, with or without blue-block"),
-                        new WhatsAppProvider.Row(BTN_TRACK_ORDER, "Track my order",
-                                "See where your order has got to"),
-                        new WhatsAppProvider.Row(BTN_WEBSITE, "Our website",
-                                "Browse " + props.storeName() + " online")));
+        List<WhatsAppProvider.Row> rows = new ArrayList<>(List.of(
+                new WhatsAppProvider.Row(BTN_EXPLORE_LENS, "Lenses",
+                        "Clear or photochromatic, with or without blue-block"),
+                new WhatsAppProvider.Row(BTN_TRACK_ORDER, "Track my order",
+                        "See where your order has got to")));
+        // Compile-time gate: with the feature off there is no row, so a client who never bought
+        // into memberships ships a build where customers are never offered one.
+        if (MembershipService.ENABLED) {
+            rows.add(new WhatsAppProvider.Row(BTN_CARE, MembershipService.NAME,
+                    MembershipService.DISCOUNT_PERCENT + "% off every pair, all year"));
+        }
+        rows.add(new WhatsAppProvider.Row(BTN_WEBSITE, "Our website",
+                "Browse " + props.storeName() + " online"));
+        provider.sendList(waId(lead), "What can I help you with?", "Choose an option", rows);
         logOutbound(lead.getId(), "interactive", "menu");
         analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
+    }
+
+    /**
+     * Specskart Care: tell an existing member what they have, or sell it. The checkout link is
+     * the ordinary Flutterwave hop the lens funnel already uses, so there is no new payment path.
+     */
+    private void sendCare(Lead lead) {
+        if (!MembershipService.ENABLED) { sendMenu(lead); return; }
+
+        Membership mine = memberships.activeFor(lead.getId());
+        if (mine != null) {
+            sendText(lead, "You're a " + MembershipService.NAME + " member ✅\n\n"
+                    + mine.getDiscountPercent() + "% comes off every lens order automatically — "
+                    + "nothing to enter.\n\nValid until "
+                    + OrderNotificationService.STAFF_TIME.format(mine.getExpiresAt()) + ".");
+            return;
+        }
+        try {
+            var purchase = memberships.startPurchase(lead.getId());
+            sendText(lead, "✨ *" + MembershipService.NAME + "*\n\n"
+                    + OrderNotificationService.money(purchase.priceMinor(), purchase.currency())
+                    + " for a year, and every lens order is "
+                    + MembershipService.DISCOUNT_PERCENT + "% cheaper — it pays for itself on your "
+                    + "second pair.\n\n• " + MembershipService.DISCOUNT_PERCENT + "% off all lenses, "
+                    + "applied automatically\n• Free adjustments whenever you need them\n"
+                    + "• A yearly eye-test reminder so your prescription never goes stale\n\n"
+                    + "Join here:\n" + purchase.checkoutUrl());
+        } catch (ApiException e) {
+            sendText(lead, "I couldn't start that just now — please try again in a moment.");
+            log.warn("membership purchase failed for lead {}: {}", lead.getId(), e.getMessage());
+        }
     }
 
     /**
@@ -343,6 +387,7 @@ public class WhatsAppBotService {
                     case BTN_EXPLORE_LENS -> BotIntent.EXPLORE_LENS;
                     case BTN_TRACK_ORDER -> BotIntent.TRACK_ORDER;
                     case BTN_MENU -> BotIntent.MENU;
+                    case BTN_CARE -> BotIntent.CARE;
                     case BTN_BUDGET_LOW -> BotIntent.BUDGET_LOW;
                     case BTN_BUDGET_MED -> BotIntent.BUDGET_MED;
                     case BTN_BUDGET_HIGH -> BotIntent.BUDGET_HIGH;
@@ -354,6 +399,7 @@ public class WhatsAppBotService {
         if (t.isBlank()) return BotIntent.GREETING;
         if (t.matches(".*(hi|hello|hey|start|namaste).*") && t.length() < 15) return BotIntent.GREETING;
         if (t.contains("menu") || t.contains("options")) return BotIntent.MENU;
+        if (MembershipService.ENABLED && (t.contains("care") || t.contains("member"))) return BotIntent.CARE;
         // Before the lens check on purpose — "where is my lens order" is a tracking question.
         if (t.contains("track") || t.contains("where") || t.contains("my order")
                 || t.contains("order status")) return BotIntent.TRACK_ORDER;

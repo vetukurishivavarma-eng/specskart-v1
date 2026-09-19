@@ -9,5 +9,6 @@ public enum BotIntent {
     EXPLORE_LENS,
     TRACK_ORDER,
     MENU,
+    CARE,
     GREETING, UNKNOWN
 }
