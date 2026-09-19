@@ -9,6 +9,7 @@ import com.specskart.lead.FollowUpState;
 import com.specskart.lead.Lead;
 import com.specskart.lead.LeadRepository;
 import com.specskart.lead.LeadService;
+import com.specskart.order.ReviewCaptureService;
 import com.specskart.whatsapp.WhatsAppProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,9 +26,9 @@ import java.time.temporal.ChronoUnit;
  * ({@link com.specskart.order.PostPurchaseJob}); the lens funnel — the one the client actually
  * has switched on — ended at "delivered" and said nothing more until the yearly recall.
  *
- * <p>Deliberately not a star-rating ask: {@code Review} rows hang off a catalogue product id and
- * a lens sale has none, so a "1-5" reply would have nowhere to land. Asking the customer to reply
- * about the fit instead keeps the thread open, which is what re-opens the 24h window anyway.
+ * <p>It also asks for a star rating. V43 gave {@code Review} a lensInquiryId so a lens sale has
+ * somewhere to record one; a bare "1"-"5" reply is picked up by
+ * {@link com.specskart.order.ReviewCaptureService} exactly as it is for a frame order.
  */
 @Component
 class LensPostPurchaseJob {
@@ -44,10 +45,12 @@ class LensPostPurchaseJob {
     private final WhatsAppProvider whatsapp;
     private final AnalyticsService analytics;
     private final AppProperties props;
+    private final ReviewCaptureService reviewCapture;
 
     LensPostPurchaseJob(LensInquiryRepository inquiries, LeadRepository leads, LeadService leadService,
                         PromoIssuer promoIssuer, WhatsAppProvider whatsapp, AnalyticsService analytics,
-                        AppProperties props) {
+                        AppProperties props, ReviewCaptureService reviewCapture) {
+        this.reviewCapture = reviewCapture;
         this.inquiries = inquiries;
         this.leads = leads;
         this.leadService = leadService;
@@ -89,6 +92,8 @@ class LensPostPurchaseJob {
 
         PromoCode promo = promoIssuer.forRecall(lead.getId());
         String referral = leadService.ensureReferralCode(lead.getId());
+        // Armed before the send: a "1"-"5" reply only counts as a rating once we've asked.
+        reviewCapture.markPendingLens(lead.getId(), q.getId());
         whatsapp.sendText(waId, message(firstName(lead, q), promo, referral));
         analytics.record(LeadEventType.WHATSAPP_FOLLOW_UP_SENT, lead.getId(), null);
         return true;
@@ -96,8 +101,9 @@ class LensPostPurchaseJob {
 
     private String message(String hi, PromoCode promo, String referral) {
         return "Hi " + hi + " 👋 How are the new lenses treating you?"
-                + "\n\nIf anything feels off — blurry edges, a frame that slips, headaches — reply here"
+                + "\n\nIf anything feels off — blurry edges, headaches, a frame that slips — reply here"
                 + " and we'll sort it. Adjustments are free."
+                + "\n\n⭐ How would you rate them? Reply with a number from 1 to 5."
                 + "\n\n🎁 " + promo.getDiscountValue() + "% off your next pair with code *"
                 + promo.getCode() + "*"
                 + "\n👥 Share code *" + referral + "* — your friend gets a discount and so do you."

@@ -11,12 +11,14 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/** Captures a bare "1"-"5" WhatsApp reply to the post-purchase rating ask. The pending
- *  order id lives on Lead.providerMetadata — no separate session store needed. */
+/** Captures a bare "1"-"5" WhatsApp reply to the post-purchase rating ask, for a frame order
+ *  or a lens sale. What is awaiting a rating lives on Lead.providerMetadata — no separate
+ *  session store needed. */
 @Service
 public class ReviewCaptureService {
 
     private static final String KEY = "pendingReviewOrderId";
+    private static final String KEY_LENS = "pendingReviewLensId";
 
     private final OrderRepository orders;
     private final OrderItemRepository items;
@@ -32,7 +34,20 @@ public class ReviewCaptureService {
     }
 
     public UUID pendingOrderId(Lead lead) {
-        Object raw = lead.getProviderMetadata().get(KEY);
+        return uuid(lead, KEY);
+    }
+
+    public UUID pendingLensInquiryId(Lead lead) {
+        return uuid(lead, KEY_LENS);
+    }
+
+    /** Is a bare "1"-"5" from this lead a star rating right now, or just a menu shortcut? */
+    public boolean awaitingRating(Lead lead) {
+        return pendingOrderId(lead) != null || pendingLensInquiryId(lead) != null;
+    }
+
+    private static UUID uuid(Lead lead, String key) {
+        Object raw = lead.getProviderMetadata().get(key);
         try {
             return raw == null ? null : UUID.fromString(String.valueOf(raw));
         } catch (IllegalArgumentException e) {
@@ -42,9 +57,18 @@ public class ReviewCaptureService {
 
     @Transactional
     public void markPending(UUID leadId, UUID orderId) {
+        put(leadId, KEY, orderId);
+    }
+
+    @Transactional
+    public void markPendingLens(UUID leadId, UUID lensInquiryId) {
+        put(leadId, KEY_LENS, lensInquiryId);
+    }
+
+    private void put(UUID leadId, String key, UUID value) {
         Lead lead = leads.findById(leadId).orElseThrow();
         Map<String, Object> meta = new HashMap<>(lead.getProviderMetadata());
-        meta.put(KEY, orderId.toString());
+        meta.put(key, value.toString());
         lead.setProviderMetadata(meta);
         leads.save(lead);
     }
@@ -54,10 +78,19 @@ public class ReviewCaptureService {
     @Transactional
     public int recordAndClear(UUID leadId, int rating) {
         Lead lead = leads.findById(leadId).orElseThrow();
+        int r = Math.max(1, Math.min(5, rating));
         UUID orderId = pendingOrderId(lead);
+        UUID lensId = pendingLensInquiryId(lead);
         int recorded = 0;
+        if (lensId != null && !reviews.existsByLensInquiryId(lensId)) {
+            Review review = new Review();
+            review.setLensInquiryId(lensId);
+            review.setLeadId(leadId);
+            review.setRating(r);
+            reviews.save(review);
+            recorded++;
+        }
         if (orderId != null && orders.existsById(orderId)) {
-            int r = Math.max(1, Math.min(5, rating));
             for (OrderItem it : items.findByOrderId(orderId)) {
                 if (it.getProductId() == null || reviews.existsByOrderIdAndProductId(orderId, it.getProductId())) continue;
                 Review review = new Review();
@@ -71,6 +104,7 @@ public class ReviewCaptureService {
         }
         Map<String, Object> meta = new HashMap<>(lead.getProviderMetadata());
         meta.remove(KEY);
+        meta.remove(KEY_LENS);
         lead.setProviderMetadata(meta);
         leads.save(lead);
         return recorded;

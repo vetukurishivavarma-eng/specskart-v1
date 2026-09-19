@@ -98,7 +98,7 @@ public class WhatsAppBotService {
         // A bare "1".."5" only means a star rating when a post-purchase ask is pending —
         // otherwise it falls through to the ordinary welcome-menu shortcuts below.
         if (buttonId == null && text != null && text.trim().matches("[1-5]")
-                && reviewCapture.pendingOrderId(lead) != null) {
+                && reviewCapture.awaitingRating(lead)) {
             handleReview(lead, Integer.parseInt(text.trim()));
             return;
         }
@@ -243,7 +243,7 @@ public class WhatsAppBotService {
         int recorded = reviewCapture.recordAndClear(lead.getId(), rating);
         String stars = "⭐".repeat(rating);
         String thanks = recorded > 0
-                ? "Thanks for the " + stars + " rating! It helps other shoppers pick the right frame."
+                ? "Thanks for the " + stars + " rating! It helps other shoppers choose with confidence."
                 : "Thanks for the rating!";
         sendText(lead, thanks);
     }

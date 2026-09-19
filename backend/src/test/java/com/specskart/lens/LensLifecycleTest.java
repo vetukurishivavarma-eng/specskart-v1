@@ -1,7 +1,11 @@
 package com.specskart.lens;
 
+import com.specskart.catalog.Review;
+import com.specskart.catalog.ReviewRepository;
 import com.specskart.lead.Lead;
 import com.specskart.lead.LeadRepository;
+import com.specskart.whatsapp.InboundMessage;
+import com.specskart.whatsapp.WhatsAppInboundService;
 import com.specskart.whatsapp.MockWhatsAppProvider;
 import com.specskart.whatsapp.WhatsAppProvider;
 import jakarta.persistence.EntityManager;
@@ -30,6 +34,8 @@ class LensLifecycleTest {
     @Autowired LensInquiryRepository inquiries;
     @Autowired LeadRepository leads;
     @Autowired WhatsAppProvider provider;
+    @Autowired ReviewRepository reviews;
+    @Autowired WhatsAppInboundService inbound;
     @Autowired EntityManager em;
 
     private int mark() {
@@ -128,6 +134,42 @@ class LensLifecycleTest {
         int second = mark();
         postPurchaseJob.run();
         assertThat(since(second).stream().filter(s -> waId.equals(s.toWaId()))).isEmpty();
+    }
+
+    @Test
+    @Transactional
+    void aStarRatingRepliedToThatAskIsRecordedAgainstTheLensSale() {
+        String waId = someNumber();
+        LensInquiry q = inquiry(waId, lead(waId).getId(), "SOLD");
+        age(q, 5);
+        postPurchaseJob.run();
+
+        int mark = mark();
+        inbound.process(new InboundMessage(waId, waId, "Mercy", "5", null, "rate:" + waId, java.util.Map.of()));
+
+        Review saved = reviews.findAll().stream()
+                .filter(r -> q.getId().equals(r.getLensInquiryId())).findFirst().orElseThrow();
+        assertThat(saved.getRating()).isEqualTo(5);
+        assertThat(saved.getProductId()).isNull();
+        assertThat(saved.getOrderId()).isNull();
+        assertThat(since(mark)).anyMatch(s -> s.text() != null && s.text().contains("Thanks for the"));
+
+        // A lens rating must never land in a product's average.
+        assertThat(reviews.aggregateAll()).allMatch(a -> a.getProductId() != null);
+    }
+
+    @Test
+    @Transactional
+    void abareNumberIsNotARatingWhenNothingWasAsked() {
+        String waId = someNumber();
+        lead(waId);
+
+        int mark = mark();
+        inbound.process(new InboundMessage(waId, waId, "Mercy", "5", null, "bare:" + waId, java.util.Map.of()));
+
+        assertThat(reviews.findAll()).noneMatch(r -> r.getRating() == 5 && r.getLensInquiryId() != null
+                && r.getLeadId().equals(leads.findByWhatsappWaId(waId).orElseThrow().getId()));
+        assertThat(since(mark)).noneMatch(s -> s.text() != null && s.text().contains("Thanks for the"));
     }
 
     @Test
