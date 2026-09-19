@@ -10,6 +10,7 @@ import com.specskart.whatsapp.StaffAlerts;
 import com.specskart.shared.ApiException;
 import com.specskart.shared.PhoneNumbers;
 import com.specskart.shared.TokenGenerator;
+import com.specskart.shared.TrackUpdate;
 import com.specskart.payment.PaymentProvider;
 import com.specskart.whatsapp.WhatsAppProvider;
 import org.slf4j.Logger;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -324,6 +326,30 @@ public class LensInquiryService {
                     ? "your lenses are out for delivery"
                     : "your lenses are out for delivery to " + q.getDeliveryAddress();
             default -> "there's an update on your lens order";
+        };
+    }
+
+    /**
+     * The lead's most recent web lens order, phrased for the chatbot's "track my order" reply.
+     * Empty until the order actually exists — a half-finished form has no fulfilment stage.
+     */
+    @Transactional(readOnly = true)
+    public Optional<TrackUpdate> latestForLead(UUID leadId) {
+        return inquiries.findTop1ByLeadIdAndWalkInFalseOrderByCreatedAtDesc(leadId)
+                .filter(q -> q.getFulfilment() != null)
+                .map(q -> new TrackUpdate(q.getCreatedAt(), "👓 Your lens order\n" + trackLine(q)));
+    }
+
+    /** Where the order is right now, in the customer's words. */
+    private static String trackLine(LensInquiry q) {
+        return switch (q.getFulfilment()) {
+            case "ORDERED" -> "We have your prescription and your lenses are being made.";
+            case "PACKED" -> "Packed and ready to go.";
+            case "OUT_FOR_DELIVERY" -> blank(q.getDeliveryAddress())
+                    ? "Out for delivery — on its way to you."
+                    : "Out for delivery to " + q.getDeliveryAddress() + ".";
+            case "DELIVERED" -> "Delivered 🎉 Anything not right with them? Just reply here.";
+            default -> "We're on it.";
         };
     }
 

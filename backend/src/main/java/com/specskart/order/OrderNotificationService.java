@@ -196,7 +196,7 @@ public class OrderNotificationService {
     }
 
     /** Short, single-line status headline — fills {{2}} of the order-update template. Null = no customer message. */
-    static String statusLine(OrderStatus status) {
+    public static String statusLine(OrderStatus status) {
         return switch (status) {
             case CONFIRMED -> "Order confirmed — pay cash when it arrives";
             case PAID -> "Payment received — we're preparing your frames";

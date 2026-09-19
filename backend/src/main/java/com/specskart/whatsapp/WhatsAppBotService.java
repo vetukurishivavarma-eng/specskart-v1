@@ -6,9 +6,12 @@ import com.specskart.catalog.CatalogService;
 import com.specskart.catalog.Product;
 import com.specskart.config.AppProperties;
 import com.specskart.framefinder.FrameFinderService;
+import com.specskart.lens.LensInquiryService;
 import com.specskart.order.CartService;
 import com.specskart.order.OrderNotificationService;
+import com.specskart.order.OrderQueryService;
 import com.specskart.order.ReviewCaptureService;
+import com.specskart.shared.TrackUpdate;
 import com.specskart.lead.Lead;
 import com.specskart.lead.LeadFollowUpService;
 import com.specskart.lead.LeadService;
@@ -19,9 +22,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 /**
  * Deterministic first-line chatbot. No LLM. Maps button ids / keywords to a fixed set of intents
@@ -39,6 +46,7 @@ public class WhatsAppBotService {
     static final String BTN_RESULTS_NOT_NOW = "RESULTS_NOT_NOW";
     static final String BTN_HELP_CHOOSE = "HELP_CHOOSE";
     static final String BTN_EXPLORE_LENS = "EXPLORE_LENS";
+    static final String BTN_TRACK_ORDER = "TRACK_ORDER";
     static final String BTN_BUDGET_LOW = "BUDGET_LOW";
     static final String BTN_BUDGET_MED = "BUDGET_MED";
     static final String BTN_BUDGET_HIGH = "BUDGET_HIGH";
@@ -56,12 +64,17 @@ public class WhatsAppBotService {
     private final CartService carts;
     private final LeadFollowUpService followUp;
     private final ReviewCaptureService reviewCapture;
+    private final OrderQueryService orderQuery;
+    private final LensInquiryService lensInquiries;
 
     public WhatsAppBotService(WhatsAppProvider provider, WhatsAppMessageRepository messages,
                               FrameFinderService frameFinder, LeadService leadService,
                               AnalyticsService analytics, AppProperties props,
                               CatalogService catalog, CartService carts, LeadFollowUpService followUp,
-                              ReviewCaptureService reviewCapture) {
+                              ReviewCaptureService reviewCapture, OrderQueryService orderQuery,
+                              LensInquiryService lensInquiries) {
+        this.orderQuery = orderQuery;
+        this.lensInquiries = lensInquiries;
         this.provider = provider;
         this.messages = messages;
         this.frameFinder = frameFinder;
@@ -101,6 +114,7 @@ public class WhatsAppBotService {
             case EXPLORE_FRAMES -> sendShop(lead, "Our full collection is here — every style, buy online:\n");
             case VISIT_WEBSITE -> sendText(lead, "Here's our website: " + props.frontendBaseUrl());
             case EXPLORE_LENS -> sendLensLink(lead);
+            case TRACK_ORDER -> sendOrderStatus(lead);
             case HELP_CHOOSE -> sendBudgetPrompt(lead);
             case BUDGET_LOW -> sendBudgetPicks(lead, "low");
             case BUDGET_MED -> sendBudgetPicks(lead, "mid");
@@ -123,11 +137,38 @@ public class WhatsAppBotService {
     // so re-enabling this is a one-line change, not a rebuild.
     public void sendWelcome(Lead lead) {
         String name = lead.getName() != null ? " " + lead.getName().split(" ")[0] : "";
+        List<WhatsAppProvider.Button> buttons = new ArrayList<>();
+        buttons.add(new WhatsAppProvider.Button(BTN_EXPLORE_LENS, "Explore Lens 🔍"));
+        // Only worth a button to someone who has actually ordered — a fresh lead has nothing to track.
+        if (latestOrderUpdate(lead).isPresent()) {
+            buttons.add(new WhatsAppProvider.Button(BTN_TRACK_ORDER, "Track my order 📦"));
+        }
         provider.sendButtons(waId(lead),
-                "Hi" + name + " 👋\nWelcome to " + props.storeName() + ".",
-                List.of(new WhatsAppProvider.Button(BTN_EXPLORE_LENS, "Explore Lens 🔍")));
+                "Hi" + name + " 👋\nWelcome to " + props.storeName() + ".", buttons);
         logOutbound(lead.getId(), "interactive", "welcome");
         analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
+    }
+
+    /**
+     * "Where's my order?" — the highest-frequency post-purchase question, and until now it just
+     * replayed the welcome menu. Answers from whichever is newer: a frames order or a lens order.
+     */
+    private void sendOrderStatus(Lead lead) {
+        Optional<TrackUpdate> update = latestOrderUpdate(lead);
+        if (update.isEmpty()) {
+            sendText(lead, "I can't find an order under this number yet. "
+                    + "Configure your lenses here and I'll keep you posted at every step:\n"
+                    + props.frontendBaseUrl() + "/lens");
+            return;
+        }
+        sendText(lead, update.get().message());
+    }
+
+    /** The lead's most recent order across both funnels. */
+    private Optional<TrackUpdate> latestOrderUpdate(Lead lead) {
+        return Stream.of(orderQuery.latestForLead(lead.getId()), lensInquiries.latestForLead(lead.getId()))
+                .flatMap(Optional::stream)
+                .max(Comparator.comparing(TrackUpdate::at));
     }
 
     private void sendLensLink(Lead lead) {
@@ -263,6 +304,7 @@ public class WhatsAppBotService {
                     case BTN_RESULTS_NOT_NOW -> BotIntent.RESULTS_NOT_NOW;
                     case BTN_HELP_CHOOSE -> BotIntent.HELP_CHOOSE;
                     case BTN_EXPLORE_LENS -> BotIntent.EXPLORE_LENS;
+                    case BTN_TRACK_ORDER -> BotIntent.TRACK_ORDER;
                     case BTN_BUDGET_LOW -> BotIntent.BUDGET_LOW;
                     case BTN_BUDGET_MED -> BotIntent.BUDGET_MED;
                     case BTN_BUDGET_HIGH -> BotIntent.BUDGET_HIGH;
@@ -273,6 +315,9 @@ public class WhatsAppBotService {
         String t = text == null ? "" : text.toLowerCase().trim();
         if (t.isBlank()) return BotIntent.GREETING;
         if (t.matches(".*(hi|hello|hey|start|namaste).*") && t.length() < 15) return BotIntent.GREETING;
+        // Before the lens check on purpose — "where is my lens order" is a tracking question.
+        if (t.contains("track") || t.contains("where") || t.contains("my order")
+                || t.contains("order status")) return BotIntent.TRACK_ORDER;
         if (t.contains("lens")) return BotIntent.EXPLORE_LENS;
         if (t.contains("help") || t.contains("choose") || t.contains("recommend") || t.contains("suggest")) return BotIntent.HELP_CHOOSE;
         if (t.contains("face") || t.contains("suit") || t.contains("frame finder") || t.equals("1")) return BotIntent.FIND_FRAMES;

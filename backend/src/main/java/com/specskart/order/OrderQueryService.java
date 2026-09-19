@@ -1,12 +1,15 @@
 package com.specskart.order;
 
+import com.specskart.config.AppProperties;
 import com.specskart.lead.Lead;
 import com.specskart.lead.LeadRepository;
 import com.specskart.shared.ApiException;
+import com.specskart.shared.TrackUpdate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -16,13 +19,31 @@ public class OrderQueryService {
     private final OrderItemRepository items;
     private final OrderEventRepository events;
     private final LeadRepository leads;
+    private final AppProperties props;
 
     public OrderQueryService(OrderRepository orders, OrderItemRepository items, OrderEventRepository events,
-                             LeadRepository leads) {
+                             LeadRepository leads, AppProperties props) {
         this.orders = orders;
         this.items = items;
         this.events = events;
         this.leads = leads;
+        this.props = props;
+    }
+
+    /**
+     * The lead's most recent frames order, phrased for the chatbot's "track my order" reply.
+     * Empty when they have never ordered.
+     */
+    @Transactional(readOnly = true)
+    public Optional<TrackUpdate> latestForLead(UUID leadId) {
+        return orders.findByLeadIdOrderByCreatedAtDesc(leadId).stream().findFirst().map(o -> {
+            String line = OrderNotificationService.statusLine(o.getStatus());
+            return new TrackUpdate(o.getCreatedAt(),
+                    "🛍️ Order *" + o.getOrderNo() + "*\n"
+                            + (line == null ? "We're on it" : line)
+                            + "\n\nFull details any time:\n"
+                            + props.frontendBaseUrl() + "/order/" + o.getOrderNo());
+        });
     }
 
     @Transactional(readOnly = true)

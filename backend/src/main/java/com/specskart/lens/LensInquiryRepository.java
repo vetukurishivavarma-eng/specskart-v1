@@ -24,4 +24,8 @@ public interface LensInquiryRepository extends JpaRepository<LensInquiry, UUID> 
     List<LensInquiry> findByFulfilmentNotOrderByCreatedAtAsc(String fulfilment);
 
     Optional<LensInquiry> findByClientReference(String clientReference);
+
+    /** The lead's latest web order, for the chatbot's "track my order". Walk-ins are handed
+     *  over at the counter, so there is nothing to track. */
+    Optional<LensInquiry> findTop1ByLeadIdAndWalkInFalseOrderByCreatedAtDesc(UUID leadId);
 }
