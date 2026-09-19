@@ -11,6 +11,14 @@ public interface WhatsAppProvider {
 
     void sendButtons(String toWaId, String bodyText, List<Button> buttons);
 
+    /**
+     * An interactive list — up to 10 tappable rows, each with an optional description.
+     * Buttons cap at 3 and carry no description, so anything longer than a yes/no belongs
+     * here. A tapped row comes back through the webhook as {@code interactive.list_reply},
+     * which the controller already maps onto the same buttonId as a button reply.
+     */
+    void sendList(String toWaId, String bodyText, String buttonLabel, List<Row> rows);
+
     /** An image message with an optional caption. Inside the 24h window only (like sendText). */
     void sendImage(String toWaId, String imageUrl, String caption);
 
@@ -38,4 +46,7 @@ public interface WhatsAppProvider {
                               String documentUrl, String filename, List<String> bodyParams);
 
     record Button(String id, String title) {}
+
+    /** One row of a list message. {@code description} may be null. */
+    record Row(String id, String title, String description) {}
 }

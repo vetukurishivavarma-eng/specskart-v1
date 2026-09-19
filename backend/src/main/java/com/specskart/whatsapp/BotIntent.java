@@ -8,5 +8,6 @@ public enum BotIntent {
     HELP_CHOOSE, BUDGET_LOW, BUDGET_MED, BUDGET_HIGH,
     EXPLORE_LENS,
     TRACK_ORDER,
+    MENU,
     GREETING, UNKNOWN
 }

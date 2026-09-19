@@ -90,6 +90,31 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
     }
 
     @Override
+    public void sendList(String toWaId, String bodyText, String buttonLabel, List<Row> rows) {
+        // Meta rejects the whole message on any overrun: 10 rows, 24-char titles, 72-char
+        // descriptions, 20-char button label. Truncate rather than lose the send.
+        var items = rows.stream().limit(10).map(r -> {
+            var row = new java.util.LinkedHashMap<String, Object>();
+            row.put("id", r.id());
+            row.put("title", trim(r.title(), 24));
+            if (r.description() != null && !r.description().isBlank()) {
+                row.put("description", trim(r.description(), 72));
+            }
+            return row;
+        }).toList();
+        post(Map.of(
+                "messaging_product", "whatsapp",
+                "to", toWaId,
+                "type", "interactive",
+                "interactive", Map.of(
+                        "type", "list",
+                        "body", Map.of("text", bodyText),
+                        "action", Map.of(
+                                "button", cap(buttonLabel),
+                                "sections", List.of(Map.of("rows", items))))));
+    }
+
+    @Override
     public void sendImage(String toWaId, String imageUrl, String caption) {
         var image = new java.util.LinkedHashMap<String, Object>();
         image.put("link", imageUrl);
@@ -174,7 +199,11 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
     }
 
     private static String cap(String s) {
-        return s.length() > 20 ? s.substring(0, 20) : s;
+        return trim(s, 20);
+    }
+
+    private static String trim(String s, int max) {
+        return s != null && s.length() > max ? s.substring(0, max) : s;
     }
 
     private void post(Map<String, Object> payload) {

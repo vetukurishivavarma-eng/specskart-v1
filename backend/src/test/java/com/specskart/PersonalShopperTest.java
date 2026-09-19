@@ -38,6 +38,16 @@ class PersonalShopperTest {
         return products.save(p);
     }
 
+    private int outboxSize() {
+        return ((MockWhatsAppProvider) provider).outbox().size();
+    }
+
+    /** The outbox is shared across the whole suite — only ever look at what this test sent. */
+    private java.util.List<MockWhatsAppProvider.Sent> sentSince(int mark) {
+        var outbox = ((MockWhatsAppProvider) provider).outbox();
+        return java.util.List.copyOf(outbox.subList(mark, outbox.size()));
+    }
+
     @Test
     void budgetQuestionThenBuyAddsToACartAndRepliesWithALink() {
         cheapFrame();
@@ -45,20 +55,26 @@ class PersonalShopperTest {
         // Message ids are deduped globally and the H2 db is shared across the suite, so derive
         // them from this run's waId — a literal "m1" collides with whatever else used one.
         String msg = "shopper:" + waId + ":";
+        int start = outboxSize();
         inbound.process(new InboundMessage(waId, waId, "Shopper", "help me choose", null, msg + "1", Map.of()));
         Lead lead = leads.findByWhatsappWaId(waId).orElseThrow();
 
-        var outbox = ((MockWhatsAppProvider) provider).outbox();
-        assertThat(outbox).anyMatch(s -> s.text() != null && s.text().contains("budget"));
+        assertThat(sentSince(start)).anyMatch(s -> s.text() != null && s.text().contains("budget"));
 
+        int afterBudget = outboxSize();
         inbound.process(new InboundMessage(waId, waId, "Shopper", null, "BUDGET_LOW", msg + "2", Map.of()));
         assertThat(leads.findById(lead.getId()).orElseThrow().getStyleBudget()).isEqualTo("low");
-        var picksMsg = ((MockWhatsAppProvider) provider).outbox().stream()
-                .filter(s -> s.text() != null && s.text().contains("BUY 1")).findFirst().orElseThrow();
-        assertThat(picksMsg.text()).contains("Budget Frame");
+        // The picks arrive as a tappable list, one row per product, priced in the description.
+        var picksMsg = sentSince(afterBudget).stream()
+                .filter(s -> s.buttons().stream().anyMatch(b -> b.id().startsWith("BUY:")))
+                .findFirst().orElseThrow();
+        assertThat(picksMsg.buttons()).anyMatch(b -> b.title().equals("Budget Frame"));
+        String rowId = picksMsg.buttons().stream()
+                .filter(b -> b.title().equals("Budget Frame")).findFirst().orElseThrow().id();
 
-        inbound.process(new InboundMessage(waId, waId, "Shopper", "BUY 1", null, msg + "3", Map.of()));
-        var confirm = ((MockWhatsAppProvider) provider).outbox().stream()
+        int afterPicks = outboxSize();
+        inbound.process(new InboundMessage(waId, waId, "Shopper", "Budget Frame", rowId, msg + "3", Map.of()));
+        var confirm = sentSince(afterPicks).stream()
                 .filter(s -> s.text() != null && s.text().contains("Added")).findFirst().orElseThrow();
         assertThat(confirm.text()).contains("Budget Frame").contains("/store?c=");
     }

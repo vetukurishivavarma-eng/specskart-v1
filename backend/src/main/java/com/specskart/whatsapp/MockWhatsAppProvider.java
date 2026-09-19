@@ -49,6 +49,14 @@ public class MockWhatsAppProvider implements WhatsAppProvider {
                 buttons.stream().map(Button::title).toList());
     }
 
+    /** Rows land in the outbox as {@code buttons} — same id + title a test wants to assert on. */
+    @Override
+    public synchronized void sendList(String toWaId, String bodyText, String buttonLabel, List<Row> rows) {
+        outbox.add(new Sent(toWaId, bodyText, rows.stream().map(r -> new Button(r.id(), r.title())).toList()));
+        log.info("[MOCK-WA] -> {} : {} list[{}]={}", toWaId, bodyText, buttonLabel,
+                rows.stream().map(Row::title).toList());
+    }
+
     @Override
     public synchronized void sendTemplate(String toWaId, String templateName, String languageCode, List<String> bodyParams) {
         outbox.add(new Sent(toWaId, null, List.of(), templateName, List.copyOf(bodyParams)));

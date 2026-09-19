@@ -47,6 +47,9 @@ public class WhatsAppBotService {
     static final String BTN_HELP_CHOOSE = "HELP_CHOOSE";
     static final String BTN_EXPLORE_LENS = "EXPLORE_LENS";
     static final String BTN_TRACK_ORDER = "TRACK_ORDER";
+    static final String BTN_MENU = "MENU";
+    /** A list row that buys one specific product: {@code BUY:<slug>}. */
+    static final String ROW_BUY_PREFIX = "BUY:";
     static final String BTN_BUDGET_LOW = "BUDGET_LOW";
     static final String BTN_BUDGET_MED = "BUDGET_MED";
     static final String BTN_BUDGET_HIGH = "BUDGET_HIGH";
@@ -107,6 +110,12 @@ public class WhatsAppBotService {
             if (m.matches()) { handleBuy(lead, Integer.parseInt(m.group(1))); return; }
         }
 
+        // A tapped product row names its own product, so it doesn't depend on what was last sent.
+        if (buttonId != null && buttonId.startsWith(ROW_BUY_PREFIX)) {
+            handleBuySlug(lead, buttonId.substring(ROW_BUY_PREFIX.length()));
+            return;
+        }
+
         BotIntent intent = classify(text, buttonId);
         log.info("bot intent {} for lead {}", intent, lead.getId());
         switch (intent) {
@@ -128,7 +137,10 @@ public class WhatsAppBotService {
                 followUp.enroll(lead.getId());
                 sendText(lead, "No problem — your recommendations are saved. Message us anytime to pick up where you left off.");
             }
-            case GREETING, UNKNOWN -> sendWelcome(lead);
+            case MENU -> sendMenu(lead);
+            case GREETING -> sendWelcome(lead);
+            // Off-script: the full option list is a better dead-end than the welcome's one button.
+            case UNKNOWN -> sendMenu(lead);
         }
     }
 
@@ -146,6 +158,23 @@ public class WhatsAppBotService {
         provider.sendButtons(waId(lead),
                 "Hi" + name + " 👋\nWelcome to " + props.storeName() + ".", buttons);
         logOutbound(lead.getId(), "interactive", "welcome");
+        analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
+    }
+
+    /**
+     * The top-level menu, as a list rather than buttons so each option can carry a description.
+     * Rows cover only what the client actually has switched on — the frames funnel stays out of
+     * here for the same reason it is off the welcome message (see sendWelcome).
+     */
+    private void sendMenu(Lead lead) {
+        provider.sendList(waId(lead), "What can I help you with?", "Choose an option",
+                List.of(new WhatsAppProvider.Row(BTN_EXPLORE_LENS, "Lenses",
+                                "Clear or photochromatic, with or without blue-block"),
+                        new WhatsAppProvider.Row(BTN_TRACK_ORDER, "Track my order",
+                                "See where your order has got to"),
+                        new WhatsAppProvider.Row(BTN_WEBSITE, "Our website",
+                                "Browse " + props.storeName() + " online")));
+        logOutbound(lead.getId(), "interactive", "menu");
         analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
     }
 
@@ -194,15 +223,19 @@ public class WhatsAppBotService {
             return;
         }
         leadService.rememberPicks(lead.getId(), picks.stream().map(Product::getSlug).toList());
-        StringBuilder sb = new StringBuilder("Here's what I'd pick for you 👓\n");
-        for (int i = 0; i < picks.size(); i++) {
-            Product p = picks.get(i);
-            sb.append("\n").append(i + 1).append(") *").append(p.getName()).append("* — ")
-                    .append(OrderNotificationService.money(p.getPriceMinor(), p.getCurrency()));
-        }
-        sb.append("\n\nReply *BUY 1*, *BUY 2* or *BUY 3* and I'll add it to your bag with a checkout link"
-                + " — pay online or cash on delivery.");
-        sendText(lead, sb.toString());
+        sendPicks(lead, "Here's what I'd pick for you 👓\nTap one and I'll add it to your bag.", picks);
+    }
+
+    /** Products as tappable list rows — no more asking the customer to type "BUY 2". The
+     *  numeric reply still works for anyone mid-conversation (see BUY_PATTERN). */
+    private void sendPicks(Lead lead, String body, List<Product> picks) {
+        List<WhatsAppProvider.Row> rows = picks.stream()
+                .map(p -> new WhatsAppProvider.Row(ROW_BUY_PREFIX + p.getSlug(), p.getName(),
+                        OrderNotificationService.money(p.getPriceMinor(), p.getCurrency())))
+                .toList();
+        provider.sendList(waId(lead), body, "See the picks", rows);
+        logOutbound(lead.getId(), "interactive", "picks");
+        analytics.record(LeadEventType.PRODUCTS_SHOWN, lead.getId(), null);
     }
 
     /** A star rating in reply to the post-purchase ask — applied to every product in that order. */
@@ -224,7 +257,11 @@ public class WhatsAppBotService {
             sendText(lead, "I don't have a pick #" + index + " for you right now — reply *Help me choose* to see options.");
             return;
         }
-        String slug = String.valueOf(slugs.get(index - 1));
+        handleBuySlug(lead, String.valueOf(slugs.get(index - 1)));
+    }
+
+    /** Add one named product to a fresh lead-linked cart and hand back a checkout link. */
+    private void handleBuySlug(Lead lead, String slug) {
         var product = catalog.bySlug(slug);
         if (product.isEmpty()) {
             sendText(lead, "That one's no longer available — reply *Help me choose* and I'll find something else.");
@@ -305,6 +342,7 @@ public class WhatsAppBotService {
                     case BTN_HELP_CHOOSE -> BotIntent.HELP_CHOOSE;
                     case BTN_EXPLORE_LENS -> BotIntent.EXPLORE_LENS;
                     case BTN_TRACK_ORDER -> BotIntent.TRACK_ORDER;
+                    case BTN_MENU -> BotIntent.MENU;
                     case BTN_BUDGET_LOW -> BotIntent.BUDGET_LOW;
                     case BTN_BUDGET_MED -> BotIntent.BUDGET_MED;
                     case BTN_BUDGET_HIGH -> BotIntent.BUDGET_HIGH;
@@ -315,6 +353,7 @@ public class WhatsAppBotService {
         String t = text == null ? "" : text.toLowerCase().trim();
         if (t.isBlank()) return BotIntent.GREETING;
         if (t.matches(".*(hi|hello|hey|start|namaste).*") && t.length() < 15) return BotIntent.GREETING;
+        if (t.contains("menu") || t.contains("options")) return BotIntent.MENU;
         // Before the lens check on purpose — "where is my lens order" is a tracking question.
         if (t.contains("track") || t.contains("where") || t.contains("my order")
                 || t.contains("order status")) return BotIntent.TRACK_ORDER;
@@ -349,17 +388,12 @@ public class WhatsAppBotService {
                 : catalog.forFaceShape(lead.getFaceShape(), 3);
         if (picks.isEmpty()) {
             sendText(lead, "Here are the frames matched to your face — shop them online:\n" + link);
-        } else {
-            StringBuilder sb = new StringBuilder("Frames matched to your face 👓\n");
-            for (Product p : picks) {
-                sb.append("\n• *").append(p.getName()).append("* — ")
-                        .append(OrderNotificationService.money(p.getPriceMinor(), p.getCurrency()))
-                        .append("\n  ").append(props.frontendBaseUrl()).append("/store/").append(p.getSlug());
-            }
-            sb.append("\n\nBrowse the full set & check out here:\n").append(link);
-            sendText(lead, sb.toString());
+            analytics.record(LeadEventType.PRODUCTS_SHOWN, lead.getId(), null);
+            return;
         }
-        analytics.record(LeadEventType.PRODUCTS_SHOWN, lead.getId(), null);
+        leadService.rememberPicks(lead.getId(), picks.stream().map(Product::getSlug).toList());
+        sendPicks(lead, "Frames matched to your face 👓\nTap one to add it to your bag.", picks);
+        sendText(lead, "Or browse the full set & check out here:\n" + link);
     }
 
     private void sendText(Lead lead, String text) {
