@@ -31,6 +31,12 @@ class TrackMyOrderTest {
         return "26097" + (200000 + (int) (Math.random() * 700000));
     }
 
+    /** Message ids are deduped globally against a db shared by the whole suite, so tie them to
+     *  this run's waId — a literal id silently turns another test's inbound into a no-op. */
+    private static String msgId(String waId, String step) {
+        return "track:" + waId + ":" + step;
+    }
+
     private int outboxSize() {
         return ((MockWhatsAppProvider) provider).outbox().size();
     }
@@ -48,7 +54,7 @@ class TrackMyOrderTest {
     @Test
     void tellsTheCustomerWhereTheirLensOrderIs() {
         String waId = someNumber();
-        inbound.process(new InboundMessage(waId, waId, "Tracker", "hi", null, "t1", Map.of()));
+        inbound.process(new InboundMessage(waId, waId, "Tracker", "hi", null, msgId(waId, "t1"), Map.of()));
         Lead lead = leads.findByWhatsappWaId(waId).orElseThrow();
 
         LensInquiry q = new LensInquiry();
@@ -62,7 +68,7 @@ class TrackMyOrderTest {
         inquiries.save(q);
 
         int mark = outboxSize();
-        inbound.process(new InboundMessage(waId, waId, "Tracker", "where is my order", null, "t2", Map.of()));
+        inbound.process(new InboundMessage(waId, waId, "Tracker", "where is my order", null, msgId(waId, "t2"), Map.of()));
 
         assertThat(replySince(mark)).contains("Out for delivery to 12 Great East Road");
     }
@@ -70,9 +76,9 @@ class TrackMyOrderTest {
     @Test
     void aLeadWithNoOrderIsPointedAtTheLensPageInsteadOfAnEmptyAnswer() {
         String waId = someNumber();
-        inbound.process(new InboundMessage(waId, waId, "Browser", "hi", null, "n1", Map.of()));
+        inbound.process(new InboundMessage(waId, waId, "Browser", "hi", null, msgId(waId, "n1"), Map.of()));
         int mark = outboxSize();
-        inbound.process(new InboundMessage(waId, waId, "Browser", "track my order", null, "n2", Map.of()));
+        inbound.process(new InboundMessage(waId, waId, "Browser", "track my order", null, msgId(waId, "n2"), Map.of()));
 
         assertThat(replySince(mark)).contains("can't find an order").contains("/lens");
     }
@@ -80,7 +86,7 @@ class TrackMyOrderTest {
     @Test
     void aWalkInIsNotTrackable() {
         String waId = someNumber();
-        inbound.process(new InboundMessage(waId, waId, "Counter", "hi", null, "w1", Map.of()));
+        inbound.process(new InboundMessage(waId, waId, "Counter", "hi", null, msgId(waId, "w1"), Map.of()));
         Lead lead = leads.findByWhatsappWaId(waId).orElseThrow();
 
         LensInquiry q = new LensInquiry();
@@ -93,7 +99,7 @@ class TrackMyOrderTest {
         inquiries.save(q);
 
         int mark = outboxSize();
-        inbound.process(new InboundMessage(waId, waId, "Counter", "track my order", null, "w2", Map.of()));
+        inbound.process(new InboundMessage(waId, waId, "Counter", "track my order", null, msgId(waId, "w2"), Map.of()));
 
         assertThat(replySince(mark)).contains("can't find an order");
     }
