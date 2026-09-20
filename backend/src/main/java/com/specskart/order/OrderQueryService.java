@@ -46,6 +46,25 @@ public class OrderQueryService {
         });
     }
 
+    /** Every frames order this lead has placed, as rows they can pick from. */
+    @Transactional(readOnly = true)
+    public List<com.specskart.shared.TrackOption> optionsForLead(UUID leadId) {
+        return orders.findByLeadIdOrderByCreatedAtDesc(leadId).stream()
+                .map(o -> {
+                    String line = OrderNotificationService.statusLine(o.getStatus());
+                    return new com.specskart.shared.TrackOption(
+                            "TRACK:O:" + o.getOrderNo(),
+                            o.getCreatedAt(),
+                            o.getOrderNo(),
+                            "Frames — " + (line == null ? "In progress" : line),
+                            "🛍️ Order *" + o.getOrderNo() + "*\n"
+                                    + (line == null ? "We're on it" : line)
+                                    + "\n\nFull details any time:\n"
+                                    + props.frontendBaseUrl() + "/order/" + o.getOrderNo());
+                })
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public OrderDtos.OrderView byOrderNo(String orderNo) {
         return toView(orders.findByOrderNo(orderNo)

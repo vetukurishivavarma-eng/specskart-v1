@@ -2,8 +2,8 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { shop, money, assetUrl, rememberedFace, rememberedName } from '../lib/shop'
 import SocialProof from '../components/SocialProof'
+import { WA } from '../lib/wa'
 
-const WA = import.meta.env.VITE_WA_LINK ?? 'https://wa.me/260000000000'
 
 // Exported (not just called locally) so it stays live code, not dead code the
 // build would flag as unused, while it's unlinked from the page below.

@@ -1,4 +1,4 @@
-const WA = import.meta.env.VITE_WA_LINK ?? 'https://wa.me/260000000000'
+import { WA } from '../lib/wa'
 export default function Contact() {
   return (
     <div className="container-x max-w-xl py-16">

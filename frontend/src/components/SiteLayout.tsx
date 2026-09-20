@@ -1,6 +1,6 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
+import { WA } from '../lib/wa'
 
-const WA = import.meta.env.VITE_WA_LINK ?? 'https://wa.me/260000000000'
 
 export default function SiteLayout() {
   return (

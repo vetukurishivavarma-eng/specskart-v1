@@ -22,10 +22,33 @@
   100% { opacity: 0; transform: translateY(-12px) scale(0.96); }
 }
 
+/* Order tracking. A status page is read once and stared at, so the motion is
+   there to show which step is live and to let the page arrive in order —
+   not to decorate it. */
+@keyframes track-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* The halo on the step the order is actually sitting at. */
+@keyframes track-pulse {
+  0%   { box-shadow: 0 0 0 0 rgb(0 0 0 / 0.30); }
+  70%  { box-shadow: 0 0 0 9px rgb(0 0 0 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(0 0 0 / 0); }
+}
+/* The line filling up to the current step, drawn once on load. */
+@keyframes track-fill {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
 @layer components {
   .btn { @apply inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-medium transition; }
   .animate-cart-bump { animation: cart-bump 0.5s ease-in-out; }
   .animate-added-pop { animation: added-pop 1.8s ease forwards; }
+  /* Staggered by an inline --d so each block lands just after the one above it. */
+  .animate-track-rise { animation: track-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: var(--d, 0ms); }
+  .animate-track-pulse { animation: track-pulse 2s ease-out infinite; }
+  .animate-track-fill { animation: track-fill 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both; transform-origin: left; }
   .btn-primary { @apply btn bg-ink text-bone hover:bg-clay; }
   .btn-ghost { @apply btn border border-ink/20 hover:border-ink/60; }
   .container-x { @apply mx-auto w-full max-w-6xl px-5; }
@@ -33,4 +56,15 @@
   .label { @apply text-xs font-medium uppercase tracking-widest text-ink/50; }
   .lbl { @apply text-xs font-medium uppercase tracking-widest text-ink/50; }
   .fld { @apply mt-1 w-full rounded-lg border border-ink/20 px-3 py-2 text-sm; }
+}
+
+/* Someone who has asked their device for less motion gets the page, not the show. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-track-rise,
+  .animate-track-pulse,
+  .animate-track-fill,
+  .animate-cart-bump,
+  .animate-added-pop {
+    animation: none !important;
+  }
 }

@@ -5,11 +5,11 @@ import { useFaceLandmarker } from '../lib/useFaceLandmarker'
 import { syntheticGeometry, type Geometry } from '../lib/faceGeometry'
 import { assetUrl, rememberFace, shop } from '../lib/shop'
 import type { TryOnFrame } from '../components/TryOn'
+import { WA } from '../lib/wa'
 
 // Pulls in Three.js + MediaPipe — kept out of the initial bundle.
 const TryOn = lazy(() => import('../components/TryOn'))
 
-const WA = import.meta.env.VITE_WA_LINK ?? 'https://wa.me/260000000000'
 
 function hoursTo(iso: string) {
   return Math.max(1, Math.round((new Date(iso).getTime() - Date.now()) / 3_600_000))
@@ -210,7 +210,7 @@ export default function FrameFinder() {
             </p>
             <p className="mt-2 text-xs text-bone/45">Policy version {session?.consentPolicyVersion}</p>
             <button className="btn-primary mt-6 w-full !bg-bone !text-ink" onClick={giveConsent}>I agree — turn on the camera</button>
-            <a href={import.meta.env.VITE_WA_LINK ?? '#'} className="mt-3 block text-center text-sm text-bone/50">Not now</a>
+            <a href={WA} className="mt-3 block text-center text-sm text-bone/50">Not now</a>
           </div>
         )}
 

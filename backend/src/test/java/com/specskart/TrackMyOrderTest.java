@@ -41,6 +41,16 @@ class TrackMyOrderTest {
         return ((MockWhatsAppProvider) provider).outbox().size();
     }
 
+    /** Row ids from any list sent since the mark. The mock records list rows as buttons. */
+    private java.util.List<String> rowIdsSince(int mark) {
+        var outbox = ((MockWhatsAppProvider) provider).outbox();
+        return outbox.subList(mark, outbox.size()).stream()
+                .filter(sent -> sent.buttons() != null)
+                .flatMap(sent -> sent.buttons().stream())
+                .map(MockWhatsAppProvider.Button::id)
+                .toList();
+    }
+
     /** The outbox is shared across the whole suite, so only look at what this test just sent. */
     private String replySince(int mark) {
         var outbox = ((MockWhatsAppProvider) provider).outbox();
@@ -102,5 +112,56 @@ class TrackMyOrderTest {
         inbound.process(new InboundMessage(waId, waId, "Counter", "track my order", null, msgId(waId, "w2"), Map.of()));
 
         assertThat(replySince(mark)).contains("can't find an order");
+    }
+
+    /**
+     * Two orders is where "the newest one" stops being an answer: the customer asked about one
+     * of them and has no way to say which. They get a list to pick from instead.
+     */
+    @Test
+    void twoOrdersAreOfferedAsAListToPickFrom() {
+        String waId = someNumber();
+        inbound.process(new InboundMessage(waId, waId, "Repeat", "hi", null, msgId(waId, "m1"), Map.of()));
+        Lead lead = leads.findByWhatsappWaId(waId).orElseThrow();
+
+        LensInquiry older = newInquiry(lead, waId, "DELIVERED");
+        LensInquiry newer = newInquiry(lead, waId, "PACKED");
+
+        int mark = outboxSize();
+        inbound.process(new InboundMessage(waId, waId, "Repeat", "track my order", null, msgId(waId, "m2"), Map.of()));
+
+        assertThat(replySince(mark)).contains("Which order did you mean?");
+        assertThat(rowIdsSince(mark))
+                .contains("TRACK:L:" + older.getId(), "TRACK:L:" + newer.getId());
+    }
+
+    /** Tapping a row answers about that order, not whichever happens to be newest. */
+    @Test
+    void tappingARowAnswersAboutThatOrder() {
+        String waId = someNumber();
+        inbound.process(new InboundMessage(waId, waId, "Picker", "hi", null, msgId(waId, "p1"), Map.of()));
+        Lead lead = leads.findByWhatsappWaId(waId).orElseThrow();
+
+        LensInquiry older = newInquiry(lead, waId, "DELIVERED");
+        newInquiry(lead, waId, "PACKED");
+
+        int mark = outboxSize();
+        inbound.process(new InboundMessage(waId, waId, "Picker", null, "TRACK:L:" + older.getId(),
+                msgId(waId, "p2"), Map.of()));
+
+        // The older one is DELIVERED; the newer is PACKED. Getting the delivered line back is
+        // what proves the tapped row won over recency.
+        assertThat(replySince(mark)).contains("Delivered");
+    }
+
+    private LensInquiry newInquiry(Lead lead, String waId, String fulfilment) {
+        LensInquiry q = new LensInquiry();
+        q.setLeadId(lead.getId());
+        q.setVerifyTokenHash("hash-" + System.nanoTime());
+        q.setPhoneRaw(waId);
+        q.setWaId(waId);
+        q.setStatus("SUBMITTED");
+        q.setFulfilment(fulfilment);
+        return inquiries.save(q);
     }
 }

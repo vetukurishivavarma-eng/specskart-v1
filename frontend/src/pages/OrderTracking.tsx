@@ -2,8 +2,8 @@ import { useEffect } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { shop, money, setCartToken } from '../lib/shop'
+import { WA } from '../lib/wa'
 
-const WA = import.meta.env.VITE_WA_LINK ?? 'https://wa.me/260000000000'
 
 const STEPS = ['PAID', 'PACKED', 'SHIPPED', 'DELIVERED']
 const STEPS_COD = ['CONFIRMED', 'PACKED', 'SHIPPED', 'DELIVERED']

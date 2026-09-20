@@ -13,6 +13,7 @@ import com.specskart.order.CartService;
 import com.specskart.order.OrderNotificationService;
 import com.specskart.order.OrderQueryService;
 import com.specskart.order.ReviewCaptureService;
+import com.specskart.shared.TrackOption;
 import com.specskart.shared.TrackUpdate;
 import com.specskart.lead.Lead;
 import com.specskart.lead.LeadFollowUpService;
@@ -53,6 +54,8 @@ public class WhatsAppBotService {
     static final String BTN_CARE = "CARE";
     /** A list row that buys one specific product: {@code BUY:<slug>}. */
     static final String ROW_BUY_PREFIX = "BUY:";
+    /** A list row naming one of the customer's own orders: {@code TRACK:L:<uuid>} or {@code TRACK:O:<orderNo>}. */
+    static final String ROW_TRACK_PREFIX = "TRACK:";
     static final String BTN_BUDGET_LOW = "BUDGET_LOW";
     static final String BTN_BUDGET_MED = "BUDGET_MED";
     static final String BTN_BUDGET_HIGH = "BUDGET_HIGH";
@@ -118,6 +121,12 @@ public class WhatsAppBotService {
         // A tapped product row names its own product, so it doesn't depend on what was last sent.
         if (buttonId != null && buttonId.startsWith(ROW_BUY_PREFIX)) {
             handleBuySlug(lead, buttonId.substring(ROW_BUY_PREFIX.length()));
+            return;
+        }
+
+        // Same for a tapped order row from the "which order did you mean?" list.
+        if (buttonId != null && buttonId.startsWith(ROW_TRACK_PREFIX)) {
+            handleTrackRow(lead, buttonId);
             return;
         }
 
@@ -226,15 +235,50 @@ public class WhatsAppBotService {
      * "Where's my order?" — the highest-frequency post-purchase question, and until now it just
      * replayed the welcome menu. Answers from whichever is newer: a frames order or a lens order.
      */
+    /**
+     * "Track my order", answered by asking which one when there is more than one.
+     *
+     * It used to reply with whichever order was newest. That is right for a customer with one
+     * order and wrong for anyone who has bought twice: they asked about the older one, were
+     * told about the newer one, and had no way to say otherwise.
+     */
     private void sendOrderStatus(Lead lead) {
-        Optional<TrackUpdate> update = latestOrderUpdate(lead);
-        if (update.isEmpty()) {
+        // Meta caps a list at ten rows and rejects the whole send on an overrun.
+        List<TrackOption> options = Stream.concat(
+                        orderQuery.optionsForLead(lead.getId()).stream(),
+                        lensInquiries.optionsForLead(lead.getId()).stream())
+                .sorted(Comparator.comparing(TrackOption::at).reversed())
+                .limit(10)
+                .toList();
+
+        if (options.isEmpty()) {
             sendText(lead, "I can't find an order under this number yet. "
                     + "Configure your lenses here and I'll keep you posted at every step:\n"
                     + props.frontendBaseUrl() + "/lens");
             return;
         }
-        sendText(lead, update.get().message());
+        // One order needs no menu -- asking someone to pick from a list of one is a worse
+        // answer than simply answering.
+        if (options.size() == 1) {
+            sendText(lead, options.get(0).message());
+            return;
+        }
+        provider.sendList(waId(lead), "Which order did you mean?", "My orders",
+                options.stream()
+                        .map(o -> new WhatsAppProvider.Row(o.rowId(), o.title(), o.description()))
+                        .toList());
+        logOutbound(lead.getId(), "interactive", "orders");
+    }
+
+    /** A tapped order row names its own order, so it does not depend on what was last sent. */
+    private void handleTrackRow(Lead lead, String rowId) {
+        Stream.concat(orderQuery.optionsForLead(lead.getId()).stream(),
+                        lensInquiries.optionsForLead(lead.getId()).stream())
+                .filter(o -> o.rowId().equals(rowId))
+                .findFirst()
+                .ifPresentOrElse(o -> sendText(lead, o.message()),
+                        () -> sendText(lead, "I couldn't find that order any more — reply "
+                                + "\"track my order\" and I'll list them again."));
     }
 
     /** The lead's most recent order across both funnels. */

@@ -221,4 +221,28 @@ class LensInquiryFlowTest {
                 .filter(s -> "Offline Customer".equals(s.customerName())).count();
         assertThat(matching).isEqualTo(1);
     }
+
+    /**
+     * A number that has verified once is not asked again. The second inquiry comes back already
+     * verified, so the configurator opens straight onto the form instead of sending the customer
+     * off to WhatsApp to find a link.
+     */
+    @Test
+    void aKnownNumberSkipsVerificationTheSecondTime() {
+        String phone = phone();
+
+        UUID first = service.start(phone, "CLEAR", false);
+        assertThat(service.status(first).verified()).isFalse();
+
+        // Prove the number once, the way the verify link does.
+        LensInquiry q = inquiries.findById(first).orElseThrow();
+        q.setPhoneVerifiedAt(java.time.Instant.now());
+        q.setStatus("VERIFIED");
+        inquiries.save(q);
+
+        UUID second = service.start(phone, "PHOTOCHROMATIC", true);
+        assertThat(service.status(second).verified()).isTrue();
+        // Same person, a genuinely new order -- not the old row handed back.
+        assertThat(second).isNotEqualTo(first);
+    }
 }

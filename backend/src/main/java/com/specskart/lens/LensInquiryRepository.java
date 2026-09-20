@@ -10,6 +10,10 @@ import java.util.UUID;
 public interface LensInquiryRepository extends JpaRepository<LensInquiry, UUID> {
     Optional<LensInquiry> findByVerifyTokenHash(String hash);
 
+    /** Has this WhatsApp number ever completed verification? A returning customer is not
+     *  asked to prove the same number twice. */
+    boolean existsByWaIdAndPhoneVerifiedAtIsNotNull(String waId);
+
     /** Verified but never reached SUBMITTED, never nudged, old enough to chase — the
      *  abandoned-lens-form recovery job's candidate pool. */
     List<LensInquiry> findTop50ByStatusAndNudgedAtIsNullAndCreatedAtBefore(String status, Instant before);
@@ -32,6 +36,9 @@ public interface LensInquiryRepository extends JpaRepository<LensInquiry, UUID> 
     /** The lead's latest web order, for the chatbot's "track my order". Walk-ins are handed
      *  over at the counter, so there is nothing to track. */
     Optional<LensInquiry> findTop1ByLeadIdAndWalkInFalseOrderByCreatedAtDesc(UUID leadId);
+
+    /** All of them, for the "which order did you mean?" list. */
+    List<LensInquiry> findByLeadIdAndWalkInFalseOrderByCreatedAtDesc(UUID leadId);
 
     /** Sold a few days ago, lead known, never thanked — the post-purchase job's candidate pool. */
     List<LensInquiry> findTop50ByStatusAndPostPurchaseAtIsNullAndLeadIdIsNotNullAndUpdatedAtBefore(

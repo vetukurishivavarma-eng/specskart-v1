@@ -11,6 +11,7 @@ import com.specskart.shared.ApiException;
 import com.specskart.shared.PhoneNumbers;
 import com.specskart.shared.TokenGenerator;
 import com.specskart.membership.MembershipService;
+import com.specskart.shared.TrackOption;
 import com.specskart.shared.TrackUpdate;
 import com.specskart.payment.PaymentProvider;
 import com.specskart.whatsapp.WhatsAppProvider;
@@ -84,8 +85,31 @@ public class LensInquiryService {
         q.setWaId(waId);
         q.setLensType(lensType);
         q.setBlueBlock(blueBlock);
+
+        // A number that has already proved it owns this WhatsApp account does not prove it
+        // again. Sending a returning customer away to find a message and come back is the
+        // biggest drop-off in this funnel, and we already know who they are.
+        //
+        // Worth being clear about what this trades away: verification stopped someone typing
+        // a number they do not own. A number that verified once is now trusted on sight. The
+        // exposure is narrow -- every update about the order still goes only to that WhatsApp
+        // number, so the real owner sees anything placed in their name -- but it is a real
+        // relaxation, made deliberately.
+        // The token is minted either way: verify_token_hash is NOT NULL, and a row that skips
+        // verification still needs one. It simply never gets sent anywhere.
         String raw = tokens.newToken();
         q.setVerifyTokenHash(tokens.hash(raw));
+
+        if (inquiries.existsByWaIdAndPhoneVerifiedAtIsNotNull(waId)) {
+            q.setPhoneVerifiedAt(Instant.now());
+            q.setStatus("VERIFIED");
+            Lead lead = leadService.onWebOrder(waId, null);
+            if (lead != null) q.setLeadId(lead.getId());
+            inquiries.save(q);
+            log.info("lens inquiry {} skipped verification -- {} is already known", q.getId(), waId);
+            return q.getId();
+        }
+
         inquiries.save(q);
 
         String link = props.frontendBaseUrl() + "/lens/verify/" + raw;
@@ -356,6 +380,31 @@ public class LensInquiryService {
         return inquiries.findTop1ByLeadIdAndWalkInFalseOrderByCreatedAtDesc(leadId)
                 .filter(q -> q.getFulfilment() != null)
                 .map(q -> new TrackUpdate(q.getCreatedAt(), "👓 Your lens order\n" + trackLine(q)));
+    }
+
+    /** Every lens order this lead has placed, as rows they can pick from. */
+    @Transactional(readOnly = true)
+    public List<TrackOption> optionsForLead(UUID leadId) {
+        return inquiries.findByLeadIdAndWalkInFalseOrderByCreatedAtDesc(leadId).stream()
+                .filter(q -> q.getFulfilment() != null)
+                .map(q -> new TrackOption(
+                        "TRACK:L:" + q.getId(),
+                        q.getCreatedAt(),
+                        ref(q),
+                        "Lenses — " + trackTitle(q),
+                        "👓 Your lens order\n" + trackLine(q)))
+                .toList();
+    }
+
+    /** {@link #trackLine} shortened to fit a list row's second line. */
+    private static String trackTitle(LensInquiry q) {
+        return switch (q.getFulfilment()) {
+            case "ORDERED" -> "Being made";
+            case "PACKED" -> "Packed";
+            case "OUT_FOR_DELIVERY" -> "Out for delivery";
+            case "DELIVERED" -> "Delivered";
+            default -> "In progress";
+        };
     }
 
     /** Where the order is right now, in the customer's words. */
