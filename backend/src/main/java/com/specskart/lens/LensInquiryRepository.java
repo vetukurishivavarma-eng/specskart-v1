@@ -23,6 +23,10 @@ public interface LensInquiryRepository extends JpaRepository<LensInquiry, UUID> 
      *  walk-ins, whose fulfilment is null — nothing is delivered at the counter. */
     List<LensInquiry> findByFulfilmentNotOrderByCreatedAtAsc(String fulfilment);
 
+    /** The other half of that list: orders already handed over. Newest first, because a
+     *  finished order is looked up to check something, not worked through in order. */
+    List<LensInquiry> findByFulfilmentOrderByCreatedAtDesc(String fulfilment);
+
     Optional<LensInquiry> findByClientReference(String clientReference);
 
     /** The lead's latest web order, for the chatbot's "track my order". Walk-ins are handed

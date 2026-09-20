@@ -116,7 +116,8 @@ public class OrderNotificationService {
         String appLink = props.whatsapp().absoluteAsset("/api/public/open/order/" + order.getId());
         List<String> failures = staffAlerts.send(staffLines(order), pdfUrl, no + ".pdf",
                 List.of(no, money(order.getTotalMinor(), order.getCurrency()), who,
-                        appLink == null ? adminLink(order) : appLink), rx);
+                        appLink == null ? adminLink(order) : appLink),
+                appLink, rx);
         for (String failure : failures) recordNote(order, "Staff alert to " + failure);
     }
 

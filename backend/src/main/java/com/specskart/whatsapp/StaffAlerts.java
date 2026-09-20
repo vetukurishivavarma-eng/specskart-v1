@@ -39,12 +39,18 @@ public class StaffAlerts {
     /**
      * @param lines the same lines the PDF is drawn from ("# " heading, "` " monospace)
      * @param pdfUrl absolute signed link to the PDF, or null when the API's public origin isn't configured
+     * @param appLink opens the POS app on this order; appended to the non-template paths
      * @return one "number: reason" entry per failed send, for the caller's timeline
      */
     public List<String> send(List<String> lines, String pdfUrl, String pdfName,
-                             List<String> templateParams, Attachment prescription) {
+                             List<String> templateParams, String appLink, Attachment prescription) {
         List<String> failures = new ArrayList<>();
-        String text = whatsappText(lines);
+        // The template carries this as {{4}}. The fallback paths below are plain messages with
+        // no parameters, so without appending it here a staff member who gets the fallback --
+        // which is exactly what happens while a template sits in review -- is told about an
+        // order and given no way to open it.
+        String text = whatsappText(lines) + (appLink == null || appLink.isBlank()
+                ? "" : "\n\nOpen in the app: " + appLink);
         for (String raw : props.whatsapp().staffNumbers()) {
             String to = raw.trim();
             if (to.isEmpty()) continue;

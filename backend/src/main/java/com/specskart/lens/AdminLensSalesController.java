@@ -20,10 +20,12 @@ public class AdminLensSalesController {
         this.service = service;
     }
 
-    /** Web orders ready for the counter to collect payment on. */
+    /** The doorstep queue. `delivered=true` returns what has already been handed over
+     *  instead, which is the app's "Delivered" tab. */
     @GetMapping("/pending")
-    public List<LensDtos.SaleView> pending() {
-        return service.pendingWebOrders();
+    public List<LensDtos.SaleView> pending(
+            @RequestParam(name = "delivered", defaultValue = "false") boolean delivered) {
+        return service.pendingWebOrders(delivered);
     }
 
     @PostMapping("/{id}/complete")

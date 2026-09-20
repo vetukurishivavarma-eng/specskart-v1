@@ -292,8 +292,23 @@ public class LensInquiryService {
 
     @Transactional(readOnly = true)
     public List<LensDtos.SaleView> pendingWebOrders() {
-        return inquiries.findByFulfilmentNotOrderByCreatedAtAsc("DELIVERED").stream()
-                .map(LensInquiryService::saleView).toList();
+        return pendingWebOrders(false);
+    }
+
+    /**
+     * The doorstep queue, or what has already left it.
+     *
+     * Delivering an order used to make it vanish from the app with nowhere to look it up:
+     * the Orders screen is `fulfilment <> 'DELIVERED'`, and the Reports screen filters on
+     * `status = 'SOLD'` for one day, which is a different field answering a different
+     * question. Staff asking "did that one go out?" had neither.
+     */
+    @Transactional(readOnly = true)
+    public List<LensDtos.SaleView> pendingWebOrders(boolean delivered) {
+        List<LensInquiry> rows = delivered
+                ? inquiries.findByFulfilmentOrderByCreatedAtDesc("DELIVERED")
+                : inquiries.findByFulfilmentNotOrderByCreatedAtAsc("DELIVERED");
+        return rows.stream().map(LensInquiryService::saleView).toList();
     }
 
     /** Staff moving a web order one rung along the doorstep ladder. Strictly one step at a
@@ -393,9 +408,12 @@ public class LensInquiryService {
         String who = blank(q.getCustomerName()) ? "there" : q.getCustomerName().split(" ")[0];
         try {
             if (props.whatsapp().orderUpdateConfigured()) {
+                // {{4}} is the template's "track your order" link. It used to point at
+                // /lens -- the configurator -- so a customer tapping it was handed a blank
+                // form to order a second pair. This is their own order's status page.
                 whatsapp.sendTemplate(q.getWaId(), props.whatsapp().orderUpdateTemplate(),
                         props.whatsapp().followUpTemplateLang(),
-                        List.of(who, line, ref(q), props.frontendBaseUrl() + "/lens"));
+                        List.of(who, line, ref(q), props.frontendBaseUrl() + "/lens/track/" + q.getId()));
             } else {
                 whatsapp.sendText(q.getWaId(), "Hi " + who + " — " + line + " (" + ref(q) + ").");
             }
@@ -416,7 +434,8 @@ public class LensInquiryService {
         String appLink = props.whatsapp().absoluteAsset("/api/public/open/lens/" + q.getId());
         List<String> failures = staffAlerts.send(staffLines(q, memberships.discountPercentFor(q.getLeadId())),
                 pdfUrl, ref(q) + ".pdf",
-                List.of(ref(q), price, who, appLink == null ? props.frontendBaseUrl() : appLink), null);
+                List.of(ref(q), price, who, appLink == null ? props.frontendBaseUrl() : appLink),
+                appLink, null);
         // No order timeline to hang these on, as there is for web orders -- at least say it out loud.
         for (String failure : failures) log.warn("lens {} staff alert to {}", ref(q), failure);
     }
