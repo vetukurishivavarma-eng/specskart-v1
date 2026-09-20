@@ -7,6 +7,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -31,6 +32,20 @@ public class GlobalExceptionHandler {
                 .map(f -> f.getField() + ": " + f.getDefaultMessage())
                 .collect(Collectors.joining("; "));
         return ResponseEntity.badRequest().body(ApiError.of("VALIDATION_FAILED", msg, traceId));
+    }
+
+    /**
+     * A path or query value that isn't the type the route declares -- "/lens/not-a-uuid". That is
+     * the caller's mistake, not ours, and it used to fall through to the catch-all below: a 500,
+     * plus a stack trace at ERROR level. Staff order links get tapped out of WhatsApp, where a
+     * wrapped or truncated URL is routine, so this would have buried real errors under noise.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String traceId = UUID.randomUUID().toString();
+        log.warn("bad-parameter name={} traceId={}", ex.getName(), traceId);
+        return ResponseEntity.badRequest()
+                .body(ApiError.of("BAD_PARAMETER", "'" + ex.getName() + "' is not in the expected format.", traceId));
     }
 
     @ExceptionHandler(Exception.class)

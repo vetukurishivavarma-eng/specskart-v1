@@ -111,8 +111,12 @@ public class OrderNotificationService {
                         "prescription-" + no + ".pdf", !pdf);
             }
         }
+        // {{4}} opens the POS app on this order's Deliveries row. The web admin link stays on the
+        // slip itself (see staffLines) for whoever is at a desk rather than on the shop floor.
+        String appLink = props.whatsapp().absoluteAsset("/api/public/open/order/" + order.getId());
         List<String> failures = staffAlerts.send(staffLines(order), pdfUrl, no + ".pdf",
-                List.of(no, money(order.getTotalMinor(), order.getCurrency()), who, adminLink(order)), rx);
+                List.of(no, money(order.getTotalMinor(), order.getCurrency()), who,
+                        appLink == null ? adminLink(order) : appLink), rx);
         for (String failure : failures) recordNote(order, "Staff alert to " + failure);
     }
 

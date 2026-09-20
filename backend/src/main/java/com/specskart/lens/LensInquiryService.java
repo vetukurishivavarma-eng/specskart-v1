@@ -410,9 +410,13 @@ public class LensInquiryService {
         String pdfUrl = base == null ? null : base + ".pdf" + links.query("lens/" + q.getId(), StaffDocController.TTL);
         String price = q.getPriceMinor() == null ? "—" : OrderNotificationService.money(q.getPriceMinor(), q.getCurrency());
         String who = q.getCustomerName() == null || q.getCustomerName().isBlank() ? "+" + q.getWaId() : q.getCustomerName();
+        // {{4}} is the staff member's next action, not a copy of the slip: the PDF already rides
+        // the template as its document header, so repeating its link here bought nothing. This
+        // one opens the POS app on this order, where the doorstep ladder is.
+        String appLink = props.whatsapp().absoluteAsset("/api/public/open/lens/" + q.getId());
         List<String> failures = staffAlerts.send(staffLines(q, memberships.discountPercentFor(q.getLeadId())),
                 pdfUrl, ref(q) + ".pdf",
-                List.of(ref(q), price, who, pdfUrl == null ? props.frontendBaseUrl() : pdfUrl), null);
+                List.of(ref(q), price, who, appLink == null ? props.frontendBaseUrl() : appLink), null);
         // No order timeline to hang these on, as there is for web orders -- at least say it out loud.
         for (String failure : failures) log.warn("lens {} staff alert to {}", ref(q), failure);
     }
