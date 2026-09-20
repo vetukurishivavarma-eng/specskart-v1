@@ -3,10 +3,20 @@ import { useQuery } from '@tanstack/react-query'
 import { lens } from '../lib/lens'
 import { money } from '../lib/shop'
 import { WA } from '../lib/wa'
+import { DeliveryScooter } from '../components/DeliveryScooter'
 
 
 /** The doorstep ladder, in the order staff move it along in the POS app. */
 const STEPS = ['ORDERED', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED']
+/**
+ * Where a step's dot actually sits, as a percentage of the rail.
+ *
+ * The steps are equal flex cells and the dot is centred in its own cell, so with four of them
+ * the dots land at 12.5/37.5/62.5/87.5% — not 0/33/67/100%. Using the latter made the filled
+ * rail overshoot the dot it was supposed to stop at.
+ */
+const stepCentre = (i: number) => ((i + 0.5) / STEPS.length) * 100
+
 const LABEL: Record<string, string> = {
   ORDERED: 'Order placed',
   PACKED: 'Packed',
@@ -61,12 +71,21 @@ export default function LensTracking() {
       {/* The ladder is a progress bar while there is progress left to show. Once delivered it
           is just four ticks, so the end state says so in words instead. */}
       {!delivered && stepIdx >= 0 && (
-        <div className="animate-track-rise relative mt-8" style={{ '--d': '90ms' } as React.CSSProperties}>
+        <div className="animate-track-rise relative mt-14" style={{ '--d': '90ms' } as React.CSSProperties}>
+          {/* Rides to wherever the order is, so the picture and the words cannot disagree.
+              Nudged left by half its own width to sit centred over its step. */}
+          <div
+            className="pointer-events-none absolute -top-11 text-ink transition-[left] duration-700 ease-out"
+            style={{ left: `calc(${stepCentre(stepIdx)}% - 28px)` }}
+          >
+            <DeliveryScooter moving={stage === 'OUT_FOR_DELIVERY'} />
+          </div>
+
           {/* The rail sits behind the dots and fills to the step the order is on. */}
           <div className="absolute left-0 right-0 top-1.5 h-px bg-ink/15" aria-hidden />
           <div
             className="animate-track-fill absolute left-0 top-1.5 h-px bg-ink"
-            style={{ width: `${(stepIdx / (STEPS.length - 1)) * 100}%` }}
+            style={{ width: `${stepCentre(stepIdx)}%` }}
             aria-hidden
           />
           <ol className="relative flex justify-between">
