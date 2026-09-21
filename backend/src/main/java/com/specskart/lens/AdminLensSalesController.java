@@ -1,6 +1,8 @@
 package com.specskart.lens;
 
+import com.specskart.shared.CurrentUser;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -15,9 +17,11 @@ import java.util.UUID;
 public class AdminLensSalesController {
 
     private final LensInquiryService service;
+    private final CurrentUser currentUser;
 
-    public AdminLensSalesController(LensInquiryService service) {
+    public AdminLensSalesController(LensInquiryService service, CurrentUser currentUser) {
         this.service = service;
+        this.currentUser = currentUser;
     }
 
     /** The doorstep queue. `delivered=true` returns what has already been handed over
@@ -38,8 +42,15 @@ public class AdminLensSalesController {
         return service.advanceFulfilment(id, req);
     }
 
-    @PostMapping("/walk-in")
-    public LensDtos.InquiryView walkIn(@RequestBody LensDtos.WalkInSale req) {
+    @PostMapping("/{id}/cancel")
+    public LensDtos.InquiryView cancel(@PathVariable UUID id) {
+        return service.cancel(id);
+    }
+
+        @PostMapping("/walk-in")
+    public LensDtos.InquiryView walkIn(@RequestBody LensDtos.WalkInSale req, Authentication auth) {
+        // the pair of lens blanks comes off this shop's shelf
+        if (req.storeId() != null) currentUser.assertStoreAccess(auth, req.storeId());
         return service.walkInSale(req);
     }
 

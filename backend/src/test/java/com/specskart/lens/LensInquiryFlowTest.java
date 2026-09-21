@@ -92,7 +92,7 @@ class LensInquiryFlowTest {
     void walkInSaleSkipsWhatsappAndIsBilledImmediately() {
         var sale = service.walkInSale(new LensDtos.WalkInSale(
                 "Counter Customer", null, "CLEAR", true, null, null,
-                "CASH", "Staff A", "Main Store", null));
+                "CASH", "Staff A", "Main Store", null, null));
 
         assertThat(sale.status()).isEqualTo("SOLD");
         assertThat(sale.priceMinor()).isEqualTo(25_000L + 8_000L);
@@ -211,7 +211,7 @@ class LensInquiryFlowTest {
     void replayingAWalkInSaleWithTheSameClientReferenceDoesNotDoubleSell() {
         String ref = "device-" + UUID.randomUUID();
         var req = new LensDtos.WalkInSale("Offline Customer", null, "CLEAR", false, null, null,
-                "CASH", "Staff A", "Main Store", ref);
+                "CASH", "Staff A", "Main Store", ref, null);
 
         var first = service.walkInSale(req);
         var replay = service.walkInSale(req);

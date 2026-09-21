@@ -14,6 +14,10 @@ import com.specskart.membership.MembershipService;
 import com.specskart.shared.TrackOption;
 import com.specskart.shared.TrackUpdate;
 import com.specskart.payment.PaymentProvider;
+import com.specskart.catalog.Product;
+import com.specskart.catalog.ProductRepository;
+import com.specskart.pos.InventoryService;
+import com.specskart.pos.StoreRepository;
 import com.specskart.whatsapp.WhatsAppProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -54,11 +59,18 @@ public class LensInquiryService {
     private final SignedLinks links;
     private final PaymentProvider payments;
     private final MembershipService memberships;
+    private final InventoryService inventory;
+    private final ProductRepository products;
+    private final StoreRepository stores;
 
     public LensInquiryService(LensInquiryRepository inquiries, LeadService leadService,
                               WhatsAppProvider whatsapp, TokenGenerator tokens, AppProperties props,
                               LensPricing pricing, StaffAlerts staffAlerts, SignedLinks links,
-                              PaymentProvider payments, MembershipService memberships) {
+                              PaymentProvider payments, MembershipService memberships,
+                              InventoryService inventory, ProductRepository products, StoreRepository stores) {
+        this.inventory = inventory;
+        this.products = products;
+        this.stores = stores;
         this.memberships = memberships;
         this.payments = payments;
         this.staffAlerts = staffAlerts;
@@ -197,6 +209,9 @@ public class LensInquiryService {
     @Transactional
     public LensDtos.InquiryView submit(UUID id) {
         LensInquiry q = requireVerified(get(id));
+        if ("CANCELLED".equals(q.getStatus())) {
+            throw ApiException.badRequest("CANCELLED", "This order was cancelled — start a new one.");
+        }
         // An order with nowhere to go is one the lab can't fulfil -- block it here rather
         // than discover it when someone tries to dispatch.
         if (!q.isWalkIn() && (blank(q.getDeliveryAddress()) || blank(q.getDeliveryArea()))) {
@@ -206,6 +221,7 @@ public class LensInquiryService {
         if (q.getPriceMinor() == null) q.setPriceMinor(pricing.quote(q));
         q.setStatus("SUBMITTED");
         q.setFulfilment("ORDERED");
+        takeLensStock(q, null);
         inquiries.save(q);
         alertStaff(q);
         notifyCustomer(q, "we've got your lens order and we're on it");
@@ -290,6 +306,8 @@ public class LensInquiryService {
         q.setPhoneVerifiedAt(Instant.now());
         q.setStatus("VERIFIED");
         q.setPriceMinor(pricing.quote(q));
+        inquiries.save(q);
+        if (d.storeId() != null) takeLensStock(q, d.storeId());
         return completeSale(inquiries.save(q).getId(),
                 new LensDtos.CompleteSale(d.paymentMethod(), d.soldBy(), d.shopName()));
     }
@@ -303,7 +321,8 @@ public class LensInquiryService {
         // Paid online already — don't let a handover overwrite that with "CASH".
         if (q.getPaidAt() == null) q.setPaymentMethod(d.paymentMethod());
         q.setSoldBy(d.soldBy());
-        q.setShopName(d.shopName());
+        // keep the shop the pair came from (takeLensStock) unless staff name another
+        if (d.shopName() != null) q.setShopName(d.shopName());
         q.setStatus("SOLD");
         // Billing a web order finishes it however staff got here — the doorstep ladder, or
         // "mark as sold" straight off the list when the customer collected in person.
@@ -331,7 +350,7 @@ public class LensInquiryService {
     public List<LensDtos.SaleView> pendingWebOrders(boolean delivered) {
         List<LensInquiry> rows = delivered
                 ? inquiries.findByFulfilmentOrderByCreatedAtDesc("DELIVERED")
-                : inquiries.findByFulfilmentNotOrderByCreatedAtAsc("DELIVERED");
+                : inquiries.findByFulfilmentNotInOrderByCreatedAtAsc(List.of("DELIVERED", "CANCELLED"));
         return rows.stream().map(LensInquiryService::saleView).toList();
     }
 
@@ -357,6 +376,31 @@ public class LensInquiryService {
             return completeSale(id, new LensDtos.CompleteSale(d.paymentMethod(), d.soldBy(), d.shopName()));
         }
         notifyCustomer(q, stageLine(q));
+        return view(q);
+    }
+
+    /**
+     * Staff call off a web order that won't go ahead (customer changed their mind, wrong Rx).
+     * Not once it's delivered: that's a refund conversation, not a cancel. Its pair of lens
+     * blanks goes back on the shelf it came from.
+     * ponytail: an online payment is refunded by hand from the Flutterwave dashboard; the
+     * customer is told it's coming. Wire the gateway's refund API if cancels get common.
+     */
+    @Transactional
+    public LensDtos.InquiryView cancel(UUID id) {
+        LensInquiry q = get(id);
+        if (q.getFulfilment() == null || "DELIVERED".equals(q.getFulfilment()) || "CANCELLED".equals(q.getFulfilment())) {
+            throw ApiException.badRequest("NOT_CANCELLABLE", "Only an open web order can be cancelled.");
+        }
+        q.setFulfilment("CANCELLED");
+        q.setStatus("CANCELLED");
+        if (q.getStockStoreId() != null) {
+            products.findBySkuIgnoreCase("LENS-" + q.getLensType()).ifPresent(lens -> inventory.adjust(
+                    q.getStockStoreId(), lens.getId(), 1, "REFUND", ref(q), "Lens order cancelled", null));
+        }
+        inquiries.save(q);
+        notifyCustomer(q, "your lens order has been cancelled"
+                + (q.getPaidAt() != null ? " — your online payment will be refunded" : ""));
         return view(q);
     }
 
@@ -403,6 +447,7 @@ public class LensInquiryService {
             case "PACKED" -> "Packed";
             case "OUT_FOR_DELIVERY" -> "Out for delivery";
             case "DELIVERED" -> "Delivered";
+            case "CANCELLED" -> "Cancelled";
             default -> "In progress";
         };
     }
@@ -416,6 +461,7 @@ public class LensInquiryService {
                     ? "Out for delivery — on its way to you."
                     : "Out for delivery to " + q.getDeliveryAddress() + ".";
             case "DELIVERED" -> "Delivered 🎉 Anything not right with them? Just reply here.";
+            case "CANCELLED" -> "Cancelled. Questions about it? Just reply here.";
             default -> "We're on it.";
         };
     }
@@ -469,6 +515,27 @@ public class LensInquiryService {
         } catch (Exception e) {
             log.warn("lens {} customer notification failed: {}", ref(q), e.getMessage());
         }
+    }
+
+    /**
+     * Takes one pair of this order's lens type off a shop's shelf, once. A counter sale passes
+     * its own shop; a web order goes to the nearest pinned shop holding it (delivery area first,
+     * then the fullest shelf). No stock anywhere still takes the order: it's flagged a backorder
+     * and the shelf goes negative, so the POS shows the shortfall.
+     */
+    private void takeLensStock(LensInquiry q, UUID storeId) {
+        if (q.getStockStoreId() != null) return;
+        Product lens = products.findBySkuIgnoreCase("LENS-" + q.getLensType()).orElse(null);
+        if (lens == null) return;
+        if (storeId == null) {
+            var allocation = inventory.allocate(Map.of(lens.getId(), 1), null, null, q.getDeliveryArea());
+            if (allocation == null) return; // no shop sells online yet
+            storeId = allocation.primary().getId();
+        }
+        q.setBackorder(inventory.quantityOf(storeId, lens.getId()) < 1);
+        inventory.adjust(storeId, lens.getId(), -1, "SALE", ref(q), "Lens order", null);
+        q.setStockStoreId(storeId);
+        stores.findById(storeId).ifPresent(s -> q.setShopName(s.getName()));
     }
 
     private void alertStaff(LensInquiry q) {
@@ -532,6 +599,8 @@ public class LensInquiryService {
         out.add("` " + String.format("%-5s%-9s%-9s%s", "L", power(q.getSphLeft()), power(q.getCylLeft()), axis(q.getAxisLeft())));
         out.add("ADD: " + power(q.getAddPower()));
         if (q.isSpecialAxis()) out.add("⚠ SPECIAL AXIS — not a stock lens, needs a manual check");
+        if (!q.isWalkIn() && q.getShopName() != null) out.add("Make at: " + q.getShopName());
+        if (q.isBackorder()) out.add("⚠ BACKORDER — no shop had this lens in stock, order blanks in");
         out.add("");
         out.add("Quoted price: " + (q.getPriceMinor() == null ? "—"
                 : OrderNotificationService.money(q.getPriceMinor(), q.getCurrency())));

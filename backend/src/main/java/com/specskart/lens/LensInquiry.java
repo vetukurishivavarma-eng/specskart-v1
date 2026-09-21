@@ -102,6 +102,12 @@ public class LensInquiry extends BaseEntity {
     @Column(unique = true)
     private String clientReference;
 
+    /** The shop whose shelf gave this order its pair of lens blanks. Set once, so a retried
+     *  submit can't take a second pair. Null until then, and for orders before lens stock. */
+    private UUID stockStoreId;
+    /** That shelf was empty when the order came in: the lab has to order blanks in. */
+    private boolean backorder = false;
+
     public boolean isPhoneVerified() {
         return phoneVerifiedAt != null;
     }

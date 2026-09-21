@@ -311,6 +311,11 @@ public class AdminCatalogService {
         if (in.sku() != null) p.setSku(in.sku().isBlank() ? null : in.sku().trim());
         if (in.barcode() != null) p.setBarcode(in.barcode().isBlank() ? null : in.barcode().trim());
         if (in.costPriceMinor() != null) p.setCostPriceMinor(Math.max(0, in.costPriceMinor()));
+        // a lens blank is POS stock, never a website product (V45) — whatever the edit form sent
+        if (p.getSku() != null && p.getSku().toUpperCase(Locale.ROOT).startsWith("LENS-")) {
+            p.setKind("LENS");
+            p.setStatus("DRAFT");
+        }
     }
 
     /** Replace the external-URL images. Uploaded photos are managed via add/deleteImage, not here. */

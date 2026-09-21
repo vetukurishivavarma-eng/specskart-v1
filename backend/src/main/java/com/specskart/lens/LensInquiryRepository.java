@@ -23,9 +23,9 @@ public interface LensInquiryRepository extends JpaRepository<LensInquiry, UUID> 
 
     List<LensInquiry> findByStatusAndCreatedAtBetweenOrderByCreatedAtDesc(String status, Instant from, Instant to);
 
-    /** Every web order still on its way to the customer. `<> 'DELIVERED'` also drops the
-     *  walk-ins, whose fulfilment is null — nothing is delivered at the counter. */
-    List<LensInquiry> findByFulfilmentNotOrderByCreatedAtAsc(String fulfilment);
+    /** Every web order still on its way to the customer. `NOT IN (DELIVERED, CANCELLED)` also
+     *  drops the walk-ins, whose fulfilment is null — nothing is delivered at the counter. */
+    List<LensInquiry> findByFulfilmentNotInOrderByCreatedAtAsc(java.util.Collection<String> fulfilment);
 
     /** The other half of that list: orders already handed over. Newest first, because a
      *  finished order is looked up to check something, not worked through in order. */

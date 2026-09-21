@@ -22,6 +22,7 @@ const LABEL: Record<string, string> = {
   PACKED: 'Packed',
   OUT_FOR_DELIVERY: 'On its way',
   DELIVERED: 'Delivered',
+  CANCELLED: 'Cancelled',
 }
 
 /** What the customer's "track your order" link opens: the state of their own lens order.
@@ -36,7 +37,7 @@ export default function LensTracking() {
     queryFn: () => lens.status(id!),
     // Someone watching this page is waiting on the shop to move it along; a slow poll costs
     // nothing and saves them refreshing. Stops once there is nowhere left to go.
-    refetchInterval: (r) => (r.state.data?.fulfilment === 'DELIVERED' ? false : 30_000),
+    refetchInterval: (r) => (['DELIVERED', 'CANCELLED'].includes(r.state.data?.fulfilment ?? '') ? false : 30_000),
   })
 
   if (isLoading) return <div className="container-x py-16 text-ink/50">Loading your order…</div>
@@ -58,7 +59,12 @@ export default function LensTracking() {
         <p className="label">Order {ref}</p>
         <h1 className="mt-2 text-3xl">{LABEL[stage] ?? stage}</h1>
 
-        {delivered ? (
+        {stage === 'CANCELLED' ? (
+          <p className="mt-3 text-ink/60">
+            This order was cancelled.{q.paid ? ' Your online payment will be refunded.' : ''} Questions?{' '}
+            <a href={WA} className="underline">Message us on WhatsApp</a>
+          </p>
+        ) : delivered ? (
           <p className="mt-3 text-ink/60">
             These lenses were handed over. If anything isn’t right with the fit, tell us and we’ll
             sort it out.
