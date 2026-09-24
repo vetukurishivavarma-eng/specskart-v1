@@ -9,11 +9,13 @@ public final class PosDtos {
     private PosDtos() {}
 
     public record StoreView(UUID id, String name, String code, String city, boolean active,
-                            Double latitude, Double longitude) {}
+                            Double latitude, Double longitude, String address) {}
     public record CreateStore(String name, String code, String city) {}
 
+    /** @param kind FRAME or LENS — the stock list is one long column otherwise, and lens blanks
+     *              are the rows staff most often need to find in it. */
     public record InventoryRow(UUID productId, String productName, String sku, int quantity,
-                               int reorderLevel, long priceMinor) {}
+                               int reorderLevel, long priceMinor, String kind) {}
     public record AdjustStock(int delta, String note) {}
 
     public record SaleItemRequest(UUID productId, int quantity, Long unitPriceMinor, Long discountMinor) {}

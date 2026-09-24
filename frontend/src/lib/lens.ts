@@ -19,6 +19,9 @@ export type LensInquiry = {
   priceMinor: number | null
   currency: string | null
   fulfilment: 'ORDERED' | 'READY' | 'DELIVERED' | 'CANCELLED' | null
+  shopName: string | null
+  shopAddress: string | null
+  shopMapsUrl: string | null
   paid: boolean
 }
 

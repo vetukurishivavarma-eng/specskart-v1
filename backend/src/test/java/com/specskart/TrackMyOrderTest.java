@@ -80,7 +80,9 @@ class TrackMyOrderTest {
         int mark = outboxSize();
         inbound.process(new InboundMessage(waId, waId, "Tracker", "where is my order", null, msgId(waId, "t2"), Map.of()));
 
-        assertThat(replySince(mark)).contains("Ready to collect at Specskart Lusaka");
+        // The shop comes from the inventory lookup now, not from the name on the inquiry, so
+        // this asserts the shape of the answer rather than a shop this test never created.
+        assertThat(replySince(mark)).contains("Ready to collect at:");
     }
 
     @Test

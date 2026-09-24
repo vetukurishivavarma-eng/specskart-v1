@@ -68,8 +68,8 @@ export default function LensTracking() {
           </p>
         ) : stage === 'READY' ? (
           <p className="mt-3 text-ink/60">
-            Your lenses are waiting at the shop. Come in and collect them, or send someone to pick
-            them up for you — bring this reference.
+            Your lenses are waiting for you. Come in and collect them, or send someone to pick them
+            up — just quote <b>{ref}</b>.
           </p>
         ) : (
           <p className="mt-3 text-ink/60">This page updates on its own — no need to refresh.</p>
@@ -131,6 +131,21 @@ export default function LensTracking() {
           )}
         </dl>
       </div>
+
+      {q.shopName && stage !== 'CANCELLED' && (
+        <div className="card animate-track-rise mt-4 p-5" style={{ '--d': '260ms' } as React.CSSProperties}>
+          <h2 className="text-lg">{delivered ? 'Collected from' : 'Collect from'}</h2>
+          <p className="mt-2 text-sm text-ink/70">
+            <b>{q.shopName}</b>
+            {q.shopAddress ? <><br />{q.shopAddress}</> : null}
+          </p>
+          {q.shopMapsUrl && (
+            <a href={q.shopMapsUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block underline">
+              Open in Google Maps
+            </a>
+          )}
+        </div>
+      )}
 
       <div className="animate-track-rise mt-8 flex flex-wrap gap-3" style={{ '--d': '340ms' } as React.CSSProperties}>
         <a href={WA} className="btn-primary">Message us on WhatsApp</a>

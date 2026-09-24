@@ -14,7 +14,7 @@ import java.util.UUID;
 public class AdminStoreController {
 
     /** location: "lat, lng" (or a pasted Google Maps link) sets the shop's pin, "" removes it. */
-    public record UpdateStore(String name, String city, Boolean active, String location) {}
+    public record UpdateStore(String name, String city, Boolean active, String location, String address) {}
 
     private static final java.util.regex.Pattern LAT_LNG =
             java.util.regex.Pattern.compile("(-?\\d{1,2}(?:\\.\\d+)?)\\s*,\\s*(-?\\d{1,3}(?:\\.\\d+)?)");
@@ -23,13 +23,53 @@ public class AdminStoreController {
     private final CurrentUser currentUser;
     private final AuditLogService audit;
     private final InventoryService inventory;
+    private final PosSaleRepository sales;
+    private final ProductInventoryRepository shelves;
 
     public AdminStoreController(StoreRepository stores, CurrentUser currentUser, AuditLogService audit,
-                                InventoryService inventory) {
+                                InventoryService inventory, PosSaleRepository sales,
+                                ProductInventoryRepository shelves) {
         this.inventory = inventory;
         this.stores = stores;
         this.currentUser = currentUser;
         this.audit = audit;
+        this.sales = sales;
+        this.shelves = shelves;
+    }
+
+    /**
+     * Removes a shop that was created by mistake.
+     *
+     * Only one that never traded. A shop with sales against it is woven through the reports,
+     * the stock movements and the audit log, and deleting it would leave those reading from a
+     * row that no longer exists — so that one is deactivated instead, which already hides it
+     * everywhere a working shop appears. Stock on its shelves is the same argument in advance:
+     * it is somebody's counted inventory, not a mistake.
+     */
+    @DeleteMapping("/{id}")
+    public java.util.Map<String, Object> delete(@PathVariable UUID id, Authentication auth) {
+        requireAdmin(auth);
+        Store s = stores.findById(id).orElseThrow(() -> ApiException.notFound("STORE_NOT_FOUND", "No such shop."));
+
+        long sold = sales.countByStoreId(id);
+        if (sold > 0) {
+            throw ApiException.badRequest("STORE_HAS_SALES",
+                    "\"" + s.getName() + "\" has " + sold + " sale(s) against it, so its reports still need it."
+                            + " Switch it off instead of deleting it.");
+        }
+        boolean stocked = shelves.findByStoreId(id).stream().anyMatch(r -> r.getQuantity() != 0);
+        if (stocked) {
+            throw ApiException.badRequest("STORE_HAS_STOCK",
+                    "\"" + s.getName() + "\" still has stock on its shelves. Move or zero it first,"
+                            + " or switch the shop off instead.");
+        }
+
+        // Empty shelf rows (a product touched then set back to zero) carry no history worth keeping.
+        shelves.deleteAll(shelves.findByStoreId(id));
+        stores.delete(s);
+        audit.record("STORE", id.toString(), "DELETE", currentUser.idOf(auth), currentUser.nameOf(auth), id, s.getName());
+        inventory.resyncWebStock();
+        return java.util.Map.of("deleted", id);
     }
 
     /** A shop-scoped login only ever needs to see its own shop (e.g. the store-picker) --
@@ -66,6 +106,7 @@ public class AdminStoreController {
         Store s = stores.findById(id).orElseThrow(() -> ApiException.notFound("STORE_NOT_FOUND", "No such store."));
         if (req.name() != null) s.setName(req.name());
         if (req.city() != null) s.setCity(req.city());
+        if (req.address() != null) s.setAddress(req.address().isBlank() ? null : req.address().trim());
         if (req.active() != null) s.setActive(req.active());
         if (req.location() != null) {
             double[] ll = parseLocation(req.location());
@@ -96,6 +137,6 @@ public class AdminStoreController {
 
     private static PosDtos.StoreView view(Store s) {
         return new PosDtos.StoreView(s.getId(), s.getName(), s.getCode(), s.getCity(), s.isActive(),
-                s.getLatitude(), s.getLongitude());
+                s.getLatitude(), s.getLongitude(), s.getAddress());
     }
 }

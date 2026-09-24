@@ -49,10 +49,16 @@
   .animate-track-rise { animation: track-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: var(--d, 0ms); }
   .animate-track-pulse { animation: track-pulse 2s ease-out infinite; }
   .animate-track-fill { animation: track-fill 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both; transform-origin: left; }
-  .btn-primary { @apply btn bg-ink text-bone hover:bg-clay; }
-  .btn-ghost { @apply btn border border-ink/20 hover:border-ink/60; }
+  /* The primary action was flat ink that turned clay on hover -- a colour change with no
+     depth behind it. Clay leads now, with a shadow that grows on press so the button reads
+     as a physical thing rather than a coloured rectangle. */
+  .btn-primary { @apply btn bg-clay text-bone shadow-card hover:bg-clay-deep hover:shadow-lift active:translate-y-px; }
+  .btn-ghost { @apply btn border border-ink/15 bg-white/60 hover:border-clay/50 hover:text-clay; }
   .container-x { @apply mx-auto w-full max-w-6xl px-5; }
-  .card { @apply rounded-2xl border border-ink/10 bg-white; }
+  /* A hairline border on white against a bone page is nearly invisible, so every card read as
+     part of the background. A soft shadow does the separating instead. */
+  .card { @apply rounded-2xl border border-ink/[0.07] bg-white shadow-card; }
+  .card-lift { @apply card transition-shadow duration-300 hover:shadow-lift; }
   .label { @apply text-xs font-medium uppercase tracking-widest text-ink/50; }
   .lbl { @apply text-xs font-medium uppercase tracking-widest text-ink/50; }
   .fld { @apply mt-1 w-full rounded-lg border border-ink/20 px-3 py-2 text-sm; }

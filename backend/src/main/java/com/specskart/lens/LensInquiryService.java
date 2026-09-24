@@ -18,6 +18,7 @@ import com.specskart.payment.PaymentProvider;
 import com.specskart.catalog.Product;
 import com.specskart.catalog.ProductRepository;
 import com.specskart.pos.InventoryService;
+import com.specskart.pos.Store;
 import com.specskart.pos.StoreRepository;
 import com.specskart.whatsapp.WhatsAppProvider;
 import org.slf4j.Logger;
@@ -407,12 +408,51 @@ public class LensInquiryService {
         return view(q);
     }
 
+    /**
+     * Which shop the customer collects from. The pair is only taken off a shelf at handover, so
+     * before that there is no stockStoreId and the shop is resolved the same way submit() does.
+     * ponytail: with one shop those always agree. If a second shop is ever added, pin the
+     * collection shop onto the inquiry at submit rather than re-deriving it here.
+     */
+    private Store collectionShop(LensInquiry q) {
+        if (q.getStockStoreId() != null) return stores.findById(q.getStockStoreId()).orElse(null);
+        Product lens = lensBlank(q);
+        UUID id = lens == null ? null : lensShopId(null, lens);
+        return id == null ? null : stores.findById(id).orElse(null);
+    }
+
+    /** Where to collect, as a line a customer can act on: name, street, and a tappable map. */
+    static String collectionLine(Store shop) {
+        if (shop == null) return "our shop";
+        StringBuilder sb = new StringBuilder(shop.getName());
+        if (!blank(shop.getAddress())) sb.append(", ").append(shop.getAddress());
+        else if (!blank(shop.getCity())) sb.append(", ").append(shop.getCity());
+        String map = mapsLink(shop);
+        if (map != null) sb.append("\n📍 ").append(map);
+        return sb.toString();
+    }
+
+    /**
+     * A Google Maps link for the shop. The pin is exact and wins; failing that the address is
+     * handed over as a search, which is still better than a name nobody can find. No API key
+     * and no billing — these are plain public URLs.
+     */
+    static String mapsLink(Store shop) {
+        if (shop.getLatitude() != null && shop.getLongitude() != null) {
+            return "https://www.google.com/maps/search/?api=1&query="
+                    + shop.getLatitude() + "," + shop.getLongitude();
+        }
+        String where = blank(shop.getAddress()) ? shop.getCity() : shop.getAddress();
+        if (blank(where)) return null;
+        return "https://www.google.com/maps/search/?api=1&query="
+                + java.net.URLEncoder.encode(shop.getName() + " " + where, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
     /** What the customer is told at each rung. */
-    private static String stageLine(LensInquiry q) {
+    private String stageLine(LensInquiry q) {
         return switch (q.getFulfilment()) {
-            case "READY" -> "your lenses are ready! Come and collect them"
-                    + (blank(q.getShopName()) ? " at the shop" : " at " + q.getShopName())
-                    + ", or send someone to pick them up for you";
+            case "READY" -> "your lenses are ready! Collect them at:\n" + collectionLine(collectionShop(q))
+                    + "\n\nCome in yourself or send someone to pick them up — just quote " + ref(q) + ".";
             default -> "there's an update on your lens order";
         };
     }
@@ -454,11 +494,11 @@ public class LensInquiryService {
     }
 
     /** Where the order is right now, in the customer's words. */
-    private static String trackLine(LensInquiry q) {
+    private String trackLine(LensInquiry q) {
         return switch (q.getFulfilment()) {
             case "ORDERED" -> "We have your prescription and your lenses are being made.";
-            case "READY" -> "Ready to collect" + (blank(q.getShopName()) ? "" : " at " + q.getShopName())
-                    + " — come in, or send someone to pick them up.";
+            case "READY" -> "Ready to collect at:\n" + collectionLine(collectionShop(q))
+                    + "\nCome in, or send someone to pick them up.";
             case "DELIVERED" -> "Collected 🎉 Anything not right with them? Just reply here.";
             case "CANCELLED" -> "Cancelled. Questions about it? Just reply here.";
             default -> "We're on it.";
@@ -662,13 +702,17 @@ public class LensInquiryService {
         return q;
     }
 
-    private static LensDtos.InquiryView view(LensInquiry q) {
+    private LensDtos.InquiryView view(LensInquiry q) {
+        Store shop = collectionShop(q);
         return new LensDtos.InquiryView(q.getId(), q.getStatus(), q.isPhoneVerified(),
                 q.getLensType(), q.isBlueBlock(),
                 q.getCustomerName(), q.getAge(), q.getGender(),
                 q.getSphRight(), q.getSphLeft(), q.getCylRight(), q.getCylLeft(),
                 q.getAxisRight(), q.getAxisLeft(), q.getAddPower(), q.getLensStructure(),
                 q.isSpecialAxis(), q.getPriceMinor(), q.getCurrency(),
-                q.getFulfilment(), q.isPaid());
+                q.getFulfilment(), q.isPaid(),
+                shop == null ? null : shop.getName(),
+                shop == null ? null : shop.getAddress(),
+                shop == null ? null : mapsLink(shop));
     }
 }

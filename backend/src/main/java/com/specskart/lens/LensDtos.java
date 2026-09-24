@@ -29,7 +29,9 @@ public final class LensDtos {
                               Integer axisRight, Integer axisLeft,
                               BigDecimal addPower, String lensStructure,
                               boolean specialAxis, Long priceMinor, String currency,
-                              String fulfilment, boolean paid) {}
+                              String fulfilment, boolean paid,
+                              /* where to collect -- the shop's own details, not an address they typed */
+                              String shopName, String shopAddress, String shopMapsUrl) {}
 
     /** Hosted-checkout hop for a lens order: where to send the shopper, and what they'll pay. */
     public record PayResult(String checkoutUrl, long amountMinor, String currency) {}

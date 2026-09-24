@@ -10,4 +10,6 @@ import java.util.UUID;
 public interface PosSaleRepository extends JpaRepository<PosSale, UUID> {
     Optional<PosSale> findByClientReference(String clientReference);
     List<PosSale> findByStoreIdAndCreatedAtBetweenOrderByCreatedAtDesc(UUID storeId, Instant from, Instant to);
+
+    long countByStoreId(UUID storeId);
 }

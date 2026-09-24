@@ -157,8 +157,8 @@ export default function LensConfigurator() {
           <h2 className="text-lg text-moss">Thanks — we've got it! ✅</h2>
           {q.paid && <p className="mt-1 text-sm text-moss">Payment received.</p>}
           <p className="mt-2 text-sm text-ink/60">
-            We'll message you on WhatsApp as soon as your lenses are ready. Collect them at the
-            shop — come in yourself, or send someone to pick them up for you.
+            We'll message you on WhatsApp as soon as your lenses are ready, with the shop's address
+            and a map. Come in yourself, or send someone to pick them up for you.
           </p>
           <button className="btn-primary mt-4" onClick={bookAnother}>Book another pair</button>
         </div>

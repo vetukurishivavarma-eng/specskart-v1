@@ -151,7 +151,7 @@ class LensInquiryFlowTest {
 
         var out = service.advanceFulfilment(id, new LensDtos.AdvanceFulfilment("READY", null, null, null));
         assertThat(out.status()).isEqualTo("SUBMITTED"); // still unpaid — they pay at the counter
-        assertThat(sentTexts()).anySatisfy(t -> assertThat(t).contains("Come and collect them"));
+        assertThat(sentTexts()).anySatisfy(t -> assertThat(t).contains("Collect them at:"));
         assertThat(sentTexts()).anySatisfy(t -> assertThat(t).contains("send someone to pick them up"));
 
         // an in-flight order stays on the staff list the whole way

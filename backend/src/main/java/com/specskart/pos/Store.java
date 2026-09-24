@@ -23,6 +23,11 @@ public class Store extends BaseEntity {
     @Column(nullable = false)
     private String city = "";
 
+    /** Street address, for the "come and collect" message. The map pin is for distance maths;
+     *  this is what a person reads and walks to. */
+    @Column(length = 500)
+    private String address;
+
     @Column(nullable = false)
     private boolean active = true;
 

@@ -153,7 +153,7 @@ public class InventoryService {
                 .map(p -> new PosDtos.InventoryRow(p.getId(), p.getName(), p.getSku() == null ? "" : p.getSku(),
                         quantityOf(storeId, p.getId()),
                         inventory.findByStoreIdAndProductId(storeId, p.getId()).map(ProductInventory::getReorderLevel).orElse(3),
-                        priceOf(storeId, p.getId(), p.getPriceMinor())))
+                        priceOf(storeId, p.getId(), p.getPriceMinor()), p.getKind()))
                 .toList();
     }
 
