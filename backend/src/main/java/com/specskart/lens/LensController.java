@@ -20,7 +20,8 @@ public class LensController {
 
     @PostMapping("/start")
     public LensDtos.StartResult start(@RequestBody LensDtos.StartVerification body) {
-        UUID id = service.start(body.phone(), body.lensType(), Boolean.TRUE.equals(body.blueBlock()));
+        UUID id = service.start(body.phone(), body.lensType(), Boolean.TRUE.equals(body.blueBlock()),
+                body.attribution());
         return new LensDtos.StartResult(id);
     }
 

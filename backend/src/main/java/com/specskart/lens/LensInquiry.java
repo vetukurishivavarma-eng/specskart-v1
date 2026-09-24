@@ -6,9 +6,13 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -24,6 +28,12 @@ import java.util.UUID;
 public class LensInquiry extends BaseEntity {
 
     private UUID leadId;
+
+    /** Which ad sent them, as the raw query params off the landing URL. Parked here until the
+     *  number verifies and there is a lead to attribute — see LensInquiryService.start. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "text")
+    private Map<String, Object> attribution = new HashMap<>();
 
     @Column(nullable = false)
     private String verifyTokenHash;

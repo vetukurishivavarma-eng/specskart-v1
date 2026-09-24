@@ -1,4 +1,5 @@
 import { api } from './api'
+import { attribution } from './attribution'
 
 export type LensInquiry = {
   id: string
@@ -31,7 +32,9 @@ export type LensDetails = {
 export const lens = {
   start: (phone: string, lensType: string, blueBlock: boolean) =>
     api<{ inquiryId: string }>('/public/lens/start', {
-      method: 'POST', body: JSON.stringify({ phone, lensType, blueBlock }),
+      // The ad that brought them here, so the lead this creates can be traced back to it.
+      method: 'POST',
+      body: JSON.stringify({ phone, lensType, blueBlock, attribution: attribution() }),
     }),
   status: (id: string) => api<LensInquiry>(`/public/lens/${id}`),
   verify: (token: string) => api<{ verified: boolean }>(`/public/lens/verify/${token}`, { method: 'POST' }),

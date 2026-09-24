@@ -43,7 +43,7 @@ class LensInquiryFlowTest {
 
     @Test
     void detailsAreGatedUntilTheWhatsappNumberIsVerified() {
-        UUID id = service.start(phone(), "CLEAR", false);
+        UUID id = service.start(phone(), "CLEAR", false, null);
         assertThat(inquiries.findById(id).orElseThrow().isPhoneVerified()).isFalse();
 
         assertThatThrownBy(() -> service.update(id, new LensDtos.UpdateDetails(
@@ -61,7 +61,7 @@ class LensInquiryFlowTest {
 
     @Test
     void axisFarFromTheNormalBandsIsFlaggedSpecial() {
-        UUID id = service.start(phone(), "PHOTOCHROMATIC", true);
+        UUID id = service.start(phone(), "PHOTOCHROMATIC", true, null);
         service.verify(tokenFromLastOutbound());
 
         // cyl present, axis 45 -> nowhere near 0/90/180 -> special
@@ -77,7 +77,7 @@ class LensInquiryFlowTest {
 
     @Test
     void quoteAddsBlueBlockAndProgressiveOnTopOfTheBaseLens() {
-        UUID id = service.start(phone(), "PHOTOCHROMATIC", true);
+        UUID id = service.start(phone(), "PHOTOCHROMATIC", true, null);
         service.verify(tokenFromLastOutbound());
         service.update(id, new LensDtos.UpdateDetails(
                 null, null, null, null, null, null, null, null, null,
@@ -108,7 +108,7 @@ class LensInquiryFlowTest {
 
     @Test
     void completingAWebOrderMovesItFromPendingToSold() {
-        UUID id = service.start(phone(), "CLEAR", false);
+        UUID id = service.start(phone(), "CLEAR", false, null);
         service.verify(tokenFromLastOutbound());
         service.submit(id);
 
@@ -124,7 +124,7 @@ class LensInquiryFlowTest {
 
     @Test
     void aWebOrderNeedsNothingButAVerifiedNumberAndIsCollectedAtTheShop() {
-        UUID id = service.start(phone(), "CLEAR", false);
+        UUID id = service.start(phone(), "CLEAR", false, null);
         service.verify(tokenFromLastOutbound());
 
         assertThat(service.submit(id).status()).isEqualTo("SUBMITTED");
@@ -139,7 +139,7 @@ class LensInquiryFlowTest {
 
     @Test
     void aWebOrderWalksTheLadderAndIsBilledWhenItIsCollected() {
-        UUID id = service.start(phone(), "CLEAR", false);
+        UUID id = service.start(phone(), "CLEAR", false, null);
         service.verify(tokenFromLastOutbound());
         service.submit(id);
         assertThat(inquiries.findById(id).orElseThrow().getFulfilment()).isEqualTo("ORDERED");
@@ -166,7 +166,7 @@ class LensInquiryFlowTest {
 
     @Test
     void payingOnlineMarksTheOrderPaidAndSurvivesTheHandover() {
-        UUID id = service.start(phone(), "CLEAR", false);
+        UUID id = service.start(phone(), "CLEAR", false, null);
         service.verify(tokenFromLastOutbound());
         service.submit(id);
 
@@ -218,7 +218,7 @@ class LensInquiryFlowTest {
     void aKnownNumberSkipsVerificationTheSecondTime() {
         String phone = phone();
 
-        UUID first = service.start(phone, "CLEAR", false);
+        UUID first = service.start(phone, "CLEAR", false, null);
         assertThat(service.status(first).verified()).isFalse();
 
         // Prove the number once, the way the verify link does.
@@ -227,7 +227,7 @@ class LensInquiryFlowTest {
         q.setStatus("VERIFIED");
         inquiries.save(q);
 
-        UUID second = service.start(phone, "PHOTOCHROMATIC", true);
+        UUID second = service.start(phone, "PHOTOCHROMATIC", true, null);
         assertThat(service.status(second).verified()).isTrue();
         // Same person, a genuinely new order -- not the old row handed back.
         assertThat(second).isNotEqualTo(first);

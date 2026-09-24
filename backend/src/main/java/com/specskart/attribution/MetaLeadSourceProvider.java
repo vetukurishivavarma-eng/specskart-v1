@@ -15,7 +15,7 @@ public class MetaLeadSourceProvider implements LeadSourceProvider {
     @Override
     public boolean supports(Map<String, Object> raw) {
         String src = str(raw, "utm_source");
-        return raw.containsKey("ctwa_clid") || raw.containsKey("referral")
+        return raw.containsKey("ctwa_clid") || raw.containsKey("fbclid") || raw.containsKey("referral")
                 || (src != null && (src.contains("facebook") || src.contains("instagram")
                     || src.contains("meta") || src.contains("fb") || src.contains("ig")));
     }
@@ -25,7 +25,8 @@ public class MetaLeadSourceProvider implements LeadSourceProvider {
     public AttributionContext extract(Map<String, Object> raw) {
         AttributionContext ctx = new AttributionContext();
         ctx.source = AcquisitionSource.META;
-        ctx.clickId = str(raw, "ctwa_clid");
+        // ctwa_clid on a click-to-WhatsApp ad; fbclid when the same ad lands on the website.
+        ctx.clickId = firstNonNull(str(raw, "ctwa_clid"), str(raw, "fbclid"));
         Object referral = raw.get("referral");
         if (referral instanceof Map<?, ?> r) {
             Map<String, Object> rm = (Map<String, Object>) r;

@@ -86,7 +86,8 @@ public class LensInquiryService {
     }
 
     @Transactional
-    public UUID start(String phone, String lensType, boolean blueBlock) {
+    public UUID start(String phone, String lensType, boolean blueBlock,
+                      Map<String, Object> attribution) {
         String waId = PhoneNumbers.normalize(phone, props.whatsapp().defaultCountryCode());
         if (waId == null || waId.length() < 8) {
             throw ApiException.badRequest("BAD_NUMBER", "Enter a valid WhatsApp number.");
@@ -99,6 +100,10 @@ public class LensInquiryService {
         q.setWaId(waId);
         q.setLensType(lensType);
         q.setBlueBlock(blueBlock);
+        // Parked on the inquiry rather than used now: for a new number the lead is only created
+        // once they verify, which is a separate request from WhatsApp's in-app browser, where
+        // this page's storage no longer exists.
+        if (attribution != null) q.setAttribution(new java.util.HashMap<>(attribution));
 
         // A number that has already proved it owns this WhatsApp account does not prove it
         // again. Sending a returning customer away to find a message and come back is the
@@ -117,7 +122,7 @@ public class LensInquiryService {
         if (inquiries.existsByWaIdAndPhoneVerifiedAtIsNotNull(waId)) {
             q.setPhoneVerifiedAt(Instant.now());
             q.setStatus("VERIFIED");
-            Lead lead = leadService.onWebOrder(waId, null);
+            Lead lead = leadService.onWebOrder(waId, null, q.getAttribution());
             if (lead != null) q.setLeadId(lead.getId());
             inquiries.save(q);
             log.info("lens inquiry {} skipped verification -- {} is already known", q.getId(), waId);
@@ -156,7 +161,7 @@ public class LensInquiryService {
         if (!q.isPhoneVerified()) {
             q.setPhoneVerifiedAt(Instant.now());
             q.setStatus("VERIFIED");
-            Lead lead = leadService.onWebOrder(q.getWaId(), null);
+            Lead lead = leadService.onWebOrder(q.getWaId(), null, q.getAttribution());
             if (lead != null) q.setLeadId(lead.getId());
             inquiries.save(q);
             log.info("lens inquiry {} verified", q.getId());

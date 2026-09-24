@@ -6,7 +6,10 @@ import java.util.UUID;
 public final class LensDtos {
     private LensDtos() {}
 
-    public record StartVerification(String phone, String lensType, Boolean blueBlock) {}
+    /** @param attribution raw query params off the page they landed on (fbclid / ttclid /
+     *                     gclid / utm_*), so a lead can be traced back to the ad that paid for it. */
+    public record StartVerification(String phone, String lensType, Boolean blueBlock,
+                                    java.util.Map<String, Object> attribution) {}
     public record StartResult(UUID inquiryId) {}
     public record VerifyResult(boolean verified, UUID inquiryId) {}
 

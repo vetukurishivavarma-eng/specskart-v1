@@ -128,6 +128,14 @@ public class LeadService {
      */
     @Transactional
     public Lead onWebOrder(String phone, String name) {
+        return onWebOrder(phone, name, Map.of());
+    }
+
+    /** @param rawAttribution query params off the page they landed on. Applied on first contact
+     *                        only, like {@link #onWhatsAppContact} — first touch wins, so a
+     *                        customer who came back through a second ad still credits the first. */
+    @Transactional
+    public Lead onWebOrder(String phone, String name, Map<String, Object> rawAttribution) {
         // Normalized to a real wa_id (country code first) — a web form takes whatever the
         // customer types (often local format with a trunk "0"), and sending WhatsApp to that
         // as-is is accepted by Meta but never delivered, with no error at send time.
@@ -142,8 +150,11 @@ public class LeadService {
             lead.setWhatsappWaId(digits);
             lead.setWhatsappNumber(phone);
             lead.setName(name);
-            lead.setAcquisitionSource(AcquisitionSource.WEBSITE);
             lead.setFirstContactAt(Instant.now());
+            // The provider chain decides the source: META for an fbclid, TIKTOK for a ttclid,
+            // GOOGLE for a gclid, WEBSITE when the URL carried nothing.
+            applyAttribution(lead, attribution.resolve(
+                    rawAttribution == null ? Map.of() : rawAttribution));
         }
         lead.setLastContactAt(Instant.now());
         if ((lead.getName() == null || lead.getName().isBlank()) && name != null) lead.setName(name);

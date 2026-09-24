@@ -71,7 +71,7 @@ class LensStockTest {
 
     private UUID webOrder() {
         String phone = "097" + (7000000 + (int) (Math.random() * 900000));
-        UUID id = service.start(phone, "PHOTOCHROMATIC", false);
+        UUID id = service.start(phone, "PHOTOCHROMATIC", false, null);
         var sent = ((MockWhatsAppProvider) provider).outbox();
         String text = sent.get(sent.size() - 1).text();
         service.verify(text.substring(text.lastIndexOf('/') + 1));
