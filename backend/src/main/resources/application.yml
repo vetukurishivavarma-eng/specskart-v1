@@ -64,6 +64,15 @@ specskart:
     enabled: ${COD_ENABLED:true}
     # Hide COD for baskets above this (minor units). 0 = no cap.
     max-order-minor: ${COD_MAX_ORDER_MINOR:0}
+  ads:
+    # Conversions reported server-side. Blank = that platform is off, which is the default.
+    meta-pixel-id: ${META_PIXEL_ID:}
+    meta-access-token: ${META_CAPI_TOKEN:}
+    meta-graph-base-url: ${META_GRAPH_BASE_URL:}
+    tiktok-pixel-id: ${TIKTOK_PIXEL_ID:}
+    tiktok-access-token: ${TIKTOK_EVENTS_TOKEN:}
+    # Set only while watching Events Manager's Test Events; clear it afterwards.
+    test-event-code: ${META_TEST_EVENT_CODE:}
   whatsapp:
     provider: ${WHATSAPP_PROVIDER:mock}
     phone-number-id: ${WHATSAPP_PHONE_NUMBER_ID:}

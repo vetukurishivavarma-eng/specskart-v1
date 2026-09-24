@@ -63,6 +63,15 @@ services:
         sync: false
       - key: WHATSAPP_GRAPH_BASE_URL
         value: https://graph.facebook.com/v21.0
+      # Conversions API. Leave unset until the pixel + token exist; nothing is sent without them.
+      - key: META_PIXEL_ID
+        sync: false
+      - key: META_CAPI_TOKEN
+        sync: false
+      - key: TIKTOK_PIXEL_ID
+        sync: false
+      - key: TIKTOK_EVENTS_TOKEN
+        sync: false
 
   # -------------------------------------------------------------- frontend site
   - type: web
@@ -78,4 +87,9 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_BASE          # https://specskart-api.onrender.com/api  (set after backend deploys)
+        sync: false
+      # Browser pixels, for retargeting audiences. Same ids as the CAPI vars above.
+      - key: VITE_META_PIXEL_ID
+        sync: false
+      - key: VITE_TIKTOK_PIXEL_ID
         sync: false

@@ -17,8 +17,30 @@ public record AppProperties(
         Promo promo,
         Loyalty loyalty,
         Lenses lenses,
-        Cod cod
+        Cod cod,
+        Ads ads
 ) {
+    /**
+     * Server-to-server conversion reporting. Each platform is independently optional: leave
+     * the token blank and nothing is sent to it, which is the default and the local/dev state.
+     *
+     * @param metaGraphBaseUrl overridden only by tests, which point it at a local stub.
+     * @param testEventCode    Meta's Events Manager "Test Events" code. Set it while you are
+     *                         watching events arrive, then clear it — events sent with a test
+     *                         code are NOT used for optimisation.
+     */
+    public record Ads(String metaPixelId, String metaAccessToken, String metaGraphBaseUrl,
+                      String tiktokPixelId, String tiktokAccessToken, String testEventCode) {
+        public boolean metaConfigured() { return set(metaPixelId) && set(metaAccessToken); }
+        public boolean tiktokConfigured() { return set(tiktokPixelId) && set(tiktokAccessToken); }
+
+        public String metaEventsUrl() {
+            String base = set(metaGraphBaseUrl) ? metaGraphBaseUrl : "https://graph.facebook.com/v21.0";
+            return base + "/" + metaPixelId + "/events?access_token=" + metaAccessToken;
+        }
+
+        private static boolean set(String s) { return s != null && !s.isBlank(); }
+    }
     /**
      * Cash / pay-on-delivery. enabled: offer it at checkout at all.
      * maxOrderMinor: hide COD for baskets above this (0 = no cap) — caps the risk on

@@ -4,10 +4,12 @@ import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import { captureAttribution } from './lib/attribution'
+import { initPixels } from './lib/pixels'
 import './index.css'
 
 // Before React mounts and the router starts rewriting the URL.
 captureAttribution()
+initPixels()
 
 const qc = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } })
 

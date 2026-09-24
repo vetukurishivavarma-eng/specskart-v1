@@ -1,5 +1,6 @@
 package com.specskart.lens;
 
+import com.specskart.ads.AdEventService;
 import com.specskart.config.AppProperties;
 import com.specskart.lead.Lead;
 import com.specskart.lead.LeadService;
@@ -64,12 +65,15 @@ public class LensInquiryService {
     private final InventoryService inventory;
     private final ProductRepository products;
     private final StoreRepository stores;
+    private final AdEventService adEvents;
 
     public LensInquiryService(LensInquiryRepository inquiries, LeadService leadService,
                               WhatsAppProvider whatsapp, TokenGenerator tokens, AppProperties props,
                               LensPricing pricing, StaffAlerts staffAlerts, SignedLinks links,
                               PaymentProvider payments, MembershipService memberships,
-                              InventoryService inventory, ProductRepository products, StoreRepository stores) {
+                              InventoryService inventory, ProductRepository products, StoreRepository stores,
+                              AdEventService adEvents) {
+        this.adEvents = adEvents;
         this.inventory = inventory;
         this.products = products;
         this.stores = stores;
@@ -125,6 +129,7 @@ public class LensInquiryService {
             Lead lead = leadService.onWebOrder(waId, null, q.getAttribution());
             if (lead != null) q.setLeadId(lead.getId());
             inquiries.save(q);
+            adEvents.lead(q);
             log.info("lens inquiry {} skipped verification -- {} is already known", q.getId(), waId);
             return q.getId();
         }
@@ -164,6 +169,7 @@ public class LensInquiryService {
             Lead lead = leadService.onWebOrder(q.getWaId(), null, q.getAttribution());
             if (lead != null) q.setLeadId(lead.getId());
             inquiries.save(q);
+            adEvents.lead(q);
             log.info("lens inquiry {} verified", q.getId());
         }
         return true;
@@ -216,6 +222,7 @@ public class LensInquiryService {
         UUID shop = pair == null ? null : lensShopId(null, pair);
         if (shop != null) q.setBackorder(inventory.quantityOf(shop, pair.getId()) < 1);
         inquiries.save(q);
+        adEvents.purchase(q);
         alertStaff(q);
         notifyCustomer(q, "we've got your lens order and we're on it");
         return view(q);
