@@ -17,7 +17,8 @@ import java.util.List;
 public class AdminAppReleaseController {
 
     public record PublishRelease(String platform, String version, int buildNumber, int minimumBuild,
-                                 String downloadUrl, String notes, boolean mandatory) {}
+                                 String downloadUrl, String notes, boolean mandatory,
+                                 Integer graceCount) {}
 
     private final AppReleaseRepository releases;
     private final CurrentUser currentUser;
@@ -45,6 +46,8 @@ public class AdminAppReleaseController {
         r.setDownloadUrl(req.downloadUrl());
         r.setNotes(req.notes() == null ? "" : req.notes());
         r.setMandatory(req.mandatory());
+        // Absent from an older admin client: keep the two postponements the column defaults to.
+        if (req.graceCount() != null) r.setGraceCount(Math.max(0, Math.min(10, req.graceCount())));
         releases.save(r);
         audit.record("APP_RELEASE", r.getId().toString(), "PUBLISH", currentUser.idOf(auth), currentUser.nameOf(auth),
                 null, "v" + r.getVersion() + " build " + r.getBuildNumber());

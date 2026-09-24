@@ -39,6 +39,11 @@ public class AppRelease extends BaseEntity {
 
     @Column(nullable = false)
     private boolean mandatory = false;
+
+    /** How many times a till may postpone this update before it is enforced. Ignored once
+     *  {@link #mandatory} is set, or once the till is below {@link #minimumBuild}. */
+    @Column(nullable = false)
+    private int graceCount = 2;
     @Column(nullable = false)
     private boolean active = true;
 
