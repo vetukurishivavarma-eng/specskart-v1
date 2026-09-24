@@ -16,10 +16,6 @@ public final class LensDtos {
                                 Integer axisRight, Integer axisLeft,
                                 BigDecimal addPower, String lensStructure) {}
 
-    /** Where the lens gets delivered — its own step after the quote, so it stays out of
-     *  the (positional) UpdateDetails record the prescription form uses. */
-    public record Delivery(String name, String address, String area, String landmark) {}
-
     /** Full current state of an inquiry — used to gate the form, resume after a refresh,
      *  and drive the poll-until-verified step. */
     public record InquiryView(UUID id, String status, boolean verified,
@@ -30,8 +26,6 @@ public final class LensDtos {
                               Integer axisRight, Integer axisLeft,
                               BigDecimal addPower, String lensStructure,
                               boolean specialAxis, Long priceMinor, String currency,
-                              String deliveryName, String deliveryAddress,
-                              String deliveryArea, String deliveryLandmark,
                               String fulfilment, boolean paid) {}
 
     /** Hosted-checkout hop for a lens order: where to send the shopper, and what they'll pay. */
@@ -45,7 +39,7 @@ public final class LensDtos {
 
     public record CompleteSale(String paymentMethod, String soldBy, String shopName) {}
 
-    /** Staff moving a web order one step along the doorstep ladder. Payment details are only
+    /** Staff moving a web order one step along the collection ladder. Payment details are only
      *  needed on the last step, where the order is also billed. */
     public record AdvanceFulfilment(String stage, String paymentMethod, String soldBy, String shopName) {}
 
@@ -53,9 +47,7 @@ public final class LensDtos {
     public record SaleView(UUID id, String customerName, String lensType, boolean blueBlock,
                            String lensStructure, boolean specialAxis, long priceMinor, String currency,
                            String paymentMethod, String soldBy, String shopName, boolean walkIn,
-                           String deliveryName, String deliveryAddress, String deliveryArea,
-                           String deliveryLandmark, String fulfilment, boolean paid,
-                           java.time.Instant createdAt) {}
+                           String fulfilment, boolean paid, java.time.Instant createdAt) {}
 
     public record DaySummary(long totalMinor, int count, String currency) {}
 }

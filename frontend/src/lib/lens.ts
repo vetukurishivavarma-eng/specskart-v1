@@ -17,15 +17,9 @@ export type LensInquiry = {
   specialAxis: boolean
   priceMinor: number | null
   currency: string | null
-  deliveryName: string | null
-  deliveryAddress: string | null
-  deliveryArea: string | null
-  deliveryLandmark: string | null
-  fulfilment: 'ORDERED' | 'PACKED' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED' | null
+  fulfilment: 'ORDERED' | 'READY' | 'DELIVERED' | 'CANCELLED' | null
   paid: boolean
 }
-
-export type Delivery = { name?: string; address: string; area: string; landmark?: string }
 
 export type LensDetails = {
   customerName?: string; age?: number; gender?: string
@@ -43,8 +37,6 @@ export const lens = {
   verify: (token: string) => api<{ verified: boolean }>(`/public/lens/verify/${token}`, { method: 'POST' }),
   update: (id: string, details: LensDetails) =>
     api<LensInquiry>(`/public/lens/${id}`, { method: 'PATCH', body: JSON.stringify(details) }),
-  delivery: (id: string, d: Delivery) =>
-    api<LensInquiry>(`/public/lens/${id}/delivery`, { method: 'PUT', body: JSON.stringify(d) }),
   quote: (id: string) => api<LensInquiry>(`/public/lens/${id}/quote`, { method: 'POST' }),
   pay: (id: string) =>
     api<{ checkoutUrl: string; amountMinor: number; currency: string }>(

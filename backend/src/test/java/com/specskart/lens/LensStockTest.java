@@ -69,39 +69,57 @@ class LensStockTest {
         return stores.save(s);
     }
 
-    private UUID webOrder(String area) {
+    private UUID webOrder() {
         String phone = "097" + (7000000 + (int) (Math.random() * 900000));
         UUID id = service.start(phone, "PHOTOCHROMATIC", false);
         var sent = ((MockWhatsAppProvider) provider).outbox();
         String text = sent.get(sent.size() - 1).text();
         service.verify(text.substring(text.lastIndexOf('/') + 1));
-        service.setDelivery(id, new LensDtos.Delivery("Ann", "12 Freedom Way", area, null));
         service.submit(id);
         return id;
     }
 
+    private void collect(UUID id) {
+        service.advanceFulfilment(id, new LensDtos.AdvanceFulfilment("READY", null, null, null));
+        service.advanceFulfilment(id, new LensDtos.AdvanceFulfilment("DELIVERED", "CASH", "Staff A", null));
+    }
+
+    /** Shop pickup: placing an order reserves nothing, collecting it is what moves the shelf. */
     @Test
-    void webOrdersTakeAPairFromTheShopInTheirTownThenTheNextOneHoldingIt() {
-        inventory.adjust(kitwe.getId(), photo, 1, "PURCHASE", "LB-1", null, null);
+    void thePairComesOffTheShelfWhenTheCustomerCollectsItNotWhenTheyOrder() {
         inventory.adjust(lusaka.getId(), photo, 3, "PURCHASE", "LB-2", null, null);
 
-        UUID first = webOrder("Riverside, Kitwe");
-        service.submit(first); // a retried submit must not take a second pair
-        assertThat(inventory.quantityOf(kitwe.getId(), photo)).isZero();
+        UUID first = webOrder();
+        assertThat(inventory.quantityOf(lusaka.getId(), photo)).isEqualTo(3); // untouched
+        assertThat(inquiries.findById(first).orElseThrow().getStockStoreId()).isNull();
+        assertThat(inquiries.findById(first).orElseThrow().isBackorder()).isFalse();
+
+        collect(first);
         LensInquiry q = inquiries.findById(first).orElseThrow();
-        assertThat(q.getStockStoreId()).isEqualTo(kitwe.getId());
-        assertThat(q.isBackorder()).isFalse();
-        assertThat(LensInquiryService.staffLines(q)).contains("Make at: Kitwe lens test");
-
-        UUID second = webOrder("Riverside, Kitwe"); // Kitwe is out now
-        assertThat(inquiries.findById(second).orElseThrow().getStockStoreId()).isEqualTo(lusaka.getId());
         assertThat(inventory.quantityOf(lusaka.getId(), photo)).isEqualTo(2);
+        assertThat(q.getStockStoreId()).isEqualTo(lusaka.getId());
+        assertThat(q.getStatus()).isEqualTo("SOLD");
+        assertThat(LensInquiryService.staffLines(q)).contains("Make at: Lusaka lens test");
 
-        // cancelling puts the pair back where it came from and takes it off the staff queue
-        assertThat(service.cancel(second).status()).isEqualTo("CANCELLED");
-        assertThat(inventory.quantityOf(lusaka.getId(), photo)).isEqualTo(3);
-        assertThat(service.pendingWebOrders()).noneSatisfy(v -> assertThat(v.id()).isEqualTo(second));
-        assertThatThrownBy(() -> service.submit(second)).hasMessageContaining("cancelled");
+        // billing a collected order twice must not take a second pair
+        service.completeSale(first, new LensDtos.CompleteSale("CASH", "Staff A", null));
+        assertThat(inventory.quantityOf(lusaka.getId(), photo)).isEqualTo(2);
+    }
+
+    /** An empty shelf never blocks a web order -- the lab is told to order blanks in. */
+    @Test
+    void anOrderWithNoStockIsTakenAnywayAndFlaggedAsABackorder() {
+        UUID id = webOrder(); // nothing purchased into either shop
+        LensInquiry placed = inquiries.findById(id).orElseThrow();
+        assertThat(placed.getStatus()).isEqualTo("SUBMITTED");
+        assertThat(placed.isBackorder()).isTrue();
+        assertThat(LensInquiryService.staffLines(placed)).anyMatch(l -> l.contains("BACKORDER"));
+
+        // cancelling before collection has no shelf to put anything back on
+        assertThat(service.cancel(id).status()).isEqualTo("CANCELLED");
+        assertThat(inquiries.findById(id).orElseThrow().getStockStoreId()).isNull();
+        assertThat(service.pendingWebOrders()).noneSatisfy(v -> assertThat(v.id()).isEqualTo(id));
+        assertThatThrownBy(() -> service.submit(id)).hasMessageContaining("cancelled");
     }
 
     @Test

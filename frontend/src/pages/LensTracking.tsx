@@ -3,25 +3,22 @@ import { useQuery } from '@tanstack/react-query'
 import { lens } from '../lib/lens'
 import { money } from '../lib/shop'
 import { WA } from '../lib/wa'
-import { DeliveryScooter } from '../components/DeliveryScooter'
 
-
-/** The doorstep ladder, in the order staff move it along in the POS app. */
-const STEPS = ['ORDERED', 'PACKED', 'OUT_FOR_DELIVERY', 'DELIVERED']
+/** The collection ladder, in the order staff move it along in the POS app. */
+const STEPS = ['ORDERED', 'READY', 'DELIVERED']
 /**
  * Where a step's dot actually sits, as a percentage of the rail.
  *
- * The steps are equal flex cells and the dot is centred in its own cell, so with four of them
- * the dots land at 12.5/37.5/62.5/87.5% — not 0/33/67/100%. Using the latter made the filled
- * rail overshoot the dot it was supposed to stop at.
+ * The steps are equal flex cells and the dot is centred in its own cell, so with three of them
+ * the dots land at 16.7/50/83.3% — not 0/50/100%. Using the latter made the filled rail
+ * overshoot the dot it was supposed to stop at.
  */
 const stepCentre = (i: number) => ((i + 0.5) / STEPS.length) * 100
 
 const LABEL: Record<string, string> = {
   ORDERED: 'Order placed',
-  PACKED: 'Packed',
-  OUT_FOR_DELIVERY: 'On its way',
-  DELIVERED: 'Delivered',
+  READY: 'Ready to collect',
+  DELIVERED: 'Collected',
   CANCELLED: 'Cancelled',
 }
 
@@ -69,24 +66,20 @@ export default function LensTracking() {
             These lenses were handed over. If anything isn’t right with the fit, tell us and we’ll
             sort it out.
           </p>
+        ) : stage === 'READY' ? (
+          <p className="mt-3 text-ink/60">
+            Your lenses are waiting at the shop. Come in and collect them, or send someone to pick
+            them up for you — bring this reference.
+          </p>
         ) : (
           <p className="mt-3 text-ink/60">This page updates on its own — no need to refresh.</p>
         )}
       </div>
 
-      {/* The ladder is a progress bar while there is progress left to show. Once delivered it
-          is just four ticks, so the end state says so in words instead. */}
+      {/* The ladder is a progress bar while there is progress left to show. Once collected it
+          is just three ticks, so the end state says so in words instead. */}
       {!delivered && stepIdx >= 0 && (
         <div className="animate-track-rise relative mt-14" style={{ '--d': '90ms' } as React.CSSProperties}>
-          {/* Rides to wherever the order is, so the picture and the words cannot disagree.
-              Nudged left by half its own width to sit centred over its step. */}
-          <div
-            className="pointer-events-none absolute -top-11 text-ink transition-[left] duration-700 ease-out"
-            style={{ left: `calc(${stepCentre(stepIdx)}% - 28px)` }}
-          >
-            <DeliveryScooter moving={stage === 'OUT_FOR_DELIVERY'} />
-          </div>
-
           {/* The rail sits behind the dots and fills to the step the order is on. */}
           <div className="absolute left-0 right-0 top-1.5 h-px bg-ink/15" aria-hidden />
           <div
@@ -132,23 +125,12 @@ export default function LensTracking() {
               <dt className="text-ink/55">Total</dt>
               <dd>
                 {money(q.priceMinor, q.currency ?? 'ZMW')}
-                {q.paid ? '' : ' — payable on delivery'}
+                {q.paid ? '' : ' — payable when you collect'}
               </dd>
             </div>
           )}
         </dl>
       </div>
-
-      {q.deliveryAddress && (
-        <div className="card animate-track-rise mt-4 p-5" style={{ '--d': '260ms' } as React.CSSProperties}>
-          <h2 className="text-lg">{delivered ? 'Delivered to' : 'Delivering to'}</h2>
-          <p className="mt-2 text-sm text-ink/70">
-            {[q.deliveryName, q.deliveryAddress, q.deliveryArea, q.deliveryLandmark]
-              .filter(Boolean)
-              .join(', ')}
-          </p>
-        </div>
-      )}
 
       <div className="animate-track-rise mt-8 flex flex-wrap gap-3" style={{ '--d': '340ms' } as React.CSSProperties}>
         <a href={WA} className="btn-primary">Message us on WhatsApp</a>

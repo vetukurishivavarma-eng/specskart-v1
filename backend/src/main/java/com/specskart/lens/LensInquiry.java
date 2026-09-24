@@ -83,14 +83,17 @@ public class LensInquiry extends BaseEntity {
         return paidAt != null || "SOLD".equals(status);
     }
 
-    /** Doorstep delivery stage — ORDERED | PACKED | OUT_FOR_DELIVERY | DELIVERED. Separate
-     *  from {@link #status}, which is the billing state: with cash on delivery a lens is
-     *  normally out for delivery while still unpaid. Null for a walk-in. */
+    /** Collection stage — ORDERED | READY | DELIVERED (DELIVERED meaning collected; the old
+     *  name kept so existing rows and queries still read). Separate from {@link #status}, which
+     *  is the billing state: a lens is normally ready while still unpaid, since the customer
+     *  pays at pickup. Null for a walk-in. */
     private String fulfilment;
 
     /** Where the finished lens is delivered. Captured on the /lens page after the quote and
      *  required before submit — a web order with no address is one the lab can't fulfil.
      *  Null for a walk-in: the customer is standing at the counter. */
+    // Delivery is retired — every order is collected at the shop. These hold the addresses
+    // captured while doorstep delivery existed; nothing writes them any more.
     private String deliveryName;
     @Column(length = 1000)
     private String deliveryAddress;

@@ -42,12 +42,14 @@ public class LensInquiryService {
 
     private static final Logger log = LoggerFactory.getLogger(LensInquiryService.class);
 
-    /** The doorstep ladder, in order. Staff move an order one rung at a time; the last rung
-     *  also bills it, because with cash on delivery that is when the money arrives. */
     /** tx_ref prefix that marks a gateway reference as a lens order, not a frame order. */
     private static final String TX_PREFIX = "LENS-";
 
-    static final List<String> FULFILMENT = List.of("ORDERED", "PACKED", "OUT_FOR_DELIVERY", "DELIVERED");
+    /** The collection ladder, in order. Staff move an order one rung at a time; the last rung
+     *  also bills it, because the customer pays when they collect. Nothing is delivered -- the
+     *  shop is the pickup point -- but the last rung keeps the name DELIVERED so every existing
+     *  row, query and report reads the same. */
+    static final List<String> FULFILMENT = List.of("ORDERED", "READY", "DELIVERED");
 
     private final LensInquiryRepository inquiries;
     private final LeadService leadService;
@@ -186,19 +188,6 @@ public class LensInquiryService {
     }
 
     @Transactional
-    public LensDtos.InquiryView setDelivery(UUID id, LensDtos.Delivery d) {
-        LensInquiry q = requireVerified(get(id));
-        if (blank(d.address()) || blank(d.area())) {
-            throw ApiException.badRequest("BAD_ADDRESS", "Enter the street address and the area or city.");
-        }
-        q.setDeliveryName(trim(d.name()));
-        q.setDeliveryAddress(trim(d.address()));
-        q.setDeliveryArea(trim(d.area()));
-        q.setDeliveryLandmark(trim(d.landmark()));
-        return view(inquiries.save(q));
-    }
-
-    @Transactional
     public LensDtos.InquiryView quote(UUID id) {
         LensInquiry q = requireVerified(get(id));
         q.setPriceMinor(pricing.quote(q));
@@ -212,16 +201,15 @@ public class LensInquiryService {
         if ("CANCELLED".equals(q.getStatus())) {
             throw ApiException.badRequest("CANCELLED", "This order was cancelled — start a new one.");
         }
-        // An order with nowhere to go is one the lab can't fulfil -- block it here rather
-        // than discover it when someone tries to dispatch.
-        if (!q.isWalkIn() && (blank(q.getDeliveryAddress()) || blank(q.getDeliveryArea()))) {
-            throw ApiException.badRequest("NO_DELIVERY_ADDRESS",
-                    "Add your delivery address before placing the order.");
-        }
         if (q.getPriceMinor() == null) q.setPriceMinor(pricing.quote(q));
         q.setStatus("SUBMITTED");
         q.setFulfilment("ORDERED");
-        takeLensStock(q, null);
+        // Placing an order never blocks on stock and never moves it -- the shelf is only touched
+        // when the customer collects. The lab still needs to know now whether it has to order
+        // blanks in, so flag the shortfall without deducting.
+        Product pair = lensBlank(q);
+        UUID shop = pair == null ? null : lensShopId(null, pair);
+        if (shop != null) q.setBackorder(inventory.quantityOf(shop, pair.getId()) < 1);
         inquiries.save(q);
         alertStaff(q);
         notifyCustomer(q, "we've got your lens order and we're on it");
@@ -239,7 +227,7 @@ public class LensInquiryService {
         if (q.getPriceMinor() == null) q.setPriceMinor(pricing.quote(q));
         var payment = payments.start(new PaymentProvider.PaymentRequest(
                 TX_PREFIX + q.getId(), q.getPriceMinor(), q.getCurrency(),
-                blank(q.getDeliveryName()) ? q.getCustomerName() : q.getDeliveryName(),
+                q.getCustomerName(),
                 null, q.getWaId(), props.frontendBaseUrl() + "/lens"));
         q.setPaymentRef(payment.providerRef());
         inquiries.save(q);
@@ -318,6 +306,9 @@ public class LensInquiryService {
     public LensDtos.InquiryView completeSale(UUID id, LensDtos.CompleteSale d) {
         LensInquiry q = requireVerified(get(id));
         if (q.getPriceMinor() == null) q.setPriceMinor(pricing.quote(q));
+        // Handing the pair over is what moves the shelf -- a web order sitting in the queue has
+        // not consumed anything yet. Idempotent, and a no-op for a walk-in that named its own shop.
+        takeLensStock(q, null);
         // Paid online already — don't let a handover overwrite that with "CASH".
         if (q.getPaidAt() == null) q.setPaymentMethod(d.paymentMethod());
         q.setSoldBy(d.soldBy());
@@ -329,7 +320,7 @@ public class LensInquiryService {
         // Otherwise a sold order would sit on the pending list forever.
         if (!q.isWalkIn()) q.setFulfilment("DELIVERED");
         inquiries.save(q);
-        notifyCustomer(q, "your lenses have been delivered — enjoy them!");
+        notifyCustomer(q, "your lenses have been collected — enjoy them!");
         return view(q);
     }
 
@@ -371,8 +362,8 @@ public class LensInquiryService {
         inquiries.save(q);
 
         if ("DELIVERED".equals(q.getFulfilment())) {
-            // Handed over is when it's paid for, cash on delivery or not — bill it here so the
-            // day's sales report matches what actually left the shop. completeSale notifies.
+            // Handed over is when it's paid for — bill it here so the day's sales report matches
+            // what actually left the shop. completeSale takes the stock and notifies.
             return completeSale(id, new LensDtos.CompleteSale(d.paymentMethod(), d.soldBy(), d.shopName()));
         }
         notifyCustomer(q, stageLine(q));
@@ -407,10 +398,9 @@ public class LensInquiryService {
     /** What the customer is told at each rung. */
     private static String stageLine(LensInquiry q) {
         return switch (q.getFulfilment()) {
-            case "PACKED" -> "your lenses are packed and ready to go";
-            case "OUT_FOR_DELIVERY" -> blank(q.getDeliveryAddress())
-                    ? "your lenses are out for delivery"
-                    : "your lenses are out for delivery to " + q.getDeliveryAddress();
+            case "READY" -> "your lenses are ready! Come and collect them"
+                    + (blank(q.getShopName()) ? " at the shop" : " at " + q.getShopName())
+                    + ", or send someone to pick them up for you";
             default -> "there's an update on your lens order";
         };
     }
@@ -444,9 +434,8 @@ public class LensInquiryService {
     private static String trackTitle(LensInquiry q) {
         return switch (q.getFulfilment()) {
             case "ORDERED" -> "Being made";
-            case "PACKED" -> "Packed";
-            case "OUT_FOR_DELIVERY" -> "Out for delivery";
-            case "DELIVERED" -> "Delivered";
+            case "READY" -> "Ready to collect";
+            case "DELIVERED" -> "Collected";
             case "CANCELLED" -> "Cancelled";
             default -> "In progress";
         };
@@ -456,11 +445,9 @@ public class LensInquiryService {
     private static String trackLine(LensInquiry q) {
         return switch (q.getFulfilment()) {
             case "ORDERED" -> "We have your prescription and your lenses are being made.";
-            case "PACKED" -> "Packed and ready to go.";
-            case "OUT_FOR_DELIVERY" -> blank(q.getDeliveryAddress())
-                    ? "Out for delivery — on its way to you."
-                    : "Out for delivery to " + q.getDeliveryAddress() + ".";
-            case "DELIVERED" -> "Delivered 🎉 Anything not right with them? Just reply here.";
+            case "READY" -> "Ready to collect" + (blank(q.getShopName()) ? "" : " at " + q.getShopName())
+                    + " — come in, or send someone to pick them up.";
+            case "DELIVERED" -> "Collected 🎉 Anything not right with them? Just reply here.";
             case "CANCELLED" -> "Cancelled. Questions about it? Just reply here.";
             default -> "We're on it.";
         };
@@ -491,7 +478,6 @@ public class LensInquiryService {
         return new LensDtos.SaleView(q.getId(), q.getCustomerName(), q.getLensType(), q.isBlueBlock(),
                 q.getLensStructure(), q.isSpecialAxis(), q.getPriceMinor() == null ? 0 : q.getPriceMinor(),
                 q.getCurrency(), q.getPaymentMethod(), q.getSoldBy(), q.getShopName(), q.isWalkIn(),
-                q.getDeliveryName(), q.getDeliveryAddress(), q.getDeliveryArea(), q.getDeliveryLandmark(),
                 q.getFulfilment(), q.isPaid(), q.getCreatedAt());
     }
 
@@ -518,24 +504,38 @@ public class LensInquiryService {
     }
 
     /**
-     * Takes one pair of this order's lens type off a shop's shelf, once. A counter sale passes
-     * its own shop; a web order goes to the nearest pinned shop holding it (delivery area first,
-     * then the fullest shelf). No stock anywhere still takes the order: it's flagged a backorder
-     * and the shelf goes negative, so the POS shows the shortfall.
+     * Takes one pair of this order's lens type off a shop's shelf, once -- at handover, not when
+     * the order is placed. A counter sale passes its own shop; a web order takes whatever
+     * {@link #lensShopId} resolves to. No stock still completes the sale: it is flagged a
+     * backorder and the shelf goes negative, so the POS shows the shortfall.
      */
     private void takeLensStock(LensInquiry q, UUID storeId) {
         if (q.getStockStoreId() != null) return;
-        Product lens = products.findBySkuIgnoreCase("LENS-" + q.getLensType()).orElse(null);
+        Product lens = lensBlank(q);
         if (lens == null) return;
-        if (storeId == null) {
-            var allocation = inventory.allocate(Map.of(lens.getId(), 1), null, null, q.getDeliveryArea());
-            if (allocation == null) return; // no shop sells online yet
-            storeId = allocation.primary().getId();
-        }
+        storeId = lensShopId(storeId, lens);
+        if (storeId == null) return; // no shop set up yet
         q.setBackorder(inventory.quantityOf(storeId, lens.getId()) < 1);
         inventory.adjust(storeId, lens.getId(), -1, "SALE", ref(q), "Lens order", null);
         q.setStockStoreId(storeId);
         stores.findById(storeId).ifPresent(s -> q.setShopName(s.getName()));
+    }
+
+    private Product lensBlank(LensInquiry q) {
+        return products.findBySkuIgnoreCase("LENS-" + q.getLensType()).orElse(null);
+    }
+
+    /**
+     * Whose shelf a web order's pair comes off. The client runs a single shop, so that is the
+     * answer whenever exactly one is active -- including when it was never pinned on the map,
+     * which {@code allocate} requires and which is the reason this fallback exists.
+     */
+    private UUID lensShopId(UUID storeId, Product lens) {
+        if (storeId != null) return storeId;
+        var allocation = inventory.allocate(Map.of(lens.getId(), 1), null, null, null);
+        if (allocation != null) return allocation.primary().getId();
+        var active = stores.findByActiveTrue();
+        return active.size() == 1 ? active.get(0).getId() : null;
     }
 
     private void alertStaff(LensInquiry q) {
@@ -578,16 +578,6 @@ public class LensInquiryService {
         if (q.getAge() != null || q.getGender() != null) {
             out.add("Age / gender: " + (q.getAge() == null ? "—" : q.getAge()) + " / " + dash(q.getGender()));
         }
-        if (!q.isWalkIn()) {
-            out.add("");
-            out.add("# Deliver to");
-            out.add("Name: " + dash(q.getDeliveryName() == null ? q.getCustomerName() : q.getDeliveryName()));
-            out.add("Address: " + dash(q.getDeliveryAddress()));
-            out.add("Area: " + dash(q.getDeliveryArea()));
-            if (q.getDeliveryLandmark() != null && !q.getDeliveryLandmark().isBlank()) {
-                out.add("Landmark: " + q.getDeliveryLandmark());
-            }
-        }
         out.add("");
         out.add("# Lens");
         out.add("Type: " + dash(q.getLensType()) + (q.isBlueBlock() ? " + blue block" : ""));
@@ -599,7 +589,8 @@ public class LensInquiryService {
         out.add("` " + String.format("%-5s%-9s%-9s%s", "L", power(q.getSphLeft()), power(q.getCylLeft()), axis(q.getAxisLeft())));
         out.add("ADD: " + power(q.getAddPower()));
         if (q.isSpecialAxis()) out.add("⚠ SPECIAL AXIS — not a stock lens, needs a manual check");
-        if (!q.isWalkIn() && q.getShopName() != null) out.add("Make at: " + q.getShopName());
+        if (!q.isWalkIn()) out.add("Collection: customer picks up at the shop");
+        if (q.getShopName() != null) out.add("Make at: " + q.getShopName());
         if (q.isBackorder()) out.add("⚠ BACKORDER — no shop had this lens in stock, order blanks in");
         out.add("");
         out.add("Quoted price: " + (q.getPriceMinor() == null ? "—"
@@ -628,10 +619,6 @@ public class LensInquiryService {
 
     private static boolean blank(String s) {
         return s == null || s.isBlank();
-    }
-
-    private static String trim(String s) {
-        return blank(s) ? null : s.trim();
     }
 
     private static String dash(String s) {
@@ -670,7 +657,6 @@ public class LensInquiryService {
                 q.getSphRight(), q.getSphLeft(), q.getCylRight(), q.getCylLeft(),
                 q.getAxisRight(), q.getAxisLeft(), q.getAddPower(), q.getLensStructure(),
                 q.isSpecialAxis(), q.getPriceMinor(), q.getCurrency(),
-                q.getDeliveryName(), q.getDeliveryAddress(), q.getDeliveryArea(), q.getDeliveryLandmark(),
                 q.getFulfilment(), q.isPaid());
     }
 }

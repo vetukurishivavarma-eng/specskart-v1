@@ -17,7 +17,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** "Where's my order?" in chat answers with the real delivery stage instead of the welcome menu. */
+/** "Where's my order?" in chat answers with the real collection stage instead of the welcome menu. */
 @SpringBootTest
 @ActiveProfiles("mock")
 class TrackMyOrderTest {
@@ -73,14 +73,14 @@ class TrackMyOrderTest {
         q.setPhoneRaw(waId);
         q.setWaId(waId);
         q.setStatus("SUBMITTED");
-        q.setFulfilment("OUT_FOR_DELIVERY");
-        q.setDeliveryAddress("12 Great East Road");
+        q.setFulfilment("READY");
+        q.setShopName("Specskart Lusaka");
         inquiries.save(q);
 
         int mark = outboxSize();
         inbound.process(new InboundMessage(waId, waId, "Tracker", "where is my order", null, msgId(waId, "t2"), Map.of()));
 
-        assertThat(replySince(mark)).contains("Out for delivery to 12 Great East Road");
+        assertThat(replySince(mark)).contains("Ready to collect at Specskart Lusaka");
     }
 
     @Test
@@ -125,7 +125,7 @@ class TrackMyOrderTest {
         Lead lead = leads.findByWhatsappWaId(waId).orElseThrow();
 
         LensInquiry older = newInquiry(lead, waId, "DELIVERED");
-        LensInquiry newer = newInquiry(lead, waId, "PACKED");
+        LensInquiry newer = newInquiry(lead, waId, "READY");
 
         int mark = outboxSize();
         inbound.process(new InboundMessage(waId, waId, "Repeat", "track my order", null, msgId(waId, "m2"), Map.of()));
@@ -143,15 +143,15 @@ class TrackMyOrderTest {
         Lead lead = leads.findByWhatsappWaId(waId).orElseThrow();
 
         LensInquiry older = newInquiry(lead, waId, "DELIVERED");
-        newInquiry(lead, waId, "PACKED");
+        newInquiry(lead, waId, "READY");
 
         int mark = outboxSize();
         inbound.process(new InboundMessage(waId, waId, "Picker", null, "TRACK:L:" + older.getId(),
                 msgId(waId, "p2"), Map.of()));
 
-        // The older one is DELIVERED; the newer is PACKED. Getting the delivered line back is
+        // The older one is DELIVERED; the newer is READY. Getting the collected line back is
         // what proves the tapped row won over recency.
-        assertThat(replySince(mark)).contains("Delivered");
+        assertThat(replySince(mark)).contains("Collected");
     }
 
     private LensInquiry newInquiry(Lead lead, String waId, String fulfilment) {

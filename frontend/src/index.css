@@ -40,21 +40,6 @@
   from { transform: scaleX(0); }
   to   { transform: scaleX(1); }
 }
-/* The rider on the rail: wheels turning, and the suspension working. */
-@keyframes scoot-wheel {
-  to { transform: rotate(360deg); }
-}
-@keyframes scoot-bob {
-  0%, 100% { transform: translateY(0); }
-  25%      { transform: translateY(-0.6px); }
-  60%      { transform: translateY(0.5px); }
-}
-/* Speed lines trailing off behind it. */
-@keyframes scoot-dash {
-  0%   { opacity: 0; transform: translateX(3px); }
-  35%  { opacity: 0.55; }
-  100% { opacity: 0; transform: translateX(-9px); }
-}
 
 @layer components {
   .btn { @apply inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-medium transition; }
@@ -64,11 +49,6 @@
   .animate-track-rise { animation: track-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: var(--d, 0ms); }
   .animate-track-pulse { animation: track-pulse 2s ease-out infinite; }
   .animate-track-fill { animation: track-fill 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both; transform-origin: left; }
-  /* The wheels turn whenever the order is moving; `transform-box: fill-box` is what
-     makes transform-origin resolve inside the SVG rather than against the page. */
-  .animate-scoot-wheel { animation: scoot-wheel 0.9s linear infinite; transform-origin: center; transform-box: fill-box; }
-  .animate-scoot-bob { animation: scoot-bob 0.55s ease-in-out infinite; }
-  .animate-scoot-dash { animation: scoot-dash 0.7s ease-out infinite; }
   .btn-primary { @apply btn bg-ink text-bone hover:bg-clay; }
   .btn-ghost { @apply btn border border-ink/20 hover:border-ink/60; }
   .container-x { @apply mx-auto w-full max-w-6xl px-5; }
@@ -83,9 +63,6 @@
   .animate-track-rise,
   .animate-track-pulse,
   .animate-track-fill,
-  .animate-scoot-wheel,
-  .animate-scoot-bob,
-  .animate-scoot-dash,
   .animate-cart-bump,
   .animate-added-pop {
     animation: none !important;

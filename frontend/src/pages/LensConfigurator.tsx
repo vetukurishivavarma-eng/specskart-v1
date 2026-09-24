@@ -157,9 +157,8 @@ export default function LensConfigurator() {
           <h2 className="text-lg text-moss">Thanks — we've got it! ✅</h2>
           {q.paid && <p className="mt-1 text-sm text-moss">Payment received.</p>}
           <p className="mt-2 text-sm text-ink/60">
-            {q.deliveryAddress
-              ? <>We'll message you on WhatsApp when your lenses are on the way to <b>{q.deliveryAddress}</b>{q.deliveryArea ? `, ${q.deliveryArea}` : ''}.</>
-              : <>We'll message you on WhatsApp to confirm your prescription and arrange delivery.</>}
+            We'll message you on WhatsApp as soon as your lenses are ready. Collect them at the
+            shop — come in yourself, or send someone to pick them up for you.
           </p>
           <button className="btn-primary mt-4" onClick={bookAnother}>Book another pair</button>
         </div>
@@ -211,11 +210,6 @@ function DetailsForm({ q, onPatch, onQuoted }: {
   const [quoting, setQuoting] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [dName, setDName] = useState(q.deliveryName ?? q.customerName ?? '')
-  const [dAddress, setDAddress] = useState(q.deliveryAddress ?? '')
-  const [dArea, setDArea] = useState(q.deliveryArea ?? '')
-  const [dLandmark, setDLandmark] = useState(q.deliveryLandmark ?? '')
-  const canDeliver = dAddress.trim().length > 3 && dArea.trim().length > 1
 
   const needsAxisR = parseFloat(cylR.magnitude) > 0
   const needsAxisL = parseFloat(cylL.magnitude) > 0
@@ -243,17 +237,12 @@ function DetailsForm({ q, onPatch, onQuoted }: {
   }
 
   // `online` sends them to the gateway after the order is placed. The order stands either
-  // way — an abandoned payment is still an order the shop can chase, and pay-on-delivery
-  // stays the default for anyone without a card.
+  // way — an abandoned payment is still an order the shop can chase, and paying at the
+  // counter on collection stays the default for anyone without a card.
   async function buyNow(online: boolean) {
     setSubmitting(true)
     setError(null)
     try {
-      // Save the address first: submit() refuses an order the lab can't deliver.
-      await lens.delivery(q.id, {
-        name: dName.trim() || undefined, address: dAddress.trim(),
-        area: dArea.trim(), landmark: dLandmark.trim() || undefined,
-      })
       const placed = await lens.submit(q.id)
       if (online) {
         const { checkoutUrl } = await lens.pay(q.id)
@@ -331,32 +320,24 @@ function DetailsForm({ q, onPatch, onQuoted }: {
           <button className="btn-ghost mt-3" onClick={checkPrice} disabled={quoting}>Re-check price</button>
 
           <section className="mt-6 border-t border-ink/10 pt-5">
-            <h2 className="text-lg">Where should we deliver?</h2>
-            <p className="mt-1 text-xs text-ink/50">We'll send your lenses here once they're ready.</p>
-            <div className="mt-3 space-y-3">
-              <TextField label="Name for the delivery" value={dName} onChange={setDName}
-                placeholder="Who receives it" />
-              <TextField label="Street address" value={dAddress} onChange={setDAddress}
-                placeholder="House / plot number and street" required />
-              <TextField label="Area or city" value={dArea} onChange={setDArea}
-                placeholder="e.g. Kabulonga, Lusaka" required />
-              <TextField label="Landmark (optional)" value={dLandmark} onChange={setDLandmark}
-                placeholder="Anything that helps us find you" />
-            </div>
+            <h2 className="text-lg">Collect at the shop</h2>
+            <p className="mt-1 text-sm text-ink/60">
+              We'll WhatsApp you the moment your lenses are ready. Come in and collect them, or
+              send someone to pick them up for you.
+            </p>
           </section>
 
           {error && <p className="mt-3 text-sm text-clay">{error}</p>}
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             <button className="btn-primary w-full disabled:bg-ink/30"
-              onClick={() => buyNow(true)} disabled={submitting || !canDeliver}>
+              onClick={() => buyNow(true)} disabled={submitting}>
               {submitting ? 'Placing…' : 'Pay now'}
             </button>
             <button className="btn-ghost w-full disabled:opacity-40"
-              onClick={() => buyNow(false)} disabled={submitting || !canDeliver}>
-              Pay on delivery
+              onClick={() => buyNow(false)} disabled={submitting}>
+              Pay when you collect
             </button>
           </div>
-          {!canDeliver && <p className="mt-2 text-xs text-ink/45">Add your street address and area to place the order.</p>}
         </div>
       )}
     </div>
@@ -370,20 +351,6 @@ function Field({ inputRef, label, type = 'text', defaultValue }: {
     <label className="block">
       <span className="text-xs font-medium uppercase tracking-widest text-ink/50">{label}</span>
       <input ref={inputRef} type={type} defaultValue={defaultValue} className="mt-1 w-full rounded-lg border border-ink/20 px-3 py-2 text-sm" />
-    </label>
-  )
-}
-
-function TextField({ label, value, onChange, placeholder, required }: {
-  label: string; value: string; onChange: (v: string) => void; placeholder?: string; required?: boolean
-}) {
-  return (
-    <label className="block">
-      <span className="text-xs font-medium uppercase tracking-widest text-ink/50">
-        {label}{required && <span className="text-clay"> *</span>}
-      </span>
-      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
-        className="mt-1 w-full rounded-lg border border-ink/20 px-3 py-2 text-sm" />
     </label>
   )
 }

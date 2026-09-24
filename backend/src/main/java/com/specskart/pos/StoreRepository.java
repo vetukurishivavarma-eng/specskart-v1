@@ -10,5 +10,7 @@ public interface StoreRepository extends JpaRepository<Store, UUID> {
 
     java.util.Optional<Store> findByCodeIgnoreCase(String code);
 
+    List<Store> findByActiveTrue();
+
     List<Store> findByActiveTrueAndLatitudeIsNotNullAndLongitudeIsNotNull();
 }

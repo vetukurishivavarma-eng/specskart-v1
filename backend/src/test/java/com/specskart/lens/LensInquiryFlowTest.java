@@ -110,7 +110,6 @@ class LensInquiryFlowTest {
     void completingAWebOrderMovesItFromPendingToSold() {
         UUID id = service.start(phone(), "CLEAR", false);
         service.verify(tokenFromLastOutbound());
-        service.setDelivery(id, new LensDtos.Delivery("Ann", "12 Freedom Way", "Kabulonga", null));
         service.submit(id);
 
         assertThat(service.pendingWebOrders()).anySatisfy(s -> assertThat(s.id()).isEqualTo(id));
@@ -120,66 +119,55 @@ class LensInquiryFlowTest {
         assertThat(service.pendingWebOrders()).noneSatisfy(s -> assertThat(s.id()).isEqualTo(id));
 
         // the customer hears about it -- they'd had nothing since the lens link
-        assertThat(sentTexts()).anySatisfy(t -> assertThat(t).contains("have been delivered"));
+        assertThat(sentTexts()).anySatisfy(t -> assertThat(t).contains("have been collected"));
     }
 
     @Test
-    void aWebOrderCannotBeSubmittedWithNowhereToDeliverIt() {
+    void aWebOrderNeedsNothingButAVerifiedNumberAndIsCollectedAtTheShop() {
         UUID id = service.start(phone(), "CLEAR", false);
         service.verify(tokenFromLastOutbound());
 
-        assertThatThrownBy(() -> service.submit(id)).hasMessageContaining("delivery address");
-
-        // area is as required as the street -- an address alone doesn't route a courier
-        assertThatThrownBy(() -> service.setDelivery(id,
-                new LensDtos.Delivery("Ann", "12 Freedom Way", "  ", null)))
-                .hasMessageContaining("area");
-
-        service.setDelivery(id, new LensDtos.Delivery("Ann", "12 Freedom Way", "Kabulonga", "opp. the bank"));
         assertThat(service.submit(id).status()).isEqualTo("SUBMITTED");
 
         // placing the order confirms it to the customer, not just the lab
         assertThat(sentTexts()).anySatisfy(t -> assertThat(t).contains("got your lens order"));
 
-        // and the lab's paperwork says where it goes
+        // and the lab's paperwork says nobody is delivering it
         assertThat(LensInquiryService.staffLines(inquiries.findById(id).orElseThrow()))
-                .contains("Address: 12 Freedom Way", "Area: Kabulonga", "Landmark: opp. the bank");
+                .contains("Collection: customer picks up at the shop");
     }
 
     @Test
-    void aDoorstepOrderWalksTheLadderAndIsBilledOnDelivery() {
+    void aWebOrderWalksTheLadderAndIsBilledWhenItIsCollected() {
         UUID id = service.start(phone(), "CLEAR", false);
         service.verify(tokenFromLastOutbound());
-        service.setDelivery(id, new LensDtos.Delivery("Ann", "12 Freedom Way", "Kabulonga", null));
         service.submit(id);
         assertThat(inquiries.findById(id).orElseThrow().getFulfilment()).isEqualTo("ORDERED");
 
-        // forward one rung at a time: no skipping straight to delivered
+        // forward one rung at a time: no skipping straight to collected
         assertThatThrownBy(() -> service.advanceFulfilment(id,
                 new LensDtos.AdvanceFulfilment("DELIVERED", "CASH", "Staff B", "Main Store")))
                 .hasMessageContaining("one step at a time");
 
-        service.advanceFulfilment(id, new LensDtos.AdvanceFulfilment("PACKED", null, null, null));
-        var out = service.advanceFulfilment(id,
-                new LensDtos.AdvanceFulfilment("OUT_FOR_DELIVERY", null, null, null));
-        assertThat(out.status()).isEqualTo("SUBMITTED"); // still unpaid — cash on delivery
-        assertThat(sentTexts()).anySatisfy(t -> assertThat(t).contains("out for delivery to 12 Freedom Way"));
+        var out = service.advanceFulfilment(id, new LensDtos.AdvanceFulfilment("READY", null, null, null));
+        assertThat(out.status()).isEqualTo("SUBMITTED"); // still unpaid — they pay at the counter
+        assertThat(sentTexts()).anySatisfy(t -> assertThat(t).contains("Come and collect them"));
+        assertThat(sentTexts()).anySatisfy(t -> assertThat(t).contains("send someone to pick them up"));
 
         // an in-flight order stays on the staff list the whole way
         assertThat(service.pendingWebOrders()).anySatisfy(v -> assertThat(v.id()).isEqualTo(id));
 
         var done = service.advanceFulfilment(id,
                 new LensDtos.AdvanceFulfilment("DELIVERED", "CASH", "Staff B", "Main Store"));
-        assertThat(done.status()).isEqualTo("SOLD"); // delivering it is what bills it
+        assertThat(done.status()).isEqualTo("SOLD"); // handing it over is what bills it
         assertThat(service.pendingWebOrders()).noneSatisfy(v -> assertThat(v.id()).isEqualTo(id));
-        assertThat(sentTexts()).anySatisfy(t -> assertThat(t).contains("have been delivered"));
+        assertThat(sentTexts()).anySatisfy(t -> assertThat(t).contains("have been collected"));
     }
 
     @Test
     void payingOnlineMarksTheOrderPaidAndSurvivesTheHandover() {
         UUID id = service.start(phone(), "CLEAR", false);
         service.verify(tokenFromLastOutbound());
-        service.setDelivery(id, new LensDtos.Delivery("Ann", "12 Freedom Way", "Kabulonga", null));
         service.submit(id);
 
         var pay = service.startPayment(id);
@@ -199,8 +187,7 @@ class LensInquiryFlowTest {
         assertThatThrownBy(() -> service.startPayment(id)).hasMessageContaining("already paid");
 
         // the handover must not overwrite ONLINE with whatever staff tapped
-        service.advanceFulfilment(id, new LensDtos.AdvanceFulfilment("PACKED", null, null, null));
-        service.advanceFulfilment(id, new LensDtos.AdvanceFulfilment("OUT_FOR_DELIVERY", null, null, null));
+        service.advanceFulfilment(id, new LensDtos.AdvanceFulfilment("READY", null, null, null));
         service.advanceFulfilment(id, new LensDtos.AdvanceFulfilment("DELIVERED", "CASH", "Staff B", "Main Store"));
         assertThat(service.salesOn(java.time.LocalDate.now(java.time.ZoneOffset.UTC)))
                 .filteredOn(v -> v.id().equals(id))
