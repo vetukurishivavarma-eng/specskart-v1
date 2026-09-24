@@ -38,7 +38,7 @@ public class AppVersionController {
     @GetMapping("/version")
     public VersionInfo version(@RequestParam(defaultValue = "android") String platform,
                                @RequestParam(required = false) Integer build) {
-        AppRelease latest = releases.findFirstByPlatformAndActiveTrueOrderByBuildNumberDesc(platform)
+        AppRelease latest = releases.findFirstByPlatformAndActiveTrueOrderByBuildNumberDescPublishedAtDesc(platform)
                 .orElse(null);
         // Nothing published yet. Answering "you are current" rather than 404 is deliberate: a
         // server with no release row must never lock a shop out of its till, and the app treats

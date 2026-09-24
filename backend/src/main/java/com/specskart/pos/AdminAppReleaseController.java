@@ -32,7 +32,7 @@ public class AdminAppReleaseController {
 
     @GetMapping
     public List<AppRelease> list(@RequestParam(defaultValue = "android") String platform) {
-        return releases.findByPlatformOrderByBuildNumberDesc(platform);
+        return releases.findByPlatformOrderByBuildNumberDescPublishedAtDesc(platform);
     }
 
     @PostMapping

@@ -83,6 +83,21 @@ class AppVersionCheckTest {
     }
 
     /**
+     * There is no edit or delete for a release, so the only way to correct one published with
+     * the wrong floor is to publish that build again. The later row has to win, or the fix is
+     * a coin toss against the mistake.
+     */
+    @Test
+    void republishingTheSameBuildCorrectsIt() throws InterruptedException {
+        publish(9, 7, true, 2);   // the mistake: a till on build 7 is not below the floor
+        Thread.sleep(5);          // publishedAt is the tie-break; don't tie it
+        publish(9, 9, true, 0);   // the correction
+
+        var v = controller.version("android", 7);
+        assertThat(v.minimumBuild()).isEqualTo(9);
+    }
+
+    /**
      * Build 7 sends no `build` at all. It must still see the raw flag and the floor, because it
      * does its own comparing — and it must NOT be handed a mandatory derived from the floor,
      * which for a missing build would always be true and would wall every old till instantly.
