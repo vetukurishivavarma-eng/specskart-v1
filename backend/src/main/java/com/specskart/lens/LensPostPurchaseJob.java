@@ -97,10 +97,11 @@ class LensPostPurchaseJob {
         reviewCapture.markPendingLens(lead.getId(), q.getId());
         // Three days on, the customer's 24h window is long shut and Meta drops free text
         // (#131047). The approved template the frames post-purchase uses -- {{1}} name,
-        // {{2}} promo code -- gets through; the plain text stays for dev and an unset template.
+        // {{2}} promo code, {{3}} referral code -- gets through; the plain text stays for dev
+        // and an unset template.
         if (props.whatsapp().postPurchaseConfigured()) {
             whatsapp.sendTemplate(waId, props.whatsapp().postPurchaseTemplate(),
-                    props.whatsapp().followUpTemplateLang(), List.of(firstName(lead, q), promo.getCode()));
+                    props.whatsapp().followUpTemplateLang(), List.of(firstName(lead, q), promo.getCode(), referral));
         } else {
             whatsapp.sendText(waId, message(firstName(lead, q), promo, referral));
         }

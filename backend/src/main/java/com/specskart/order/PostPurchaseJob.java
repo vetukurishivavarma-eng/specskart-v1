@@ -7,6 +7,7 @@ import com.specskart.catalog.PromoCodeRepository;
 import com.specskart.config.AppProperties;
 import com.specskart.lead.Lead;
 import com.specskart.lead.LeadRepository;
+import com.specskart.lead.LeadService;
 import com.specskart.whatsapp.WhatsAppProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,11 +47,13 @@ class PostPurchaseJob {
     private final AnalyticsService analytics;
     private final AppProperties props;
     private final ReviewCaptureService reviewCapture;
+    private final LeadService leadService;
 
     PostPurchaseJob(OrderRepository orders, OrderEventRepository orderEvents, LeadRepository leads,
                     PromoCodeRepository promos, CartService carts, WhatsAppProvider whatsapp,
                     OrderNotificationService notifications, AnalyticsService analytics, AppProperties props,
-                    ReviewCaptureService reviewCapture) {
+                    ReviewCaptureService reviewCapture, LeadService leadService) {
+        this.leadService = leadService;
         this.orders = orders;
         this.orderEvents = orderEvents;
         this.leads = leads;
@@ -86,7 +89,9 @@ class PostPurchaseJob {
                 if (props.whatsapp().postPurchaseConfigured()) {
                     whatsapp.sendTemplate(waId, props.whatsapp().postPurchaseTemplate(),
                             props.whatsapp().followUpTemplateLang(),
-                            List.of(name.isBlank() ? "there" : name, code != null ? code : ""));
+                            // Shared with the lens post-purchase: {{1}} name, {{2}} promo, {{3}} referral.
+                            List.of(name.isBlank() ? "there" : name, code != null ? code : "",
+                                    leadService.ensureReferralCode(lead.getId())));
                 } else {
                     whatsapp.sendText(waId, plainMessage(lead, order, code));
                 }
