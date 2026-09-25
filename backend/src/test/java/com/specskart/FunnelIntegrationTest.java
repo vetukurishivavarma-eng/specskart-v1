@@ -91,6 +91,17 @@ class FunnelIntegrationTest {
     }
 
     @Test
+    void wameLinkAdsAreTracedByTheirPrefilledText() {
+        // TikTok/Google "chat now" is a bare wa.me link, no referral: the first message names the ad.
+        inbound.process(new InboundMessage("2609771101", "2609771101", "Tt", "Hi Specskart, I saw your ad on TikTok", null, "src-tt-1", Map.of()));
+        inbound.process(new InboundMessage("2609771102", "2609771102", "Gg", "Hi, found you on Google", null, "src-g-1", Map.of()));
+        inbound.process(new InboundMessage("2609771103", "2609771103", "Org", "Hi", null, "src-org-1", Map.of()));
+        assertThat(leads.findByWhatsappWaId("2609771101").orElseThrow().getAcquisitionSource()).isEqualTo(com.specskart.lead.AcquisitionSource.TIKTOK);
+        assertThat(leads.findByWhatsappWaId("2609771102").orElseThrow().getAcquisitionSource()).isEqualTo(com.specskart.lead.AcquisitionSource.GOOGLE);
+        assertThat(leads.findByWhatsappWaId("2609771103").orElseThrow().getAcquisitionSource()).isEqualTo(com.specskart.lead.AcquisitionSource.WHATSAPP);
+    }
+
+    @Test
     void duplicateWebhookMessageIsProcessedOnce() {
         var in = new InboundMessage("2609770002", "2609770002", "Dup", "Hi", null, "dup-msg-1", Map.of());
         inbound.process(in);

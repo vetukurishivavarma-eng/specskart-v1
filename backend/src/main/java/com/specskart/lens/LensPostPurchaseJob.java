@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 
 /**
  * A few days after lenses are handed over, one WhatsApp: check the fit is right, hand over the
@@ -94,7 +95,15 @@ class LensPostPurchaseJob {
         String referral = leadService.ensureReferralCode(lead.getId());
         // Armed before the send: a "1"-"5" reply only counts as a rating once we've asked.
         reviewCapture.markPendingLens(lead.getId(), q.getId());
-        whatsapp.sendText(waId, message(firstName(lead, q), promo, referral));
+        // Three days on, the customer's 24h window is long shut and Meta drops free text
+        // (#131047). The approved template the frames post-purchase uses -- {{1}} name,
+        // {{2}} promo code -- gets through; the plain text stays for dev and an unset template.
+        if (props.whatsapp().postPurchaseConfigured()) {
+            whatsapp.sendTemplate(waId, props.whatsapp().postPurchaseTemplate(),
+                    props.whatsapp().followUpTemplateLang(), List.of(firstName(lead, q), promo.getCode()));
+        } else {
+            whatsapp.sendText(waId, message(firstName(lead, q), promo, referral));
+        }
         analytics.record(LeadEventType.WHATSAPP_FOLLOW_UP_SENT, lead.getId(), null);
         return true;
     }

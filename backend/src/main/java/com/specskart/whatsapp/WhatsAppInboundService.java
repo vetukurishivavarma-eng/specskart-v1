@@ -47,9 +47,24 @@ public class WhatsAppInboundService {
             return;
         }
 
-        Map<String, Object> referral = in.referral() != null ? in.referral() : Map.of();
+        Map<String, Object> referral = in.referral() != null && !in.referral().isEmpty()
+                ? in.referral() : Map.of("utm_source", sourceFromText(in.text()));
         Lead lead = leadService.onWhatsAppContact(in.waId(), in.phoneNumber(), in.profileName(), referral);
         if (walkIns.tryVerify(lead, in.text())) return; // shop walk-in QR sign-up, not a bot conversation
         bot.handleInbound(lead, in.text(), in.buttonId(), in.waMessageId());
+    }
+
+    /**
+     * Only a Meta click-to-WhatsApp ad hands us a referral. A TikTok or Google "chat now" button
+     * is a plain wa.me link, so its ad is identified by the prefilled first message instead
+     * (e.g. {@code wa.me/<number>?text=Hi Specskart, I saw your ad on TikTok}). Anything else
+     * with no referral is someone messaging us directly -- WHATSAPP, not the WEBSITE fallback.
+     * Only used on first contact; a returning lead keeps its original source.
+     */
+    static String sourceFromText(String text) {
+        String t = text == null ? "" : text.toLowerCase();
+        if (t.contains("tiktok")) return "tiktok";
+        if (t.contains("google")) return "google";
+        return "whatsapp";
     }
 }
