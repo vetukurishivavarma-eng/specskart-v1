@@ -58,13 +58,14 @@ public class AdminLeadController {
     @GetMapping
     public AdminDtos.Page<AdminDtos.LeadRow> list(@RequestParam(required = false) String status,
                                                  @RequestParam(required = false) UUID campaignId,
+                                                 @RequestParam(required = false) AcquisitionSource source,
                                                  @RequestParam(required = false) String q,
                                                  @RequestParam(defaultValue = "false") boolean archived,
                                                  @RequestParam(defaultValue = "0") int page,
                                                  @RequestParam(defaultValue = "20") int size) {
         LeadStatus ls = status == null || status.isBlank() ? null : LeadStatus.valueOf(status);
         var pr = PageRequest.of(page, Math.min(size, 100), Sort.by(Sort.Direction.DESC, "createdAt"));
-        var result = leads.search(ls, campaignId, q == null || q.isBlank() ? null : q, archived, pr);
+        var result = leads.search(ls, campaignId, source, q == null || q.isBlank() ? null : q, archived, pr);
         Map<UUID, String> names = campaignNames();
         var rows = result.map(l -> AdminMapper.row(l, names.get(l.getCampaignId()))).getContent();
         return new AdminDtos.Page<>(rows, result.getNumber(), result.getSize(),

@@ -72,12 +72,14 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
                or :archived = false and l.archivedAt is null)
           and (:status is null or l.status = :status)
           and (:campaignId is null or l.campaignId = :campaignId)
+          and (:source is null or l.acquisitionSource = :source)
           and (:q is null
                or lower(l.name) like lower(concat('%', cast(:q as string), '%'))
                or l.whatsappNumber like concat('%', cast(:q as string), '%'))
         """)
     Page<Lead> search(@Param("status") LeadStatus status,
                       @Param("campaignId") UUID campaignId,
+                      @Param("source") AcquisitionSource source,
                       @Param("q") String q,
                       @Param("archived") boolean archived,
                       Pageable pageable);

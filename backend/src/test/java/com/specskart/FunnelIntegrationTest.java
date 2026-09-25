@@ -59,13 +59,13 @@ class FunnelIntegrationTest {
         assertThat(events.findByLeadIdOrderByCreatedAtAsc(id)).isNotEmpty();
 
         leadService.setArchived(id, true);
-        assertThat(leads.search(null, null, null, false, PageRequest.of(0, 50)).getContent())
+        assertThat(leads.search(null, null, null, null, false, PageRequest.of(0, 50)).getContent())
                 .noneMatch(l -> l.getId().equals(id));
-        assertThat(leads.search(null, null, null, true, PageRequest.of(0, 50)).getContent())
+        assertThat(leads.search(null, null, null, null, true, PageRequest.of(0, 50)).getContent())
                 .anyMatch(l -> l.getId().equals(id));
 
         leadService.setArchived(id, false);
-        assertThat(leads.search(null, null, null, false, PageRequest.of(0, 50)).getContent())
+        assertThat(leads.search(null, null, null, null, false, PageRequest.of(0, 50)).getContent())
                 .anyMatch(l -> l.getId().equals(id));
 
         leadService.hardDelete(id);
@@ -81,8 +81,13 @@ class FunnelIntegrationTest {
         // null bind made `lower(concat('%', :q, '%'))` resolve to lower(bytea)
         // and 500. The `cast(:q as string)` in the query keeps it valid.
         inbound.process(new InboundMessage("2609779999", "2609779999", "Search Me", "Hi", null, "search-1", Map.of()));
-        assertThat(leads.search(null, null, null, false, PageRequest.of(0, 20)).getContent()).isNotEmpty();
-        assertThat(leads.search(null, null, "search", false, PageRequest.of(0, 20)).getTotalElements()).isEqualTo(1);
+        assertThat(leads.search(null, null, null, null, false, PageRequest.of(0, 20)).getContent()).isNotEmpty();
+        assertThat(leads.search(null, null, null, "search", false, PageRequest.of(0, 20)).getTotalElements()).isEqualTo(1);
+        // Source filter (POS Leads screen): matches the lead's own source, excludes any other.
+        var own = leads.search(null, null, null, "search", false, PageRequest.of(0, 20)).getContent().get(0).getAcquisitionSource();
+        var other = own == com.specskart.lead.AcquisitionSource.TIKTOK ? com.specskart.lead.AcquisitionSource.META : com.specskart.lead.AcquisitionSource.TIKTOK;
+        assertThat(leads.search(null, null, own, "search", false, PageRequest.of(0, 20)).getTotalElements()).isEqualTo(1);
+        assertThat(leads.search(null, null, other, "search", false, PageRequest.of(0, 20)).getTotalElements()).isZero();
     }
 
     @Test
