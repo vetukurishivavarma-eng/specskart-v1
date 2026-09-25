@@ -41,9 +41,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/public/**").permitAll()
                 .requestMatchers("/api/sim/**").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                // Leads are customers' phone numbers; staff (AGENT) run the till and don't need them.
+                .requestMatchers("/api/admin/leads", "/api/admin/leads/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/admin/**").hasAnyRole("ADMIN", "AGENT")
                 .requestMatchers(HttpMethod.GET, "/api/admin/users").hasAnyRole("ADMIN", "AGENT")
-                .requestMatchers(HttpMethod.DELETE, "/api/admin/leads/**").hasRole("ADMIN")
                 .requestMatchers("/api/admin/campaigns/**", "/api/admin/recommendations/**", "/api/admin/users/**",
                         "/api/admin/catalog/**").hasRole("ADMIN")
                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "AGENT")

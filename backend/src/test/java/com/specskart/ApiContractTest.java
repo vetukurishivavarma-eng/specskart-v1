@@ -17,6 +17,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Instant;
 
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -47,6 +48,12 @@ class ApiContractTest {
     @Test
     void adminEndpointsRequireAuth() throws Exception {
         mvc().perform(get("/api/admin/leads")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void leadsAreAdminOnly() throws Exception {
+        mvc().perform(get("/api/admin/leads").with(user("staff").roles("AGENT"))).andExpect(status().isForbidden());
+        mvc().perform(get("/api/admin/leads").with(user("owner").roles("ADMIN"))).andExpect(status().isOk());
     }
 
     @Test

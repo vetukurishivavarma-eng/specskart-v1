@@ -13,7 +13,7 @@ export default function AdminLayout() {
           <div className="font-display text-xl">Specskart CRM</div>
           <nav className="mt-6 space-y-1">
             <NavLink end to="/admin" className={link}>Dashboard</NavLink>
-            <NavLink to="/admin/leads" className={link}>Leads</NavLink>
+            {user?.role === 'ADMIN' && <NavLink to="/admin/leads" className={link}>Leads</NavLink>}
             <NavLink to="/admin/campaigns" className={link}>Campaigns</NavLink>
             <NavLink to="/admin/broadcast" className={link}>Broadcast</NavLink>
             <div className="pt-3 text-[10px] uppercase tracking-widest text-ink/30">Shop</div>
