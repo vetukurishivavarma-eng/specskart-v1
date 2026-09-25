@@ -38,6 +38,16 @@ public interface WhatsAppProvider {
      */
     void sendTemplate(String toWaId, String templateName, String languageCode, List<String> bodyParams);
 
+    /**
+     * {@link #sendTemplate} for a template with a "Copy offer code" button (Meta's COPY_CODE,
+     * always button index 0 -- a template may carry only one). Meta rejects the send if the
+     * template has that button and no code arrives for it, or the other way round.
+     */
+    default void sendCouponTemplate(String toWaId, String templateName, String languageCode,
+                                    List<String> bodyParams, String couponCode) {
+        sendTemplate(toWaId, templateName, languageCode, bodyParams);
+    }
+
     /** A document (PDF) by public link with an optional caption (≤1024 chars). Inside the 24h window only. */
     void sendDocument(String toWaId, String documentUrl, String filename, String caption);
 

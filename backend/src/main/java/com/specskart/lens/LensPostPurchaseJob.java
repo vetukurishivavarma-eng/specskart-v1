@@ -100,8 +100,10 @@ class LensPostPurchaseJob {
         // {{2}} promo code, {{3}} referral code -- gets through; the plain text stays for dev
         // and an unset template.
         if (props.whatsapp().postPurchaseConfigured()) {
-            whatsapp.sendTemplate(waId, props.whatsapp().postPurchaseTemplate(),
-                    props.whatsapp().followUpTemplateLang(), List.of(firstName(lead, q), promo.getCode(), referral));
+            // The template carries a "Copy offer code" button for the promo.
+            whatsapp.sendCouponTemplate(waId, props.whatsapp().postPurchaseTemplate(),
+                    props.whatsapp().followUpTemplateLang(), List.of(firstName(lead, q), promo.getCode(), referral),
+                    promo.getCode());
         } else {
             whatsapp.sendText(waId, message(firstName(lead, q), promo, referral));
         }

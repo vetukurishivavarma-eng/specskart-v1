@@ -86,12 +86,13 @@ class PostPurchaseJob {
             String name = OrderNotificationService.firstName(lead).trim();
 
             try {
-                if (props.whatsapp().postPurchaseConfigured()) {
-                    whatsapp.sendTemplate(waId, props.whatsapp().postPurchaseTemplate(),
+                // The shared template's "Copy offer code" button needs a code, so no code = plain text.
+                if (props.whatsapp().postPurchaseConfigured() && code != null) {
+                    whatsapp.sendCouponTemplate(waId, props.whatsapp().postPurchaseTemplate(),
                             props.whatsapp().followUpTemplateLang(),
                             // Shared with the lens post-purchase: {{1}} name, {{2}} promo, {{3}} referral.
-                            List.of(name.isBlank() ? "there" : name, code != null ? code : "",
-                                    leadService.ensureReferralCode(lead.getId())));
+                            List.of(name.isBlank() ? "there" : name, code,
+                                    leadService.ensureReferralCode(lead.getId())), code);
                 } else {
                     whatsapp.sendText(waId, plainMessage(lead, order, code));
                 }

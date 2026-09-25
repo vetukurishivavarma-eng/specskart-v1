@@ -168,6 +168,24 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
     }
 
     @Override
+    public void sendCouponTemplate(String toWaId, String templateName, String languageCode,
+                                   List<String> bodyParams, String couponCode) {
+        var components = new java.util.ArrayList<Map<String, Object>>();
+        if (bodyParams != null && !bodyParams.isEmpty()) {
+            components.add(Map.of("type", "body", "parameters", bodyParams.stream()
+                    .map(p -> Map.of("type", "text", "text", p == null ? "" : p)).toList()));
+        }
+        components.add(Map.of("type", "button", "sub_type", "copy_code", "index", "0",
+                "parameters", List.of(Map.of("type", "coupon_code", "coupon_code", couponCode))));
+        post(Map.of(
+                "messaging_product", "whatsapp",
+                "to", toWaId,
+                "type", "template",
+                "template", Map.of("name", templateName, "language", Map.of("code", languageCode),
+                        "components", components)));
+    }
+
+    @Override
     public void sendDocument(String toWaId, String documentUrl, String filename, String caption) {
         var doc = new java.util.LinkedHashMap<String, Object>();
         doc.put("link", documentUrl);
