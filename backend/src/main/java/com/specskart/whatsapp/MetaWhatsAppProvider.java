@@ -136,7 +136,7 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
         }
         if (bodyParams != null && !bodyParams.isEmpty()) {
             components.add(Map.of("type", "body", "parameters", bodyParams.stream()
-                    .map(p -> Map.of("type", "text", "text", p == null ? "" : p)).toList()));
+                    .map(p -> Map.of("type", "text", "text", param(p))).toList()));
         }
         var template = new java.util.LinkedHashMap<String, Object>();
         template.put("name", templateName);
@@ -156,7 +156,7 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
         template.put("language", Map.of("code", languageCode));
         if (bodyParams != null && !bodyParams.isEmpty()) {
             var params = bodyParams.stream()
-                    .map(p -> Map.of("type", "text", "text", p == null ? "" : p))
+                    .map(p -> Map.of("type", "text", "text", param(p)))
                     .toList();
             template.put("components", List.of(Map.of("type", "body", "parameters", params)));
         }
@@ -173,7 +173,7 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
         var components = new java.util.ArrayList<Map<String, Object>>();
         if (bodyParams != null && !bodyParams.isEmpty()) {
             components.add(Map.of("type", "body", "parameters", bodyParams.stream()
-                    .map(p -> Map.of("type", "text", "text", p == null ? "" : p)).toList()));
+                    .map(p -> Map.of("type", "text", "text", param(p))).toList()));
         }
         components.add(Map.of("type", "button", "sub_type", "copy_code", "index", "0",
                 "parameters", List.of(Map.of("type", "coupon_code", "coupon_code", couponCode))));
@@ -206,7 +206,7 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
                 "document", Map.of("link", documentUrl, "filename", filename)))));
         if (bodyParams != null && !bodyParams.isEmpty()) {
             components.add(Map.of("type", "body", "parameters", bodyParams.stream()
-                    .map(p -> Map.of("type", "text", "text", p == null ? "" : p)).toList()));
+                    .map(p -> Map.of("type", "text", "text", param(p))).toList()));
         }
         post(Map.of(
                 "messaging_product", "whatsapp",
@@ -214,6 +214,16 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
                 "type", "template",
                 "template", Map.of("name", templateName, "language", Map.of("code", languageCode),
                         "components", components)));
+    }
+
+    /**
+     * Meta rejects a template parameter (#132018) holding a newline, a tab or more than four
+     * spaces in a row. Callers build their lines for free text, where line breaks read well,
+     * so every template parameter is flattened here rather than at each caller.
+     */
+    static String param(String p) {
+        if (p == null) return "";
+        return p.replaceAll("\\s*[\\r\\n\\t]+\\s*", " ").replaceAll(" {4,}", " ").trim();
     }
 
     private static String cap(String s) {
