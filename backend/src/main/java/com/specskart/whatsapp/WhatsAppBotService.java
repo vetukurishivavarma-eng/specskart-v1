@@ -52,6 +52,10 @@ public class WhatsAppBotService {
     static final String BTN_TRACK_ORDER = "TRACK_ORDER";
     static final String BTN_MENU = "MENU";
     static final String BTN_CARE = "CARE";
+    static final String BTN_FAQ = "FAQ";
+    /** A tapped FAQ row: {@code FAQ:<uuid>}, or {@code FAQ_MORE:<offset>} for the next page. */
+    static final String ROW_FAQ_PREFIX = "FAQ:";
+    static final String ROW_FAQ_MORE_PREFIX = "FAQ_MORE:";
     /** A list row that buys one specific product: {@code BUY:<slug>}. */
     static final String ROW_BUY_PREFIX = "BUY:";
     /** A list row naming one of the customer's own orders: {@code TRACK:L:<uuid>} or {@code TRACK:O:<orderNo>}. */
@@ -76,13 +80,16 @@ public class WhatsAppBotService {
     private final OrderQueryService orderQuery;
     private final LensInquiryService lensInquiries;
     private final MembershipService memberships;
+    private final FaqRepository faqs;
 
     public WhatsAppBotService(WhatsAppProvider provider, WhatsAppMessageRepository messages,
                               FrameFinderService frameFinder, LeadService leadService,
                               AnalyticsService analytics, AppProperties props,
                               CatalogService catalog, CartService carts, LeadFollowUpService followUp,
                               ReviewCaptureService reviewCapture, OrderQueryService orderQuery,
-                              LensInquiryService lensInquiries, MembershipService memberships) {
+                              LensInquiryService lensInquiries, MembershipService memberships,
+                              FaqRepository faqs) {
+        this.faqs = faqs;
         this.orderQuery = orderQuery;
         this.lensInquiries = lensInquiries;
         this.memberships = memberships;
@@ -130,6 +137,15 @@ public class WhatsAppBotService {
             return;
         }
 
+        if (buttonId != null && buttonId.startsWith(ROW_FAQ_PREFIX)) {
+            handleFaqRow(lead, buttonId.substring(ROW_FAQ_PREFIX.length()));
+            return;
+        }
+        if (buttonId != null && buttonId.startsWith(ROW_FAQ_MORE_PREFIX)) {
+            sendFaqs(lead, Integer.parseInt(buttonId.substring(ROW_FAQ_MORE_PREFIX.length())));
+            return;
+        }
+
         BotIntent intent = classify(text, buttonId);
         log.info("bot intent {} for lead {}", intent, lead.getId());
         switch (intent) {
@@ -139,6 +155,7 @@ public class WhatsAppBotService {
             case EXPLORE_LENS -> sendLensLink(lead);
             case TRACK_ORDER -> sendOrderStatus(lead);
             case CARE -> sendCare(lead);
+            case FAQ -> sendFaqs(lead, 0);
             case HELP_CHOOSE -> sendBudgetPrompt(lead);
             case BUDGET_LOW -> sendBudgetPicks(lead, "low");
             case BUDGET_MED -> sendBudgetPicks(lead, "mid");
@@ -170,6 +187,7 @@ public class WhatsAppBotService {
         if (latestOrderUpdate(lead).isPresent()) {
             buttons.add(new WhatsAppProvider.Button(BTN_TRACK_ORDER, "Track my order 📦"));
         }
+        buttons.add(new WhatsAppProvider.Button(BTN_FAQ, "FAQs ❓"));
         provider.sendButtons(waId(lead),
                 "Hi" + name + " 👋\nWelcome to " + props.storeName() + ".", buttons);
         logOutbound(lead.getId(), "interactive", "welcome");
@@ -186,7 +204,9 @@ public class WhatsAppBotService {
                 new WhatsAppProvider.Row(BTN_EXPLORE_LENS, "Lenses",
                         "Clear or photochromatic, with or without blue-block"),
                 new WhatsAppProvider.Row(BTN_TRACK_ORDER, "Track my order",
-                        "See where your order has got to")));
+                        "See where your order has got to"),
+                new WhatsAppProvider.Row(BTN_FAQ, "FAQs",
+                        "Prices, insurance, opening hours, location and more")));
         // Compile-time gate: with the feature off there is no row, so a client who never bought
         // into memberships ships a build where customers are never offered one.
         if (MembershipService.ENABLED) {
@@ -286,6 +306,31 @@ public class WhatsAppBotService {
         return Stream.of(orderQuery.latestForLead(lead.getId()), lensInquiries.latestForLead(lead.getId()))
                 .flatMap(Optional::stream)
                 .max(Comparator.comparing(TrackUpdate::at));
+    }
+
+    /**
+     * The admin-edited FAQ list. Meta caps a list at ten rows, so past ten the last row
+     * becomes "More questions" and pages on.
+     */
+    private void sendFaqs(Lead lead, int offset) {
+        List<Faq> all = faqs.findAllByOrderBySortOrderAscCreatedAtAsc();
+        if (all.isEmpty() || offset >= all.size()) { sendMenu(lead); return; }
+        List<Faq> rest = all.subList(offset, all.size());
+        boolean more = rest.size() > 10;
+        List<WhatsAppProvider.Row> rows = new ArrayList<>(rest.stream().limit(more ? 9 : 10)
+                .map(f -> new WhatsAppProvider.Row(ROW_FAQ_PREFIX + f.getId(), f.getTitle(), f.getQuestion()))
+                .toList());
+        if (more) rows.add(new WhatsAppProvider.Row(ROW_FAQ_MORE_PREFIX + (offset + 9), "More questions ➡️", null));
+        provider.sendList(waId(lead), "Frequently asked questions — tap one for the answer.", "See questions", rows);
+        logOutbound(lead.getId(), "interactive", "faqs");
+        analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
+    }
+
+    private void handleFaqRow(Lead lead, String id) {
+        Optional<Faq> faq;
+        try { faq = faqs.findById(UUID.fromString(id)); } catch (IllegalArgumentException e) { faq = Optional.empty(); }
+        faq.ifPresentOrElse(f -> sendText(lead, "*" + f.getQuestion() + "*\n\n" + f.getAnswer()),
+                () -> sendFaqs(lead, 0)); // deleted since the list went out
     }
 
     private void sendLensLink(Lead lead) {
@@ -432,6 +477,7 @@ public class WhatsAppBotService {
                     case BTN_TRACK_ORDER -> BotIntent.TRACK_ORDER;
                     case BTN_MENU -> BotIntent.MENU;
                     case BTN_CARE -> BotIntent.CARE;
+                    case BTN_FAQ -> BotIntent.FAQ;
                     case BTN_BUDGET_LOW -> BotIntent.BUDGET_LOW;
                     case BTN_BUDGET_MED -> BotIntent.BUDGET_MED;
                     case BTN_BUDGET_HIGH -> BotIntent.BUDGET_HIGH;
@@ -443,6 +489,7 @@ public class WhatsAppBotService {
         if (t.isBlank()) return BotIntent.GREETING;
         if (t.matches(".*(hi|hello|hey|start|namaste).*") && t.length() < 15) return BotIntent.GREETING;
         if (t.contains("menu") || t.contains("options")) return BotIntent.MENU;
+        if (t.contains("faq") || t.contains("question")) return BotIntent.FAQ;
         if (MembershipService.ENABLED && (t.contains("care") || t.contains("member"))) return BotIntent.CARE;
         // Before the lens check on purpose — "where is my lens order" is a tracking question.
         if (t.contains("track") || t.contains("where") || t.contains("my order")

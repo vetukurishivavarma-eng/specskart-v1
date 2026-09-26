@@ -2,6 +2,8 @@ package com.specskart;
 
 import com.specskart.catalog.Product;
 import com.specskart.catalog.ProductRepository;
+import com.specskart.whatsapp.Faq;
+import com.specskart.whatsapp.FaqRepository;
 import com.specskart.whatsapp.InboundMessage;
 import com.specskart.whatsapp.MockWhatsAppProvider;
 import com.specskart.whatsapp.WhatsAppInboundService;
@@ -24,6 +26,7 @@ class ChatMenuTest {
     @Autowired WhatsAppInboundService inbound;
     @Autowired ProductRepository products;
     @Autowired WhatsAppProvider provider;
+    @Autowired FaqRepository faqs;
 
     private static String someNumber() {
         return "26097" + (200000 + (int) (Math.random() * 700000));
@@ -67,6 +70,33 @@ class ChatMenuTest {
         var ids = since(mark).stream().flatMap(s -> s.buttons().stream())
                 .map(WhatsAppProvider.Button::id).toList();
         assertThat(ids).contains("EXPLORE_LENS");
+    }
+
+    @Test
+    void faqsListTheAdminsQuestionsAndAnswerATappedOne() {
+        // The mock profile builds its schema from JPA, not Flyway, so V50's seed isn't here.
+        Faq faq = new Faq();
+        faq.setTitle("Insurance");
+        faq.setQuestion("Do you take insurance?");
+        faq.setAnswer("Yes, we are with Prudential, Onelife and ZISC insurances.");
+        faqs.save(faq);
+
+        String waId = someNumber();
+        inbound.process(new InboundMessage(waId, waId, "Curious", "hi", null, msgId(waId, "f0"), Map.of()));
+        assertThat(since(0).stream().filter(s -> waId.equals(s.toWaId())).flatMap(s -> s.buttons().stream())
+                .map(WhatsAppProvider.Button::id)).contains("FAQ");
+
+        int mark = mark();
+        inbound.process(new InboundMessage(waId, waId, "Curious", null, "FAQ", msgId(waId, "f1"), Map.of()));
+        var rows = since(mark).stream().filter(s -> waId.equals(s.toWaId()))
+                .flatMap(s -> s.buttons().stream()).toList();
+        assertThat(rows).isNotEmpty().allMatch(r -> r.id().startsWith("FAQ:"));
+        String insurance = "FAQ:" + faq.getId();
+        assertThat(rows).anyMatch(r -> r.id().equals(insurance));
+
+        mark = mark();
+        inbound.process(new InboundMessage(waId, waId, "Curious", null, insurance, msgId(waId, "f2"), Map.of()));
+        assertThat(since(mark)).anyMatch(s -> waId.equals(s.toWaId()) && s.text().contains("Prudential"));
     }
 
     @Test

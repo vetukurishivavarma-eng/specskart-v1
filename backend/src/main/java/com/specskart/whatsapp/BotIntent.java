@@ -10,5 +10,6 @@ public enum BotIntent {
     TRACK_ORDER,
     MENU,
     CARE,
+    FAQ,
     GREETING, UNKNOWN
 }
