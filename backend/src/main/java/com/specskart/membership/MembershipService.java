@@ -29,7 +29,7 @@ import java.util.UUID;
 public class MembershipService {
 
     /** The kill switch. One line, no configuration, deliberately compile-time. */
-    public static final boolean ENABLED = true;
+    public static final boolean ENABLED = false; // off until online payment is live -- joining is online-only
 
     /** K150 a year, 15% off every lens order — it pays for itself on the second pair. */
     public static final long PRICE_MINOR = 15_000;

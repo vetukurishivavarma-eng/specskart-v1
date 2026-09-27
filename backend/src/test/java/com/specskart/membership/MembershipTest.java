@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /** Specskart Care: the discount reaches the price, and the kill switch really does kill it. */
 @SpringBootTest
@@ -80,6 +81,7 @@ class MembershipTest {
     @Test
     @Transactional
     void aMemberIsQuotedLessForTheSameLenses() {
+        assumeTrue(MembershipService.ENABLED, "memberships switched off");
         String plainWa = someNumber();
         Lead plain = lead(plainWa);
         long listPrice = memberships.applyDiscount(45_000, plain.getId());
@@ -121,6 +123,7 @@ class MembershipTest {
     @Test
     @Transactional
     void theMemberPriceIsWhatTheFunnelActuallyQuotes() {
+        assumeTrue(MembershipService.ENABLED, "memberships switched off");
         String waId = someNumber();
         Lead l = lead(waId);
         paidUpMember(l.getId());
