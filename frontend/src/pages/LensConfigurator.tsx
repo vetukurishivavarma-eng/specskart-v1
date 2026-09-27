@@ -330,12 +330,13 @@ function DetailsForm({ q, onPatch, onQuoted }: {
           {error && <p className="mt-3 text-sm text-clay">{error}</p>}
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             <button className="btn-primary w-full disabled:bg-ink/30"
-              onClick={() => buyNow(true)} disabled={submitting}>
-              {submitting ? 'Placing…' : 'Pay now'}
-            </button>
-            <button className="btn-ghost w-full disabled:opacity-40"
               onClick={() => buyNow(false)} disabled={submitting}>
-              Pay when you collect
+              {submitting ? 'Placing…' : 'Pay at the shop'}
+            </button>
+            {/* Online payment is off until the client goes live with it. buyNow(true) still
+                works end to end: re-enable by restoring onClick={() => buyNow(true)}. */}
+            <button className="btn-ghost w-full cursor-not-allowed opacity-40" disabled>
+              Pay online (Coming soon)
             </button>
           </div>
         </div>
