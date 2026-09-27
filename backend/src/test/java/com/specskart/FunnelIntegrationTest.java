@@ -96,9 +96,11 @@ class FunnelIntegrationTest {
         inbound.process(new InboundMessage("2609771101", "2609771101", "Tt", "Hi Specskart, I saw your ad on TikTok", null, "src-tt-1", Map.of()));
         inbound.process(new InboundMessage("2609771102", "2609771102", "Gg", "Hi, found you on Google", null, "src-g-1", Map.of()));
         inbound.process(new InboundMessage("2609771103", "2609771103", "Org", "Hi", null, "src-org-1", Map.of()));
+        inbound.process(new InboundMessage("2609771104", "2609771104", "Fb", "Hi Specskart, I found you on Facebook", null, "src-fb-1", Map.of()));
         assertThat(leads.findByWhatsappWaId("2609771101").orElseThrow().getAcquisitionSource()).isEqualTo(com.specskart.lead.AcquisitionSource.TIKTOK);
         assertThat(leads.findByWhatsappWaId("2609771102").orElseThrow().getAcquisitionSource()).isEqualTo(com.specskart.lead.AcquisitionSource.GOOGLE);
         assertThat(leads.findByWhatsappWaId("2609771103").orElseThrow().getAcquisitionSource()).isEqualTo(com.specskart.lead.AcquisitionSource.WHATSAPP);
+        assertThat(leads.findByWhatsappWaId("2609771104").orElseThrow().getAcquisitionSource()).isEqualTo(com.specskart.lead.AcquisitionSource.META);
     }
 
     @Test

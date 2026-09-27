@@ -65,6 +65,7 @@ public class WhatsAppInboundService {
         String t = text == null ? "" : text.toLowerCase();
         if (t.contains("tiktok")) return "tiktok";
         if (t.contains("google")) return "google";
+        if (t.contains("facebook")) return "facebook"; // Page button's wa.me link -> META
         return "whatsapp";
     }
 }
