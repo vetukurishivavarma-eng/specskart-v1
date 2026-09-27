@@ -463,7 +463,7 @@ public class WhatsAppBotService {
         analytics.record(LeadEventType.WHATSAPP_FOLLOW_UP_SENT, lead.getId(), null);
     }
 
-    BotIntent classify(String text, String buttonId) {
+    static BotIntent classify(String text, String buttonId) {
         if (buttonId != null) {
             try {
                 return switch (buttonId) {
@@ -496,7 +496,7 @@ public class WhatsAppBotService {
                 || t.contains("order status")) return BotIntent.TRACK_ORDER;
         if (t.contains("lens")) return BotIntent.EXPLORE_LENS;
         if (t.contains("help") || t.contains("choose") || t.contains("recommend") || t.contains("suggest")) return BotIntent.HELP_CHOOSE;
-        if (t.contains("face") || t.contains("suit") || t.contains("frame finder") || t.equals("1")) return BotIntent.FIND_FRAMES;
+        if (t.matches(".*\\bfaces?\\b.*") || t.contains("suit") || t.contains("frame finder") || t.equals("1")) return BotIntent.FIND_FRAMES;
         if (t.contains("explore") || t.contains("latest") || t.contains("catalog") || t.equals("2")) return BotIntent.EXPLORE_FRAMES;
         if (t.contains("website") || t.contains("site") || t.equals("3")) return BotIntent.VISIT_WEBSITE;
         return BotIntent.UNKNOWN;
