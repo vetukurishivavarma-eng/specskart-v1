@@ -25,11 +25,17 @@ export default function SiteLayout() {
         <div className="container-x flex flex-wrap items-center justify-between gap-4">
           <span>© {new Date().getFullYear()} Specskart</span>
           <div className="flex gap-6">
+            <Link to="/terms">Terms</Link>
             <Link to="/privacy">Privacy</Link>
             <a href={WA} target="_blank" rel="noreferrer">WhatsApp</a>
             <Link to="/admin/login" className="text-ink/35">Staff</Link>
           </div>
         </div>
+        <p className="container-x mt-6 text-xs text-ink/40">
+          Offers and prices are subject to availability and may change without notice. T&amp;C apply.
+          Information on this site is general guidance, not medical advice, and is not a substitute for an eye
+          examination. Final lens prices depend on your prescription. See our <Link to="/terms" className="underline">Terms &amp; Conditions</Link>.
+        </p>
       </footer>
     </div>
   )

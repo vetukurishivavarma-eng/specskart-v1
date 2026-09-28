@@ -11,5 +11,7 @@ public enum BotIntent {
     MENU,
     CARE,
     FAQ,
+    // The FB ad's prefilled "can I have more information" — lens link, then the menu.
+    MORE_INFO,
     GREETING, UNKNOWN
 }

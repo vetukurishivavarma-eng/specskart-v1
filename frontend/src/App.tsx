@@ -10,6 +10,7 @@ import Checkout from './pages/Checkout'
 import LensTracking from './pages/LensTracking'
 import OrderTracking from './pages/OrderTracking'
 import Privacy from './pages/Privacy'
+import Terms from './pages/Terms'
 import FrameFinder from './pages/FrameFinder'
 import LensConfigurator from './pages/LensConfigurator'
 import LensVerify from './pages/LensVerify'
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/order/:orderNo" element={<OrderTracking />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
         <Route path="/lens" element={<LensConfigurator />} />
         <Route path="/lens/track/:id" element={<LensTracking />} />
       </Route>

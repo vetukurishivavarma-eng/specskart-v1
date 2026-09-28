@@ -170,6 +170,10 @@ public class WhatsAppBotService {
                 sendText(lead, "No problem — your recommendations are saved. Message us anytime to pick up where you left off.");
             }
             case MENU -> sendMenu(lead);
+            case MORE_INFO -> {
+                sendLensLink(lead);
+                sendMenu(lead);
+            }
             case GREETING -> sendWelcome(lead);
             // Off-script: the full option list is a better dead-end than the welcome's one button.
             case UNKNOWN -> sendMenu(lead);
@@ -488,6 +492,7 @@ public class WhatsAppBotService {
         String t = text == null ? "" : text.toLowerCase().trim();
         if (t.isBlank()) return BotIntent.GREETING;
         if (t.matches(".*(hi|hello|hey|start|namaste).*") && t.length() < 15) return BotIntent.GREETING;
+        if (t.contains("information") || t.contains("more info") || t.contains("details")) return BotIntent.MORE_INFO;
         if (t.contains("menu") || t.contains("options")) return BotIntent.MENU;
         if (t.contains("faq") || t.contains("question")) return BotIntent.FAQ;
         if (MembershipService.ENABLED && (t.contains("care") || t.contains("member"))) return BotIntent.CARE;
