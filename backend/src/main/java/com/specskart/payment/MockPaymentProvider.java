@@ -33,6 +33,12 @@ public class MockPaymentProvider implements PaymentProvider {
 
     @Override
     public synchronized Payment start(PaymentRequest r) {
+        if (prod) {
+            // No gateway is live: the shop takes cash / QR in person. Refuse rather than leave an
+            // order stuck in PENDING_PAYMENT behind a fake payment page.
+            throw com.specskart.shared.ApiException.badRequest("ONLINE_PAYMENT_OFF",
+                    "Online payment isn't available yet. Choose pay on delivery, or pay at the shop.");
+        }
         String ref = "mock-" + r.orderNo();
         issued.add(ref);
         log.info("[MOCK-PAY] order {} amount {} {} -> ref {}", r.orderNo(), r.amountMinor(), r.currency(), ref);

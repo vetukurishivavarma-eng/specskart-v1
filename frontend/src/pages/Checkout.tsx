@@ -13,7 +13,7 @@ export default function Checkout() {
   const [cc, setCc] = useState(DEFAULT_COUNTRY_CODE)
   const [usePoints, setUsePoints] = useState(false)
   const [referral, setReferral] = useState('')
-  const [method, setMethod] = useState<'ONLINE' | 'COD'>('ONLINE')
+  const [method, setMethod] = useState<'ONLINE' | 'COD'>('COD')
   const [delivery, setDelivery] = useState<'DOOR' | 'PICKUP'>('DOOR')
   const [pickupPoint, setPickupPoint] = useState('')
 
@@ -144,9 +144,11 @@ export default function Checkout() {
 
           <fieldset className="mt-4 space-y-2">
             <span className="text-xs font-medium uppercase tracking-widest text-ink/50">How would you like to pay?</span>
-            <label className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${!cod ? 'border-ink bg-ink/5' : 'border-ink/20'}`}>
-              <input type="radio" name="pay" checked={!cod} onChange={() => setMethod('ONLINE')} className="mt-0.5" />
-              <span><b>Pay now</b> — card or mobile money (MTN / Airtel). Secure checkout.</span>
+            {/* Online payment is off until the client goes live with it (same as the lens page).
+                Re-enable: restore onChange={() => setMethod('ONLINE')}, drop `disabled`, default to 'ONLINE'. */}
+            <label className="flex cursor-not-allowed items-start gap-3 rounded-lg border border-ink/20 p-3 text-sm opacity-40">
+              <input type="radio" name="pay" checked={false} disabled className="mt-0.5" />
+              <span><b>Pay now</b> — card or mobile money (Coming soon)</span>
             </label>
             {cfg?.codEnabled !== false && (
               <label className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${cod ? 'border-ink bg-ink/5' : 'border-ink/20'}`}>
