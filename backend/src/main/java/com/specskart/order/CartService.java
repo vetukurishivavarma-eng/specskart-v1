@@ -76,7 +76,10 @@ public class CartService {
             throw ApiException.badRequest("FILE_TOO_LARGE", "That file's too big — please upload a photo under 8MB.");
         }
         String ct = file.getContentType();
-        if (ct == null || !(ct.startsWith("image/") || ct.equals("application/pdf"))) {
+        // An explicit list, not image/*: an uploaded SVG can carry script, and this file is served back
+        // with the type the uploader declared.
+        if (ct == null || !java.util.Set.of("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif",
+                "application/pdf").contains(ct.toLowerCase())) {
             throw ApiException.badRequest("BAD_FILE_TYPE", "Upload a photo (JPG/PNG) or PDF of your prescription.");
         }
         Cart cart = getOrCreate(token);

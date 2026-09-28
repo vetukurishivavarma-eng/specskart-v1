@@ -48,6 +48,12 @@ public class GlobalExceptionHandler {
                 .body(ApiError.of("BAD_PARAMETER", "'" + ex.getName() + "' is not in the expected format.", traceId));
     }
 
+    /** An unknown URL (bots probe them constantly) is a 404, not a 500 with a stack trace. */
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<ApiError> handleNoRoute(org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+        return ResponseEntity.status(404).body(ApiError.of("NOT_FOUND", "No such endpoint.", UUID.randomUUID().toString()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnexpected(Exception ex) {
         String traceId = UUID.randomUUID().toString();

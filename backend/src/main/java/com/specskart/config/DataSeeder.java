@@ -119,6 +119,9 @@ public class DataSeeder {
     private void seedUsers(UserRepository users, PasswordEncoder encoder, Environment env) {
         if (users.count() > 0) return;
         String adminPw = env.getProperty("SPECSKART_ADMIN_PASSWORD", "admin12345");
+        if (env.matchesProfiles("prod") && "admin12345".equals(adminPw)) {
+            throw new IllegalStateException("Fresh production database: set SPECSKART_ADMIN_PASSWORD before first boot");
+        }
         User admin = new User();
         admin.setEmail(env.getProperty("SPECSKART_ADMIN_EMAIL", "admin@specskart.local"));
         admin.setPasswordHash(encoder.encode(adminPw));

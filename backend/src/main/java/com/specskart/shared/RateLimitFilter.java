@@ -32,7 +32,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String p = request.getRequestURI();
-        return !(p.startsWith("/api/webhooks/") || p.startsWith("/api/frame-finder/") || p.startsWith("/api/sim/"));
+        // Login and forgot-password (which WhatsApps staff) are brute-force / spam targets. Public
+        // writes (lens start, checkout, notify-me) send WhatsApp messages to a typed-in number.
+        // Public GETs stay unlimited: they're the catalogue, and Zambian mobile carriers put many
+        // shoppers behind one NAT address.
+        boolean publicWrite = p.startsWith("/api/public/") && !"GET".equals(request.getMethod());
+        return !(p.startsWith("/api/webhooks/") || p.startsWith("/api/frame-finder/") || p.startsWith("/api/sim/")
+                || p.startsWith("/api/auth/") || publicWrite);
     }
 
     @Override

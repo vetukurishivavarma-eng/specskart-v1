@@ -39,6 +39,14 @@ class RateLimitFilterTest {
     }
 
     @Test
+    void limitsLoginAndPublicWritesButNotCatalogueReads() {
+        assertThat(filter.shouldNotFilter(req("/api/auth/login", "1.1.1.1"))).isFalse();
+        assertThat(filter.shouldNotFilter(req("/api/auth/forgot-password", "1.1.1.1"))).isFalse();
+        assertThat(filter.shouldNotFilter(req("/api/public/lens/start", "1.1.1.1"))).isFalse();
+        assertThat(filter.shouldNotFilter(new MockHttpServletRequest("GET", "/api/public/products"))).isTrue();
+    }
+
+    @Test
     void bucketsAreSeparatePerClientIp() throws Exception {
         FilterChain chain = (request, response) -> {};
         for (int i = 0; i < 60; i++) {

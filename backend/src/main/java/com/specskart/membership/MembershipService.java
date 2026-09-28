@@ -132,7 +132,7 @@ public class MembershipService {
         }
         Membership m = memberships.findById(id).orElse(null);
         if (m == null || m.getPaidAt() != null) return; // unknown, or already handled
-        if (!payments.verify(m.getPaymentRef() == null ? providerRef : m.getPaymentRef())) {
+        if (!payments.verify(m.getPaymentRef() == null ? providerRef : m.getPaymentRef(), m.getPriceMinor(), m.getCurrency())) {
             log.warn("membership payment {} did not verify", providerRef);
             return;
         }

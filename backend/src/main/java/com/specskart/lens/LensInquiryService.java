@@ -265,7 +265,8 @@ public class LensInquiryService {
         }
         LensInquiry q = inquiries.findById(id).orElse(null);
         if (q == null || q.getPaidAt() != null) return; // unknown, or already handled
-        if (!payments.verify(q.getPaymentRef() == null ? providerRef : q.getPaymentRef())) {
+        if (q.getPriceMinor() == null
+                || !payments.verify(q.getPaymentRef() == null ? providerRef : q.getPaymentRef(), q.getPriceMinor(), q.getCurrency())) {
             log.warn("lens payment {} did not verify", providerRef);
             return;
         }

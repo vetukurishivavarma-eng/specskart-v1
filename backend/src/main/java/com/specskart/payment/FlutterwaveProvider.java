@@ -71,7 +71,7 @@ public class FlutterwaveProvider implements PaymentProvider {
 
     @Override
     @SuppressWarnings("unchecked")
-    public boolean verify(String providerRef) {
+    public boolean verify(String providerRef, long expectedMinor, String currency) {
         try {
             Map<String, Object> res = http.get()
                     .uri(fw().baseUrl() + "/v3/transactions/verify_by_reference?tx_ref=" + providerRef)
@@ -79,11 +79,22 @@ public class FlutterwaveProvider implements PaymentProvider {
                     .retrieve()
                     .body(Map.class);
             Map<String, Object> data = res == null ? null : (Map<String, Object>) res.get("data");
-            boolean ok = data != null && "successful".equalsIgnoreCase(String.valueOf(data.get("status")));
+            boolean ok = data != null && "successful".equalsIgnoreCase(String.valueOf(data.get("status")))
+                    && paidInFull(data, expectedMinor, currency);
             if (!ok) log.warn("Flutterwave verify {} -> {}", providerRef, res);
             return ok;
         } catch (Exception e) {
             log.error("Flutterwave verify {} failed: {}", providerRef, e.getMessage());
+            return false;
+        }
+    }
+
+    /** A "successful" charge for less than the order, or in another currency, is not a payment for it. */
+    static boolean paidInFull(Map<String, Object> data, long expectedMinor, String currency) {
+        try {
+            long paidMinor = new BigDecimal(String.valueOf(data.get("amount"))).movePointRight(2).longValueExact();
+            return paidMinor >= expectedMinor && String.valueOf(currency).equalsIgnoreCase(String.valueOf(data.get("currency")));
+        } catch (ArithmeticException | NumberFormatException e) {
             return false;
         }
     }

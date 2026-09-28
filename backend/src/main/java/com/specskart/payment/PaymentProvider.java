@@ -11,8 +11,11 @@ public interface PaymentProvider {
      */
     Payment start(PaymentRequest request);
 
-    /** Confirm with the gateway that a reference is actually paid. Never trust the callback alone. */
-    boolean verify(String providerRef);
+    /**
+     * Confirm with the gateway that a reference is actually paid, in full and in the right
+     * currency. Never trust the callback alone, and never trust "successful" alone either.
+     */
+    boolean verify(String providerRef, long expectedMinor, String currency);
 
     record PaymentRequest(String orderNo, long amountMinor, String currency,
                           String customerName, String customerEmail, String customerPhone,

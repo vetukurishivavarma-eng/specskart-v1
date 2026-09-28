@@ -19,6 +19,12 @@ public class MockPaymentProvider implements PaymentProvider {
 
     private static final Logger log = LoggerFactory.getLogger(MockPaymentProvider.class);
     private final Set<String> issued = new HashSet<>();
+    private final boolean prod;
+
+    public MockPaymentProvider(org.springframework.core.env.Environment env) {
+        this.prod = env.matchesProfiles("prod");
+        if (prod) log.error("[MOCK-PAY] payments.provider=mock under the prod profile: online payments will NEVER confirm");
+    }
 
     @Override
     public String name() {
@@ -35,7 +41,8 @@ public class MockPaymentProvider implements PaymentProvider {
     }
 
     @Override
-    public synchronized boolean verify(String providerRef) {
-        return providerRef != null && (issued.contains(providerRef) || providerRef.startsWith("mock-"));
+    public synchronized boolean verify(String providerRef, long expectedMinor, String currency) {
+        // Mock "payments" are free to anyone who asks; in production that would be free goods.
+        return !prod && providerRef != null && (issued.contains(providerRef) || providerRef.startsWith("mock-"));
     }
 }

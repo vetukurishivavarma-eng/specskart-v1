@@ -224,7 +224,8 @@ public class CheckoutService {
                 .orElseThrow(() -> ApiException.notFound("ORDER_NOT_FOUND", "No order for ref " + providerRef));
         if (order.getStatus() != OrderStatus.PENDING_PAYMENT) return; // already handled
 
-        if (!payments.verify(order.getPaymentRef() != null ? order.getPaymentRef() : order.getOrderNo())) {
+        if (!payments.verify(order.getPaymentRef() != null ? order.getPaymentRef() : order.getOrderNo(),
+                order.getTotalMinor(), order.getCurrency())) {
             log.warn("payment {} for order {} did not verify", providerRef, order.getOrderNo());
             return;
         }

@@ -17,7 +17,13 @@ public class JwtService {
     private final long ttlMillis;
 
     public JwtService(@Value("${specskart.security.jwt-secret}") String secret,
-                      @Value("${specskart.security.jwt-ttl-minutes:720}") long ttlMinutes) {
+                      @Value("${specskart.security.jwt-ttl-minutes:720}") long ttlMinutes,
+                      org.springframework.core.env.Environment env) {
+        // The fallback in application.yml is public on GitHub; signing prod tokens with it lets
+        // anyone mint an ADMIN token.
+        if (env.matchesProfiles("prod") && secret.contains("insecure")) {
+            throw new IllegalStateException("SESSION_SECRET must be set in production");
+        }
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.ttlMillis = ttlMinutes * 60_000;
     }
