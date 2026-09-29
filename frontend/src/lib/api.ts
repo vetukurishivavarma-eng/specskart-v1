@@ -35,7 +35,13 @@ export async function api<T>(path: string, opts: RequestInit & { auth?: boolean 
     const code = body?.code ?? 'ERROR'
     const msg = body?.message ?? res.statusText
     if (res.status === 401 && auth) {
+      // The 12h token expired: drop the stale session and send admins back to sign in,
+      // instead of leaving forms on screen that silently fail to save.
       localStorage.removeItem('specskart_token')
+      localStorage.removeItem('specskart_user')
+      if (location.pathname.startsWith('/admin') && location.pathname !== '/admin/login') {
+        location.assign('/admin/login')
+      }
     }
     throw new ApiError(code, msg, res.status)
   }
