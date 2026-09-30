@@ -25,5 +25,15 @@ public enum LeadEventType {
     ORDER_DELIVERED,
     REVIEW_REQUESTED,
     EYE_TEST_RECALL_SENT,
-    LEAD_CONVERTED
+    LEAD_CONVERTED,
+    // the lens funnel, step by step (LensInquiryService) — what staff read on a lead to follow up
+    LENS_LINK_OPENED,
+    LENS_STARTED,
+    LENS_RX_ENTERED,
+    LENS_QUOTED,
+    LENS_ORDERED,
+    LENS_PAID,
+    LENS_READY,
+    LENS_COLLECTED,
+    LENS_CANCELLED
 }

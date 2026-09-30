@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { lens, type LensDetails, type LensInquiry } from '../lib/lens'
+import { lens, personalLinkFrom, type LensDetails, type LensInquiry, type PersonalLink } from '../lib/lens'
 import { money } from '../lib/shop'
 import { DEFAULT_COUNTRY_CODE, cleanCc } from '../lib/phone'
 
@@ -30,11 +30,23 @@ export default function LensConfigurator() {
   const [phone, setPhone] = useState('')
   const [cc, setCc] = useState(DEFAULT_COUNTRY_CODE)
   const [sending, setSending] = useState(false)
+  // Opened from the personal link WhatsApp sent them: we already know who they are.
+  const [link, setLink] = useState<PersonalLink | null>(null)
+  const [linkedAs, setLinkedAs] = useState<string | null>(null)
 
   const pollRef = useRef<number | null>(null)
 
   // Resume an inquiry: ?resume= (the follow-up nudge link) beats whatever's in local storage.
   // A finished one remembered by this browser is not resumed — opening /lens again means a new booking.
+  useEffect(() => {
+    const personal = personalLinkFrom(params)
+    if (personal) {
+      lens.openLink(personal)
+        .then((who) => { setLink(personal); setLinkedAs(who.maskedNumber) })
+        .catch(() => { /* expired or tampered: fall back to typing the number */ })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const linked = params.get('resume')
     const resumeId = linked || localStorage.getItem(STORAGE_KEY)
@@ -63,11 +75,11 @@ export default function LensConfigurator() {
 
   async function sendVerification() {
     const digits = phone.replace(/\D/g, '')
-    if (digits.length < 8 || cleanCc(cc).length < 2 || !lensType) return
+    if (!lensType || (!link && (digits.length < 8 || cleanCc(cc).length < 2))) return
     setSending(true)
     setError(null)
     try {
-      const { inquiryId } = await lens.start(cleanCc(cc) + digits, lensType, blueBlock)
+      const { inquiryId } = await lens.start(link ? null : cleanCc(cc) + digits, lensType, blueBlock, link)
       localStorage.setItem(STORAGE_KEY, inquiryId)
       const v = await lens.status(inquiryId)
       setQ(v)
@@ -116,7 +128,23 @@ export default function LensConfigurator() {
             </label>
           </section>
 
-          {lensType && (
+          {lensType && link && (
+            <section>
+              <h2 className="text-lg">2. Continue</h2>
+              <p className="mt-1 text-sm text-ink/60">
+                Continuing as your WhatsApp number <b>{linkedAs}</b> — no need to verify it again.
+              </p>
+              <button type="button" onClick={sendVerification} disabled={sending} className="btn-primary mt-3 w-full disabled:bg-ink/30">
+                {sending ? 'One moment…' : 'Continue'}
+              </button>
+              <button type="button" onClick={() => setLink(null)} className="mt-2 text-xs text-ink/50 underline">
+                Not your number? Use a different one
+              </button>
+              {error && <p className="mt-2 text-sm text-clay">{error}</p>}
+            </section>
+          )}
+
+          {lensType && !link && (
             <section>
               <h2 className="text-lg">2. Verify your WhatsApp number</h2>
               <p className="mt-1 text-xs text-ink/50">We'll send a link to confirm it's really you — tap it to continue.</p>

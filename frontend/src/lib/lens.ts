@@ -32,12 +32,25 @@ export type LensDetails = {
   addPower?: number; lensStructure?: string
 }
 
+/** The signed personal link the WhatsApp bot sends: /lens?l=&exp=&sig= */
+export type PersonalLink = { l: string; exp: number; sig: string }
+
+export function personalLinkFrom(params: URLSearchParams): PersonalLink | null {
+  const l = params.get('l'), exp = params.get('exp'), sig = params.get('sig')
+  return l && exp && sig ? { l, exp: Number(exp), sig } : null
+}
+
 export const lens = {
-  start: (phone: string, lensType: string, blueBlock: boolean) =>
+  // `link` stands in for the phone: the number is already known from the link.
+  start: (phone: string | null, lensType: string, blueBlock: boolean, link?: PersonalLink | null) =>
     api<{ inquiryId: string }>('/public/lens/start', {
       // The ad that brought them here, so the lead this creates can be traced back to it.
       method: 'POST',
-      body: JSON.stringify({ phone, lensType, blueBlock, attribution: attribution() }),
+      body: JSON.stringify({ phone, lensType, blueBlock, attribution: attribution(), link: link ?? undefined }),
+    }),
+  openLink: (link: PersonalLink) =>
+    api<{ name: string | null; maskedNumber: string }>('/public/lens/link', {
+      method: 'POST', body: JSON.stringify(link),
     }),
   status: (id: string) => api<LensInquiry>(`/public/lens/${id}`),
   verify: (token: string) => api<{ verified: boolean }>(`/public/lens/verify/${token}`, { method: 'POST' }),

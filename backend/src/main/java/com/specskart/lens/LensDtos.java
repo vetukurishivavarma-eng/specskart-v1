@@ -9,7 +9,14 @@ public final class LensDtos {
     /** @param attribution raw query params off the page they landed on (fbclid / ttclid /
      *                     gclid / utm_*), so a lead can be traced back to the ad that paid for it. */
     public record StartVerification(String phone, String lensType, Boolean blueBlock,
-                                    java.util.Map<String, Object> attribution) {}
+                                    java.util.Map<String, Object> attribution, PersonalLink link) {}
+
+    /** The signed personal link the bot sends (/lens?l=&exp=&sig=). Proves the holder got it
+     *  on that lead's WhatsApp, so it stands in for typing + verifying the number. */
+    public record PersonalLink(UUID l, Long exp, String sig) {}
+
+    /** What the lens page shows when opened from a personal link — never the full number. */
+    public record LinkInfo(String name, String maskedNumber) {}
     public record StartResult(UUID inquiryId) {}
     public record VerifyResult(boolean verified, UUID inquiryId) {}
 
@@ -53,7 +60,12 @@ public final class LensDtos {
     public record SaleView(UUID id, String customerName, String lensType, boolean blueBlock,
                            String lensStructure, boolean specialAxis, long priceMinor, String currency,
                            String paymentMethod, String soldBy, String shopName, boolean walkIn,
-                           String fulfilment, boolean paid, java.time.Instant createdAt) {}
+                           String fulfilment, boolean paid, java.time.Instant createdAt,
+                           /* the order itself, so staff never depend on the WhatsApp alert arriving */
+                           String waId, UUID leadId, Integer age, String gender,
+                           BigDecimal sphRight, BigDecimal cylRight, Integer axisRight,
+                           BigDecimal sphLeft, BigDecimal cylLeft, Integer axisLeft,
+                           BigDecimal addPower) {}
 
     public record DaySummary(long totalMinor, int count, String currency) {}
 }

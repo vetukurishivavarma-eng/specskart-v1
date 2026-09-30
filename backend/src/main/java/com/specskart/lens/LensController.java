@@ -21,8 +21,14 @@ public class LensController {
     @PostMapping("/start")
     public LensDtos.StartResult start(@RequestBody LensDtos.StartVerification body) {
         UUID id = service.start(body.phone(), body.lensType(), Boolean.TRUE.equals(body.blueBlock()),
-                body.attribution());
+                body.attribution(), body.link());
         return new LensDtos.StartResult(id);
+    }
+
+    /** Opening a personal link: who it's for (masked) — and the open itself is the lead's first step. */
+    @PostMapping("/link")
+    public LensDtos.LinkInfo openLink(@RequestBody LensDtos.PersonalLink link) {
+        return service.openLink(link);
     }
 
     @PostMapping("/verify/{token}")

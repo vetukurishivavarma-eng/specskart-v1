@@ -7,6 +7,7 @@ import com.specskart.campaign.CampaignRepository;
 import com.specskart.faceanalysis.FaceAnalysis;
 import com.specskart.faceanalysis.FaceAnalysisService;
 import com.specskart.lead.*;
+import com.specskart.lens.LensInquiryService;
 import com.specskart.shared.ApiException;
 import com.specskart.shared.ConsentRecord;
 import com.specskart.shared.ConsentRecordRepository;
@@ -37,12 +38,14 @@ public class AdminLeadController {
     private final ConsentRecordRepository consents;
     private final WhatsAppBotService bot;
     private final com.specskart.lead.LeadFollowUpService followUp;
+    private final LensInquiryService lens;
 
     public AdminLeadController(LeadRepository leads, LeadService leadService, LeadNoteRepository notes,
                               CampaignRepository campaigns, LeadEventRepository events,
                               WhatsAppMessageRepository waMessages, FaceAnalysisService faceAnalysis,
                               ConsentRecordRepository consents, WhatsAppBotService bot,
-                              com.specskart.lead.LeadFollowUpService followUp) {
+                              com.specskart.lead.LeadFollowUpService followUp, LensInquiryService lens) {
+        this.lens = lens;
         this.leads = leads;
         this.leadService = leadService;
         this.notes = notes;
@@ -67,7 +70,8 @@ public class AdminLeadController {
         var pr = PageRequest.of(page, Math.min(size, 100), Sort.by(Sort.Direction.DESC, "createdAt"));
         var result = leads.search(ls, campaignId, source, q == null || q.isBlank() ? null : q, archived, pr);
         Map<UUID, String> names = campaignNames();
-        var rows = result.map(l -> AdminMapper.row(l, names.get(l.getCampaignId()))).getContent();
+        Map<UUID, String> stages = lens.stagesFor(result.map(Lead::getId).getContent());
+        var rows = result.map(l -> AdminMapper.row(l, names.get(l.getCampaignId())).withStage(stages.get(l.getId()))).getContent();
         return new AdminDtos.Page<>(rows, result.getNumber(), result.getSize(),
                 result.getTotalElements(), result.getTotalPages());
     }
@@ -105,7 +109,8 @@ public class AdminLeadController {
                 .toList();
 
         return new AdminDtos.LeadDetail(AdminMapper.row(l, campaignName), AdminMapper.attribution(l),
-                timeline, noteDtos, msgs, analyses, consentDtos, followUp.statusOf(l));
+                timeline, noteDtos, msgs, analyses, consentDtos, followUp.statusOf(l),
+                lens.ordersForLead(id), lens.personalLink(l));
     }
 
     /** Start / restart the automated WhatsApp nurture sequence for this lead. */

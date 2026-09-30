@@ -65,9 +65,20 @@ public class WhatsAppWebhookController {
                     for (JsonNode msg : messages) {
                         inbound.process(toInbound(msg, contacts));
                     }
-                    // delivery / read statuses are logged only
+                    // delivery / read statuses are logged only -- but a failure loudly: Meta accepts a
+                    // send and only reports here that it never arrived (e.g. 131047, outside the 24h
+                    // window), which is how a staff alert used to vanish without a trace.
                     for (JsonNode status : value.path("statuses")) {
-                        log.debug("wa status {} for {}", status.path("status").asText(), status.path("id").asText());
+                        if ("failed".equals(status.path("status").asText())) {
+                            JsonNode err = status.path("errors").path(0);
+                            String to = status.path("recipient_id").asText("");
+                            log.warn("wa send FAILED to {}•••• msg={} code={} {}",
+                                    to.length() > 4 ? to.substring(0, to.length() - 4) : to,
+                                    status.path("id").asText(), err.path("code").asText(),
+                                    err.path("title").asText() + " " + err.path("error_data").path("details").asText(""));
+                        } else {
+                            log.debug("wa status {} for {}", status.path("status").asText(), status.path("id").asText());
+                        }
                     }
                 }
             }

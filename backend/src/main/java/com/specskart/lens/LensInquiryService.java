@@ -1,8 +1,11 @@
 package com.specskart.lens;
 
 import com.specskart.ads.AdEventService;
+import com.specskart.analytics.AnalyticsService;
+import com.specskart.analytics.LeadEventType;
 import com.specskart.config.AppProperties;
 import com.specskart.lead.Lead;
+import com.specskart.lead.LeadRepository;
 import com.specskart.lead.LeadService;
 import com.specskart.order.OrderNotificationService;
 import com.specskart.order.StaffDocController;
@@ -26,6 +29,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -67,14 +71,21 @@ public class LensInquiryService {
     private final ProductRepository products;
     private final StoreRepository stores;
     private final AdEventService adEvents;
+    private final AnalyticsService analytics;
+    private final LeadRepository leads;
+
+    /** How long a personal /lens link keeps working after the bot sends it. */
+    private static final Duration LINK_TTL = Duration.ofDays(30);
 
     public LensInquiryService(LensInquiryRepository inquiries, LeadService leadService,
                               WhatsAppProvider whatsapp, TokenGenerator tokens, AppProperties props,
                               LensPricing pricing, StaffAlerts staffAlerts, SignedLinks links,
                               PaymentProvider payments, MembershipService memberships,
                               InventoryService inventory, ProductRepository products, StoreRepository stores,
-                              AdEventService adEvents) {
+                              AdEventService adEvents, AnalyticsService analytics, LeadRepository leads) {
         this.adEvents = adEvents;
+        this.analytics = analytics;
+        this.leads = leads;
         this.inventory = inventory;
         this.products = products;
         this.stores = stores;
@@ -93,6 +104,14 @@ public class LensInquiryService {
     @Transactional
     public UUID start(String phone, String lensType, boolean blueBlock,
                       Map<String, Object> attribution) {
+        return start(phone, lensType, blueBlock, attribution, null);
+    }
+
+    @Transactional
+    public UUID start(String phone, String lensType, boolean blueBlock,
+                      Map<String, Object> attribution, LensDtos.PersonalLink personal) {
+        Lead linked = personal == null ? null : fromLink(personal);
+        if (linked != null) phone = linked.getWhatsappWaId();
         String waId = PhoneNumbers.normalize(phone, props.whatsapp().defaultCountryCode());
         if (waId == null || waId.length() < 8) {
             throw ApiException.badRequest("BAD_NUMBER", "Enter a valid WhatsApp number.");
@@ -124,13 +143,16 @@ public class LensInquiryService {
         String raw = tokens.newToken();
         q.setVerifyTokenHash(tokens.hash(raw));
 
-        if (inquiries.existsByWaIdAndPhoneVerifiedAtIsNotNull(waId)) {
+        // The personal link arrived on this number's WhatsApp, which is exactly what verifying proves.
+        if (linked != null || inquiries.existsByWaIdAndPhoneVerifiedAtIsNotNull(waId)) {
             q.setPhoneVerifiedAt(Instant.now());
             q.setStatus("VERIFIED");
             Lead lead = leadService.onWebOrder(waId, null, q.getAttribution());
             if (lead != null) q.setLeadId(lead.getId());
             inquiries.save(q);
             adEvents.lead(q);
+            track(q, LeadEventType.LENS_STARTED, "via", linked != null ? "personal link" : "website (known number)",
+                    "lensType", q.getLensType(), "blueBlock", q.isBlueBlock());
             log.info("lens inquiry {} skipped verification -- {} is already known", q.getId(), waId);
             return q.getId();
         }
@@ -171,6 +193,8 @@ public class LensInquiryService {
             if (lead != null) q.setLeadId(lead.getId());
             inquiries.save(q);
             adEvents.lead(q);
+            track(q, LeadEventType.LENS_STARTED, "via", "website (verified number)",
+                    "lensType", q.getLensType(), "blueBlock", q.isBlueBlock());
             log.info("lens inquiry {} verified", q.getId());
         }
         return true;
@@ -196,7 +220,9 @@ public class LensInquiryService {
         if (d.addPower() != null) q.setAddPower(d.addPower());
         if (d.lensStructure() != null) q.setLensStructure(d.lensStructure());
         q.setSpecialAxis(computeSpecialAxis(q));
-        return view(inquiries.save(q));
+        inquiries.save(q);
+        track(q, LeadEventType.LENS_RX_ENTERED, "rx", rxSummary(q));
+        return view(q);
     }
 
     @Transactional
@@ -204,7 +230,9 @@ public class LensInquiryService {
         LensInquiry q = requireVerified(get(id));
         q.setPriceMinor(pricing.quote(q));
         q.setStatus("PRICED");
-        return view(inquiries.save(q));
+        inquiries.save(q);
+        track(q, LeadEventType.LENS_QUOTED, "price", OrderNotificationService.money(q.getPriceMinor(), q.getCurrency()));
+        return view(q);
     }
 
     @Transactional
@@ -224,6 +252,8 @@ public class LensInquiryService {
         if (shop != null) q.setBackorder(inventory.quantityOf(shop, pair.getId()) < 1);
         inquiries.save(q);
         adEvents.purchase(q);
+        track(q, LeadEventType.LENS_ORDERED, "ref", ref(q),
+                "price", OrderNotificationService.money(q.getPriceMinor(), q.getCurrency()));
         alertStaff(q);
         notifyCustomer(q, "we've got your lens order and we're on it");
         return view(q);
@@ -273,6 +303,7 @@ public class LensInquiryService {
         q.setPaidAt(Instant.now());
         q.setPaymentMethod("ONLINE");
         inquiries.save(q);
+        track(q, LeadEventType.LENS_PAID, "ref", ref(q), "method", "online");
         log.info("lens {} paid online", ref(q));
         notifyCustomer(q, "we've received your payment of "
                 + OrderNotificationService.money(q.getPriceMinor(), q.getCurrency()));
@@ -338,6 +369,7 @@ public class LensInquiryService {
         // Otherwise a sold order would sit on the pending list forever.
         if (!q.isWalkIn()) q.setFulfilment("DELIVERED");
         inquiries.save(q);
+        track(q, LeadEventType.LENS_COLLECTED, "ref", ref(q), "shop", q.getShopName());
         notifyCustomer(q, "your lenses have been collected — enjoy them!");
         return view(q);
     }
@@ -384,6 +416,7 @@ public class LensInquiryService {
             // what actually left the shop. completeSale takes the stock and notifies.
             return completeSale(id, new LensDtos.CompleteSale(d.paymentMethod(), d.soldBy(), d.shopName()));
         }
+        if ("READY".equals(q.getFulfilment())) track(q, LeadEventType.LENS_READY, "ref", ref(q));
         notifyCustomer(q, stageLine(q));
         return view(q);
     }
@@ -408,6 +441,7 @@ public class LensInquiryService {
                     q.getStockStoreId(), lens.getId(), 1, "REFUND", ref(q), "Lens order cancelled", null));
         }
         inquiries.save(q);
+        track(q, LeadEventType.LENS_CANCELLED, "ref", ref(q));
         notifyCustomer(q, "your lens order has been cancelled"
                 + (q.getPaidAt() != null ? " — your online payment will be refunded" : ""));
         return view(q);
@@ -535,7 +569,10 @@ public class LensInquiryService {
         return new LensDtos.SaleView(q.getId(), q.getCustomerName(), q.getLensType(), q.isBlueBlock(),
                 q.getLensStructure(), q.isSpecialAxis(), q.getPriceMinor() == null ? 0 : q.getPriceMinor(),
                 q.getCurrency(), q.getPaymentMethod(), q.getSoldBy(), q.getShopName(), q.isWalkIn(),
-                q.getFulfilment(), q.isPaid(), q.getCreatedAt());
+                q.getFulfilment(), q.isPaid(), q.getCreatedAt(),
+                q.getWaId(), q.getLeadId(), q.getAge(), q.getGender(),
+                q.getSphRight(), q.getCylRight(), q.getAxisRight(),
+                q.getSphLeft(), q.getCylLeft(), q.getAxisLeft(), q.getAddPower());
     }
 
     /** Keep the customer in the loop at the two moments that matter to them -- the order
@@ -676,6 +713,97 @@ public class LensInquiryService {
 
     private static boolean blank(String s) {
         return s == null || s.isBlank();
+    }
+
+    /** The /lens link the bot hands this lead: signed, so opening it identifies them without
+     *  asking for the number again, and every step after is tracked against them. */
+    public String personalLink(Lead lead) {
+        return props.frontendBaseUrl() + "/lens" + links.query(linkResource(lead.getId()), LINK_TTL) + "&l=" + lead.getId();
+    }
+
+    @Transactional
+    public LensDtos.LinkInfo openLink(LensDtos.PersonalLink link) {
+        Lead lead = link == null ? null : fromLink(link);
+        if (lead == null) throw ApiException.badRequest("LINK_EXPIRED", "This link has expired — enter your number below.");
+        analytics.record(LeadEventType.LENS_LINK_OPENED, lead.getId(), null, "LENS", null, null);
+        String n = lead.getWhatsappNumber() == null ? "" : lead.getWhatsappNumber().replaceAll("\\D", "");
+        return new LensDtos.LinkInfo(lead.getName(), n.length() < 4 ? "••••" : "•••• " + n.substring(n.length() - 4));
+    }
+
+    private Lead fromLink(LensDtos.PersonalLink link) {
+        if (link.l() == null || link.exp() == null || !links.valid(linkResource(link.l()), link.exp(), link.sig())) return null;
+        return leads.findById(link.l()).orElse(null);
+    }
+
+    private static String linkResource(UUID leadId) {
+        return "lead-lens/" + leadId;
+    }
+
+    /** One line per step on the lead's timeline. Nothing to attach it to until the number is
+     *  known (verify), so an anonymous visitor's steps before that simply aren't recorded. */
+    private void track(LensInquiry q, LeadEventType type, Object... kv) {
+        if (q.getLeadId() == null) return;
+        Map<String, Object> meta = new java.util.LinkedHashMap<>();
+        meta.put("inquiryId", q.getId().toString());
+        for (int i = 0; i + 1 < kv.length; i += 2) if (kv[i + 1] != null) meta.put(String.valueOf(kv[i]), kv[i + 1]);
+        analytics.record(type, q.getLeadId(), null, "LENS", null, meta);
+    }
+
+    private static String rxSummary(LensInquiry q) {
+        StringBuilder s = new StringBuilder();
+        s.append("R ").append(eye(q.getSphRight(), q.getCylRight(), q.getAxisRight()));
+        s.append(" | L ").append(eye(q.getSphLeft(), q.getCylLeft(), q.getAxisLeft()));
+        if (q.getAddPower() != null && q.getAddPower().signum() > 0) {
+            s.append(" | Add +").append(q.getAddPower()).append(q.getLensStructure() == null ? "" : " " + q.getLensStructure());
+        }
+        return s.toString();
+    }
+
+    private static String eye(java.math.BigDecimal sph, java.math.BigDecimal cyl, Integer axis) {
+        return "SPH " + (sph == null ? "—" : sph.toPlainString())
+                + " CYL " + (cyl == null ? "—" : cyl.toPlainString())
+                + (axis == null ? "" : " x" + axis);
+    }
+
+    /** Where each of these leads got to in the lens funnel — their latest web order's stage. */
+    @Transactional(readOnly = true)
+    public Map<UUID, String> stagesFor(java.util.Collection<UUID> leadIds) {
+        Map<UUID, String> out = new java.util.HashMap<>();
+        if (leadIds.isEmpty()) return out;
+        for (LensInquiry q : inquiries.findByLeadIdInAndWalkInFalseOrderByCreatedAtDesc(leadIds)) {
+            out.putIfAbsent(q.getLeadId(), stage(q)); // newest first, so the first one wins
+        }
+        return out;
+    }
+
+    static String stage(LensInquiry q) {
+        if ("CANCELLED".equals(q.getStatus())) return "Cancelled";
+        if ("SOLD".equals(q.getStatus())) return "Collected";
+        if ("READY".equals(q.getFulfilment())) return "Ready for pickup";
+        if ("SUBMITTED".equals(q.getStatus())) return q.isPaid() ? "Ordered · paid" : "Ordered";
+        if ("PRICED".equals(q.getStatus())) return "Checked price, not ordered";
+        if (q.getSphRight() != null || q.getSphLeft() != null) return "Entered Rx, no price";
+        if (q.isPhoneVerified()) return "Started, no Rx yet";
+        return "Waiting to verify number";
+    }
+
+    /** A lead's web lens orders, newest first, with everything staff need to follow up. */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> ordersForLead(UUID leadId) {
+        return inquiries.findByLeadIdAndWalkInFalseOrderByCreatedAtDesc(leadId).stream().map(q -> {
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("id", q.getId()); m.put("ref", ref(q)); m.put("stage", stage(q));
+            m.put("createdAt", q.getCreatedAt()); m.put("updatedAt", q.getUpdatedAt());
+            m.put("lensType", q.getLensType()); m.put("blueBlock", q.isBlueBlock());
+            m.put("lensStructure", q.getLensStructure()); m.put("addPower", q.getAddPower());
+            m.put("sphRight", q.getSphRight()); m.put("cylRight", q.getCylRight()); m.put("axisRight", q.getAxisRight());
+            m.put("sphLeft", q.getSphLeft()); m.put("cylLeft", q.getCylLeft()); m.put("axisLeft", q.getAxisLeft());
+            m.put("specialAxis", q.isSpecialAxis());
+            m.put("customerName", q.getCustomerName()); m.put("age", q.getAge()); m.put("gender", q.getGender());
+            m.put("priceMinor", q.getPriceMinor()); m.put("currency", q.getCurrency());
+            m.put("paid", q.isPaid()); m.put("fulfilment", q.getFulfilment()); m.put("shopName", q.getShopName());
+            return m;
+        }).toList();
     }
 
     private static String dash(String s) {

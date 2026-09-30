@@ -278,7 +278,7 @@ public class WhatsAppBotService {
         if (options.isEmpty()) {
             sendText(lead, "I can't find an order under this number yet. "
                     + "Configure your lenses here and I'll keep you posted at every step:\n"
-                    + props.frontendBaseUrl() + "/lens");
+                    + lensInquiries.personalLink(lead));
             return;
         }
         // One order needs no menu -- asking someone to pick from a list of one is a worse
@@ -339,7 +339,7 @@ public class WhatsAppBotService {
 
     private void sendLensLink(Lead lead) {
         sendText(lead, "Take a look and configure your lenses here — clear or photochromatic, "
-                + "with or without blue-block:\n" + props.frontendBaseUrl() + "/lens");
+                + "with or without blue-block:\n" + lensInquiries.personalLink(lead));
     }
 
     /** Personal-shopper entry point: one question (budget), then picks — no LLM, just a

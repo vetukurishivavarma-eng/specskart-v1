@@ -16,7 +16,7 @@ final class AdminMapper {
                 l.getAcquisitionSource().name(), l.getCampaignId(), campaignName, l.getFaceShape(),
                 l.getRecommendedFrameCategories(), l.getStatus().name(), l.getCreatedAt(),
                 l.getLastContactAt(), l.getAssignedToUserId(), l.getArchivedAt(),
-                l.getPoints(), l.getReferralCode(), score.points(), score.temperature().name());
+                l.getPoints(), l.getReferralCode(), score.points(), score.temperature().name(), null);
     }
 
     static Map<String, Object> attribution(Lead l) {

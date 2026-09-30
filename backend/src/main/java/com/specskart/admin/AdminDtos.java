@@ -12,7 +12,15 @@ public class AdminDtos {
     public record LeadRow(UUID id, String name, String whatsappNumber, String source, UUID campaignId,
                           String campaignName, String faceShape, List<String> recommendedFrames, String status,
                           Instant createdAt, Instant lastContactAt, UUID assignedToUserId, Instant archivedAt,
-                          int points, String referralCode, int leadScore, String leadTemperature) {}
+                          int points, String referralCode, int leadScore, String leadTemperature,
+                          String stage) {
+        /** Where they got to in the lens funnel (latest web order), for the list. */
+        public LeadRow withStage(String s) {
+            return new LeadRow(id, name, whatsappNumber, source, campaignId, campaignName, faceShape,
+                    recommendedFrames, status, createdAt, lastContactAt, assignedToUserId, archivedAt,
+                    points, referralCode, leadScore, leadTemperature, s);
+        }
+    }
 
     public record Page<T>(List<T> content, int page, int size, long totalElements, int totalPages) {}
 
@@ -23,7 +31,8 @@ public class AdminDtos {
     public record LeadDetail(LeadRow lead, Map<String, Object> attribution, List<TimelineItem> timeline,
                              List<NoteDto> notes, List<Map<String, Object>> whatsappMessages,
                              List<Map<String, Object>> faceAnalyses, List<Map<String, Object>> consents,
-                             Map<String, Object> followUp) {}
+                             Map<String, Object> followUp,
+                             List<Map<String, Object>> lensOrders, String lensLink) {}
 
     public record StatusUpdate(String status) {}
     public record NewNote(String body) {}

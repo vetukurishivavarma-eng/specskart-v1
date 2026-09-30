@@ -31,6 +31,9 @@ public interface LensInquiryRepository extends JpaRepository<LensInquiry, UUID> 
      *  finished order is looked up to check something, not worked through in order. */
     List<LensInquiry> findByFulfilmentOrderByCreatedAtDesc(String fulfilment);
 
+    /** Latest web orders for a page of leads — the Leads list's "stage" column in one query. */
+    List<LensInquiry> findByLeadIdInAndWalkInFalseOrderByCreatedAtDesc(java.util.Collection<UUID> leadIds);
+
     Optional<LensInquiry> findByClientReference(String clientReference);
 
     /** The lead's latest web order, for the chatbot's "track my order". Walk-ins are handed
