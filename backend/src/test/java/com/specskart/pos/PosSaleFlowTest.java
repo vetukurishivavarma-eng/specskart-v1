@@ -56,6 +56,24 @@ class PosSaleFlowTest {
     }
 
     @Test
+    void aDiscountComesOffTheTotalAndCantExceedThePrice() {
+        var sale = saleService.createSale(new PosDtos.CreateSale(
+                store.getId(),
+                List.of(new PosDtos.SaleItemRequest(product.getId(), 1, null, 5_000L)),
+                List.of(new PosDtos.PaymentRequest("CASH", 20_000, null)),
+                "Walk-in", null, "", null), null, "Cashier A");
+        assertThat(sale.subtotalMinor()).isEqualTo(25_000);
+        assertThat(sale.discountMinor()).isEqualTo(5_000);
+        assertThat(sale.totalMinor()).isEqualTo(20_000);
+
+        assertThatThrownBy(() -> saleService.createSale(new PosDtos.CreateSale(
+                store.getId(),
+                List.of(new PosDtos.SaleItemRequest(product.getId(), 1, null, 30_000L)),
+                List.of(new PosDtos.PaymentRequest("CASH", 0, null)),
+                "Walk-in", null, "", null), null, "Cashier A")).hasMessageContaining("discount");
+    }
+
+        @Test
     void refusesToOversell() {
         assertThatThrownBy(() -> saleService.createSale(new PosDtos.CreateSale(
                 store.getId(),

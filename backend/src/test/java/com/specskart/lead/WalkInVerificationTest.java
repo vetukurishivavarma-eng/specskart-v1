@@ -60,4 +60,16 @@ class WalkInVerificationTest {
         assertThat(lead.getFollowUpState()).isEqualTo(FollowUpState.OPTED_OUT);
         assertThat(broadcast.previewCount(new BroadcastService.Filter(null, false, true))).isEqualTo(optedInBefore);
     }
+
+    @Test
+    void staffCanTypeTheNumberInsteadOfTheQr() {
+        String local = "097" + (1_000_000 + (int) (Math.random() * 8_000_000));
+        var s = walkIns.manual(null, "Chanda Bwalya", local);
+        Lead lead = leads.findByWhatsappWaId(s.whatsappNumber().substring(1)).orElseThrow();
+        assertThat(lead.getName()).isEqualTo("Chanda Bwalya");
+        assertThat(lead.getAcquisitionSource()).isEqualTo(AcquisitionSource.WALK_IN);
+        assertThat(lead.getMarketingOptInAt()).isNull(); // typed by staff is not consent
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> walkIns.manual(null, "x", "12"))
+                .hasMessageContaining("valid phone");
+    }
 }

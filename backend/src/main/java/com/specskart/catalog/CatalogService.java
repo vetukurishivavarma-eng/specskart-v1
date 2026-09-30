@@ -41,6 +41,13 @@ public class CatalogService {
 
     @Transactional(readOnly = true)
     public List<CatalogDtos.ProductCard> browse(String faceShape, String category, String gender, String sort) {
+        return browse(faceShape, category, gender, sort, null);
+    }
+
+    /** @param maxPrice the store's "Under K500 / K1,000 / …" filter, in whole kwacha */
+    @Transactional(readOnly = true)
+    public List<CatalogDtos.ProductCard> browse(String faceShape, String category, String gender, String sort,
+                                                Long maxPrice) {
         List<Product> list = products.findByStatusOrderByCreatedAtDesc("ACTIVE");
 
         List<String> shapeCategories = faceShape == null || faceShape.isBlank() ? null
@@ -48,6 +55,7 @@ public class CatalogService {
 
         var stream = list.stream().filter(p -> {
             if (p.isUpcoming()) return false; // scheduled drop — not yet on sale
+            if (maxPrice != null && p.getPriceMinor() > maxPrice * 100) return false;
             if (category != null && !category.isBlank() && !category.equalsIgnoreCase(p.getFrameCategoryCode())) return false;
             if (gender != null && !gender.isBlank() && !gender.equalsIgnoreCase(p.getGender())
                     && !"UNISEX".equalsIgnoreCase(p.getGender())) return false;
@@ -156,7 +164,7 @@ public class CatalogService {
                 p.getStockQty(), p.inStock(), p.isLensable(), p.isFeatured(), imgs,
                 p.getDropsAt(), p.isLimitedEdition(), p.getTryOnImageUrl(),
                 agg == null ? null : Math.round(agg.getAvgRating() * 10) / 10.0,
-                agg == null ? 0 : agg.getCnt().intValue());
+                agg == null ? 0 : agg.getCnt().intValue(), p.getBrand());
     }
 
     /** Register a "notify me" request for a product (sold out, or a scheduled drop). Idempotent. */
@@ -229,6 +237,6 @@ public class CatalogService {
                 p.inStock(), p.isFeatured(), imageUrl,
                 p.getDropsAt(), p.isLimitedEdition(), p.getTryOnImageUrl(),
                 rating == null ? null : Math.round(rating.getAvgRating() * 10) / 10.0,
-                rating == null ? 0 : rating.getCnt().intValue(), p.getStockQty());
+                rating == null ? 0 : rating.getCnt().intValue(), p.getStockQty(), p.getBrand());
     }
 }

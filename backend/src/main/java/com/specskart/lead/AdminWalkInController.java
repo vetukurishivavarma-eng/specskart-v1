@@ -12,6 +12,7 @@ import java.util.UUID;
 public class AdminWalkInController {
 
     public record StartRequest(UUID storeId, String customerName) {}
+    public record ManualRequest(UUID storeId, String customerName, String phone) {}
 
     private final WalkInService walkIns;
     private final CurrentUser currentUser;
@@ -26,6 +27,14 @@ public class AdminWalkInController {
         UUID store = req.storeId() != null ? req.storeId() : currentUser.storeIdOf(auth);
         if (store != null) currentUser.assertStoreAccess(auth, store);
         return walkIns.start(store, req.customerName(), currentUser.idOf(auth));
+    }
+
+    /** No QR: staff type the customer's number. */
+    @PostMapping("/manual")
+    public WalkInService.Status manual(@RequestBody ManualRequest req, Authentication auth) {
+        UUID store = req.storeId() != null ? req.storeId() : currentUser.storeIdOf(auth);
+        if (store != null) currentUser.assertStoreAccess(auth, store);
+        return walkIns.manual(store, req.customerName(), req.phone());
     }
 
     @GetMapping("/{id}")

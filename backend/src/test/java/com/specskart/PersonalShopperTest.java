@@ -59,7 +59,8 @@ class PersonalShopperTest {
         inbound.process(new InboundMessage(waId, waId, "Shopper", "help me choose", null, msg + "1", Map.of()));
         Lead lead = leads.findByWhatsappWaId(waId).orElseThrow();
 
-        assertThat(sentSince(start)).anyMatch(s -> s.text() != null && s.text().contains("budget"));
+        // "help me choose" now opens the client's frames flow; the budget picks live on behind its buttons
+        assertThat(sentSince(start)).anyMatch(s -> s.text() != null && s.text().contains("suit your face"));
 
         int afterBudget = outboxSize();
         inbound.process(new InboundMessage(waId, waId, "Shopper", null, "BUDGET_LOW", msg + "2", Map.of()));

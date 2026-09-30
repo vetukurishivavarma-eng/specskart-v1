@@ -42,9 +42,11 @@ public class WalkInService {
     private final LeadRepository leads;
     private final WhatsAppProvider whatsapp;
     private final AppProperties props;
+    private final LeadService leadService;
 
     public WalkInService(WalkInVerificationRepository verifications, LeadRepository leads,
-                         WhatsAppProvider whatsapp, AppProperties props) {
+                         WhatsAppProvider whatsapp, AppProperties props, LeadService leadService) {
+        this.leadService = leadService;
         this.verifications = verifications;
         this.leads = leads;
         this.whatsapp = whatsapp;
@@ -68,6 +70,27 @@ public class WalkInService {
         String msg = "Hi " + props.storeName() + "! Please save my number for offers & updates. Code: " + v.getCode();
         String link = "https://wa.me/" + business + "?text=" + URLEncoder.encode(msg, StandardCharsets.UTF_8).replace("+", "%20");
         return new Started(v.getId(), v.getCode(), link, "+" + business, Instant.now().plus(CODE_TTL));
+    }
+
+    /**
+     * For a customer who can't (or won't) scan the QR: staff type the number. Saved as a
+     * walk-in lead so it's followed up like any other, but NOT opted in to offers -- only the
+     * customer messaging us themselves is consent (and is what opens the 24h window).
+     */
+    @Transactional
+    public Status manual(UUID storeId, String customerName, String phone) {
+        Instant before = Instant.now();
+        String name = customerName == null || customerName.isBlank() ? null : customerName.trim();
+        Lead lead = leadService.onWebOrder(phone, name);
+        if (lead == null) throw ApiException.badRequest("BAD_NUMBER", "Enter a valid phone number, with the country code.");
+        if (lead.getFirstContactAt() != null && !lead.getFirstContactAt().isBefore(before)) {
+            lead.setAcquisitionSource(AcquisitionSource.WALK_IN); // new to us, met in the shop
+        }
+        if (name != null) lead.setName(name); // staff have the real name in front of them
+        if (lead.getHomeStoreId() == null) lead.setHomeStoreId(storeId);
+        leads.save(lead);
+        log.info("walk-in lead {} added by hand", lead.getId());
+        return new Status(null, storeId, false, lead.getName(), "+" + lead.getWhatsappWaId());
     }
 
     @Transactional(readOnly = true)

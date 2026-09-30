@@ -77,6 +77,7 @@ export type ProductCard = {
   dropsAt: string | null; limitedEdition: boolean
   tryOnImageUrl: string | null
   avgRating: number | null; reviewCount: number; stockQty: number
+  brand: string | null
 }
 
 export type ProductDetail = ProductCard & {

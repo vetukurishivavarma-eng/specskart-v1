@@ -53,6 +53,7 @@ public class WhatsAppBotService {
     static final String BTN_MENU = "MENU";
     static final String BTN_CARE = "CARE";
     static final String BTN_FAQ = "FAQ";
+    static final String BTN_SUITS = "SUITS_YOU";
     /** A tapped FAQ row: {@code FAQ:<uuid>}, or {@code FAQ_MORE:<offset>} for the next page. */
     static final String ROW_FAQ_PREFIX = "FAQ:";
     static final String ROW_FAQ_MORE_PREFIX = "FAQ_MORE:";
@@ -150,19 +151,26 @@ public class WhatsAppBotService {
         log.info("bot intent {} for lead {}", intent, lead.getId());
         switch (intent) {
             case FIND_FRAMES -> sendFrameFinderLink(lead);
-            case EXPLORE_FRAMES -> sendShop(lead, "Our full collection is here — every style, buy online:\n");
+            // The client's frames flow (2026-10-01): any frames question -> "want to know what
+            // suits you?" -> Yes: the face-shape chart / Explore: the website with its shape +
+            // price filters. A price question gets the range and the shop's address.
+            case FRAMES, HELP_CHOOSE -> sendSuitsPrompt(lead);
+            // budget buttons still sitting in older chats keep working
+            case BUDGET_LOW -> sendBudgetPicks(lead, "low");
+            case BUDGET_MED -> sendBudgetPicks(lead, "mid");
+            case BUDGET_HIGH -> sendBudgetPicks(lead, "high");
+            case SUITS_YOU -> sendFaceChart(lead);
+            case EXPLORE_FRAMES -> sendText(lead, "Browse all our frames here — filter by shape and price:\n"
+                    + props.frontendBaseUrl() + "/store");
+            case PRICE -> sendVisitStore(lead);
             case VISIT_WEBSITE -> sendText(lead, "Here's our website: " + props.frontendBaseUrl());
             case EXPLORE_LENS -> sendLensLink(lead);
             case TRACK_ORDER -> sendOrderStatus(lead);
             case CARE -> sendCare(lead);
             case FAQ -> sendFaqs(lead, 0);
-            case HELP_CHOOSE -> sendBudgetPrompt(lead);
-            case BUDGET_LOW -> sendBudgetPicks(lead, "low");
-            case BUDGET_MED -> sendBudgetPicks(lead, "mid");
-            case BUDGET_HIGH -> sendBudgetPicks(lead, "high");
             case RESULTS_SHOW_FRAMES -> {
                 leadService.advanceStatusSoft(lead.getId(), LeadStatus.INTERESTED);
-                sendRecommendedProducts(lead);
+                sendShop(lead, "Here are frames for you — filter by shape and price:\n");
             }
             case RESULTS_NOT_NOW -> {
                 leadService.advanceStatusSoft(lead.getId(), LeadStatus.FOLLOW_UP);
@@ -342,16 +350,6 @@ public class WhatsAppBotService {
                 + "with or without blue-block:\n" + lensInquiries.personalLink(lead));
     }
 
-    /** Personal-shopper entry point: one question (budget), then picks — no LLM, just a
-     *  short deterministic flow reusing the catalogue + recommendation logic. */
-    private void sendBudgetPrompt(Lead lead) {
-        provider.sendButtons(waId(lead), "Happy to help 🛍️ What's your budget for a pair?",
-                List.of(new WhatsAppProvider.Button(BTN_BUDGET_LOW, "Under K300"),
-                        new WhatsAppProvider.Button(BTN_BUDGET_MED, "K300 – K600"),
-                        new WhatsAppProvider.Button(BTN_BUDGET_HIGH, "K600+")));
-        logOutbound(lead.getId(), "interactive", "budget-prompt");
-    }
-
     private void sendBudgetPicks(Lead lead, String tier) {
         leadService.saveStyleProfile(lead.getId(), null, null, tier, null);
         List<Product> picks = catalog.forBudget(lead.getFaceShape(), tier, 3);
@@ -482,6 +480,7 @@ public class WhatsAppBotService {
                     case BTN_MENU -> BotIntent.MENU;
                     case BTN_CARE -> BotIntent.CARE;
                     case BTN_FAQ -> BotIntent.FAQ;
+                    case BTN_SUITS -> BotIntent.SUITS_YOU;
                     case BTN_BUDGET_LOW -> BotIntent.BUDGET_LOW;
                     case BTN_BUDGET_MED -> BotIntent.BUDGET_MED;
                     case BTN_BUDGET_HIGH -> BotIntent.BUDGET_HIGH;
@@ -500,10 +499,12 @@ public class WhatsAppBotService {
         if (t.contains("track") || t.contains("where") || t.contains("my order")
                 || t.contains("order status")) return BotIntent.TRACK_ORDER;
         if (t.contains("lens")) return BotIntent.EXPLORE_LENS;
+        if (t.matches(".*\\b(price|prices|pricing|cost|costs|how much|rate|rates|charges?)\\b.*")) return BotIntent.PRICE;
         if (t.contains("help") || t.contains("choose") || t.contains("recommend") || t.contains("suggest")) return BotIntent.HELP_CHOOSE;
         if (t.matches(".*\\bfaces?\\b.*") || t.contains("suit") || t.contains("frame finder") || t.equals("1")) return BotIntent.FIND_FRAMES;
         if (t.contains("explore") || t.contains("latest") || t.contains("catalog") || t.equals("2")) return BotIntent.EXPLORE_FRAMES;
         if (t.contains("website") || t.contains("site") || t.equals("3")) return BotIntent.VISIT_WEBSITE;
+        if (t.matches(".*\\b(frames?|spectacles?|specs|glasses|eyewear|sunglasses)\\b.*")) return BotIntent.FRAMES;
         return BotIntent.UNKNOWN;
     }
 
@@ -517,6 +518,37 @@ public class WhatsAppBotService {
         String url = props.frontendBaseUrl() + "/store?c=" + token;
         if (lead.getFaceShape() != null) url += "&face=" + lead.getFaceShape();
         return url;
+    }
+
+    private void sendSuitsPrompt(Lead lead) {
+        provider.sendButtons(waId(lead), "Would you like to know which frames suit your face? 👓",
+                List.of(new WhatsAppProvider.Button(BTN_SUITS, "Yes, show me"),
+                        new WhatsAppProvider.Button(BTN_EXPLORE, "Explore frames")));
+        logOutbound(lead.getId(), "interactive", "suits-prompt");
+    }
+
+    /** The face-shape chart (frontend/public/face-shape-chart.jpg), then the way to the frames.
+     *  If Meta can't fetch the image, the Frame Finder does the same job interactively. */
+    private void sendFaceChart(Lead lead) {
+        try {
+            provider.sendImage(waId(lead), props.frontendBaseUrl() + "/face-shape-chart.jpg",
+                    "Find your face shape, then pick a frame style that suits it.");
+            logOutbound(lead.getId(), "image", "face-shape-chart");
+        } catch (Exception e) {
+            log.warn("face-shape chart send failed for lead {}: {}", lead.getId(), e.getMessage());
+            sendFrameFinderLink(lead);
+            return;
+        }
+        provider.sendButtons(waId(lead), "Found your shape? See the frames that match it:",
+                List.of(new WhatsAppProvider.Button(BTN_EXPLORE, "Explore frames")));
+    }
+
+    /** The client's own words, then where the shop is (with a map) so they can walk in. */
+    private void sendVisitStore(Lead lead) {
+        String shops = lensInquiries.shopLines();
+        sendText(lead, "We have a wide range of frames starting from K300 going up to K3,000. "
+                + "Please visit our store to choose."
+                + (shops.isBlank() ? "" : "\n\n" + shops));
     }
 
     private void sendShop(Lead lead, String intro) {

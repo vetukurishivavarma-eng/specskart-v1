@@ -7,8 +7,11 @@ import SocialProof from '../components/SocialProof'
 const CATEGORIES = [
   ['', 'All frames'], ['WAYFARER', 'Wayfarer'], ['AVIATOR', 'Aviator'], ['ROUND_FRAME', 'Round'],
   ['GEOMETRIC', 'Geometric'], ['CATEYE', 'Cat-eye'], ['BROWLINE', 'Browline'],
-  ['RECTANGLE', 'Rectangle'], ['OVERSIZED', 'Oversized'], ['THIN_RIM', 'Thin-rim'], ['OVAL_FRAME', 'Oval'],
+  ['RECTANGLE', 'Rectangle'], ['SQUARE_FRAME', 'Square'], ['OVERSIZED', 'Oversized'], ['THIN_RIM', 'Thin-rim'],
+  ['OVAL_FRAME', 'Oval'],
 ]
+// The client's price bands, in whole kwacha.
+const UNDER = [500, 1000, 2000, 3000, 4000, 5000]
 
 export default function Store() {
   const [params, setParams] = useSearchParams()
@@ -28,6 +31,7 @@ export default function Store() {
   const category = params.get('category') ?? ''
   const gender = params.get('gender') ?? ''
   const sort = params.get('sort') ?? ''
+  const maxPrice = params.get('maxPrice') ?? ''
 
   const set = (k: string, v: string) => {
     const next = new URLSearchParams(params)
@@ -37,8 +41,8 @@ export default function Store() {
 
   const { data: cfg } = useQuery({ queryKey: ['store-config'], queryFn: shop.storeConfig })
   const { data: products, isLoading } = useQuery({
-    queryKey: ['products', face, category, gender, sort],
-    queryFn: () => shop.products({ faceShape: face || undefined, category: category || undefined, gender: gender || undefined, sort: sort || undefined }),
+    queryKey: ['products', face, category, gender, sort, maxPrice],
+    queryFn: () => shop.products({ faceShape: face || undefined, category: category || undefined, gender: gender || undefined, sort: sort || undefined, maxPrice: maxPrice || undefined }),
   })
 
   const faceLabel = useMemo(() => face ? face.charAt(0) + face.slice(1).toLowerCase() : '', [face])
@@ -76,8 +80,14 @@ export default function Store() {
         <select value={gender} onChange={(e) => set('gender', e.target.value)} className="ml-auto rounded-lg border border-ink/20 px-2 py-1 text-sm">
           <option value="">Everyone</option><option value="MEN">Men</option><option value="WOMEN">Women</option>
         </select>
-        <select value={sort} onChange={(e) => set('sort', e.target.value)} className="rounded-lg border border-ink/20 px-2 py-1 text-sm">
-          <option value="">Featured</option><option value="price_asc">Price ↑</option><option value="price_desc">Price ↓</option>
+        <select value={maxPrice} onChange={(e) => set('maxPrice', e.target.value)} aria-label="Price" className="rounded-lg border border-ink/20 px-2 py-1 text-sm">
+          <option value="">Any price</option>
+          {UNDER.map((k) => <option key={k} value={k}>Under K{k.toLocaleString()}</option>)}
+        </select>
+        <select value={sort} onChange={(e) => set('sort', e.target.value)} aria-label="Sort" className="rounded-lg border border-ink/20 px-2 py-1 text-sm">
+          <option value="">Featured</option>
+          <option value="price_asc">Price: Low to High</option>
+          <option value="price_desc">Price: High to Low</option>
         </select>
       </div>
 
@@ -118,7 +128,7 @@ function Tile({ p }: { p: ProductCard }) {
           <span className="shrink-0 text-sm font-medium">{money(p.priceMinor, p.currency)}</span>
         </div>
         <p className="text-xs text-ink/50">
-          {p.colour}{p.colour && p.material ? ' · ' : ''}{p.material}
+          {[p.brand, p.colour, p.material].filter(Boolean).join(' · ')}
           {!p.inStock && <span className="text-clay"> · sold out</span>}
         </p>
         {p.reviewCount > 0 && (

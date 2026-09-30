@@ -63,7 +63,8 @@ public class SaleService {
         sale.setClientReference(req.clientReference());
         sales.save(sale);
 
-        long subtotal = 0;
+        long subtotal = 0;      // before discounts
+        long discountTotal = 0;
         for (PosDtos.SaleItemRequest line : req.items()) {
             if (line.quantity() <= 0) throw ApiException.badRequest("BAD_QTY", "Quantity must be positive.");
             Product product = products.findById(line.productId())
@@ -71,8 +72,12 @@ public class SaleService {
             long unitPrice = line.unitPriceMinor() != null ? line.unitPriceMinor()
                     : inventory.priceOf(store.getId(), product.getId(), product.getPriceMinor());
             long discount = line.discountMinor() == null ? 0 : line.discountMinor();
+            if (discount < 0 || discount > unitPrice * line.quantity()) {
+                throw ApiException.badRequest("BAD_DISCOUNT", "A discount can't be negative or more than the frame's price.");
+            }
             long lineTotal = unitPrice * line.quantity() - discount;
-            subtotal += lineTotal;
+            subtotal += unitPrice * line.quantity();
+            discountTotal += discount;
 
             inventory.decrementForSale(store.getId(), product.getId(), line.quantity(), sale.getReceiptNumber(), cashierId);
 
@@ -99,13 +104,14 @@ public class SaleService {
             payments.save(payment);
             paid += p.amountMinor();
         }
-        if (paid < subtotal) {
-            throw ApiException.badRequest("UNDERPAID", "Payments (" + paid + ") don't cover the sale total (" + subtotal + ").");
+        long total = subtotal - discountTotal;
+        if (paid < total) {
+            throw ApiException.badRequest("UNDERPAID", "Payments (" + paid + ") don't cover the sale total (" + total + ").");
         }
 
         sale.setSubtotalMinor(subtotal);
-        sale.setDiscountMinor(0);
-        sale.setTotalMinor(subtotal);
+        sale.setDiscountMinor(discountTotal);
+        sale.setTotalMinor(total);
         return view(sales.save(sale));
     }
 

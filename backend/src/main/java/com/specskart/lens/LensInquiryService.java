@@ -460,6 +460,14 @@ public class LensInquiryService {
         return id == null ? null : stores.findById(id).orElse(null);
     }
 
+    /** Every shop a customer can walk into, one collectionLine each — pinned shops first choice,
+     *  since those are the ones with an exact map pin. */
+    public String shopLines() {
+        List<Store> shops = stores.findByActiveTrueAndLatitudeIsNotNullAndLongitudeIsNotNull();
+        if (shops.isEmpty()) shops = stores.findByActiveTrue();
+        return String.join("\n\n", shops.stream().map(LensInquiryService::collectionLine).toList());
+    }
+
     /** Where to collect, as a line a customer can act on: name, street, and a tappable map. */
     static String collectionLine(Store shop) {
         if (shop == null) return "our shop";

@@ -29,6 +29,7 @@ public class Product extends BaseEntity {
     private String frameCategoryCode;
 
     private String material;
+    private String brand;
     private String colour;
 
     @Column(nullable = false)

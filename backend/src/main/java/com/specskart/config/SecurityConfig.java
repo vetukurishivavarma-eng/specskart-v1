@@ -45,6 +45,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/leads", "/api/admin/leads/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/admin/**").hasAnyRole("ADMIN", "AGENT")
                 .requestMatchers(HttpMethod.GET, "/api/admin/users").hasAnyRole("ADMIN", "AGENT")
+                // Staff add frames (photo, code, brand, price, shape) from the POS app; only an
+                // admin removes one.
+                .requestMatchers(HttpMethod.DELETE, "/api/admin/catalog/**").hasRole("ADMIN")
+                .requestMatchers("/api/admin/catalog/products", "/api/admin/catalog/products/**").hasAnyRole("ADMIN", "AGENT")
                 .requestMatchers("/api/admin/campaigns/**", "/api/admin/recommendations/**", "/api/admin/users/**",
                         "/api/admin/catalog/**", "/api/admin/faqs/**", "/api/admin/lens-pricing/**").hasRole("ADMIN")
                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "AGENT")

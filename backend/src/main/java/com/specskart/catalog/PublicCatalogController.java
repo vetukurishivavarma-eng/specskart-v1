@@ -20,8 +20,9 @@ public class PublicCatalogController {
     public List<CatalogDtos.ProductCard> browse(@RequestParam(required = false) String faceShape,
                                                 @RequestParam(required = false) String category,
                                                 @RequestParam(required = false) String gender,
-                                                @RequestParam(required = false) String sort) {
-        return catalog.browse(faceShape, category, gender, sort);
+                                                @RequestParam(required = false) String sort,
+                                                @RequestParam(required = false) Long maxPrice) {
+        return catalog.browse(faceShape, category, gender, sort, maxPrice);
     }
 
     @GetMapping("/products/featured")
