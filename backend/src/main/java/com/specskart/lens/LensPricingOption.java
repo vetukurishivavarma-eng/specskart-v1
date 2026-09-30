@@ -7,8 +7,7 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 
-/** One editable line in the lens price list — CLEAR, PHOTOCHROMATIC, BLUE_BLOCK, BIFOCAL,
- *  PROGRESSIVE — set from the Specskart POS app (or admin) instead of hardcoded in
+/** One editable line in the client's lens price list (V51) — set from the Specskart POS app (or admin) instead of hardcoded in
  *  {@link LensPricing}. {@code inStock=false} lets staff pull an option from sale (e.g. out
  *  of a coating) without deleting its price history. */
 @Getter
@@ -28,4 +27,7 @@ public class LensPricingOption extends BaseEntity {
 
     @Column(name = "in_stock", nullable = false)
     private boolean inStock = true;
+
+    @Column(name = "sort_order", nullable = false)
+    private int sortOrder;
 }

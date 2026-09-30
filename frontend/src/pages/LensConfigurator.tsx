@@ -217,6 +217,7 @@ function DetailsForm({ q, onPatch, onQuoted }: {
 
   async function checkPrice() {
     setQuoting(true)
+    setError(null)
     try {
       await onPatch({
         customerName: nameRef.current?.value || undefined,
@@ -231,6 +232,8 @@ function DetailsForm({ q, onPatch, onQuoted }: {
       })
       const v = await lens.quote(q.id)
       onQuoted(v)
+    } catch (e) {
+      setError((e as Error).message) // e.g. PRICE_ON_REQUEST: Rx outside the client's price list
     } finally {
       setQuoting(false)
     }

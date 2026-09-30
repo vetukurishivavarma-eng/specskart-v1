@@ -299,9 +299,13 @@ public class LensInquiryService {
         q.setPhoneRaw(d.phone() == null ? "" : d.phone());
         q.setLensType(d.lensType());
         q.setBlueBlock(Boolean.TRUE.equals(d.blueBlock()));
+        q.setSphRight(d.sphRight());
+        q.setSphLeft(d.sphLeft());
+        q.setCylRight(d.cylRight());
+        q.setCylLeft(d.cylLeft());
         q.setAddPower(d.addPower());
         q.setLensStructure(d.lensStructure());
-        q.setSpecialAxis(false); // no Rx captured at the counter yet — staff enters that separately if needed
+        q.setSpecialAxis(false); // counter takes SPH/CYL for the price band, not the axis
         q.setClientReference(d.clientReference());
         String raw = tokens.newToken();
         q.setVerifyTokenHash(tokens.hash(raw));

@@ -124,7 +124,7 @@ class LensStockTest {
 
     @Test
     void aCounterSaleWithNoStockStillSellsAsABackorder() {
-        var sale = service.walkInSale(new LensDtos.WalkInSale("Walk In", null, "PHOTOCHROMATIC", false,
+        var sale = service.walkInSale(new LensDtos.WalkInSale("Walk In", null, "PHOTOCHROMATIC", false, null, null, null, null,
                 null, null, "CASH", "Staff A", null, "lens-stock-" + UUID.randomUUID(), kitwe.getId()));
 
         assertThat(sale.status()).isEqualTo("SOLD");

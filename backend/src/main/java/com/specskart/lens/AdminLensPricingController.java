@@ -24,7 +24,7 @@ public class AdminLensPricingController {
 
     @GetMapping
     public List<OptionView> list() {
-        return options.findAllByOrderByCodeAsc().stream().map(AdminLensPricingController::view).toList();
+        return options.findAllByOrderBySortOrderAsc().stream().map(AdminLensPricingController::view).toList();
     }
 
     @PatchMapping("/{id}")

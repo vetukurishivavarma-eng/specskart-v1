@@ -76,26 +76,42 @@ class LensInquiryFlowTest {
     }
 
     @Test
-    void quoteAddsBlueBlockAndProgressiveOnTopOfTheBaseLens() {
+    void quotePicksTheClientPriceListRow() {
         UUID id = service.start(phone(), "PHOTOCHROMATIC", true, null);
         service.verify(tokenFromLastOutbound());
         service.update(id, new LensDtos.UpdateDetails(
                 null, null, null, null, null, null, null, null, null,
                 new BigDecimal("1.00"), "PROGRESSIVE"));
-
         var quoted = service.quote(id);
         assertThat(quoted.status()).isEqualTo("PRICED");
-        assertThat(quoted.priceMinor()).isEqualTo(45_000L + 8_000L + 35_000L);
+        assertThat(quoted.priceMinor()).isEqualTo(135_000L); // Colormatic Prog BB, Plano-2, Add 1-2
+
+        // Colormatic BB single vision, SPH -5.00 -> ±4.25-±8.00 band, CYL -2.50 -> +K200
+        service.update(id, new LensDtos.UpdateDetails(
+                null, null, null, new BigDecimal("-5.00"), null, new BigDecimal("-2.50"), null, 90, null,
+                BigDecimal.ZERO, null));
+        assertThat(service.quote(id).priceMinor()).isEqualTo(99_900L + 20_000L);
+
+        // bifocal with CYL -2.50 can't be a stock lens -> RX
+        service.update(id, new LensDtos.UpdateDetails(
+                null, null, null, null, null, null, null, null, null, new BigDecimal("2.00"), "BIFOCAL"));
+        assertThat(service.quote(id).priceMinor()).isEqualTo(180_000L);
+
+        // SPH beyond ±10 isn't on the list at all
+        service.update(id, new LensDtos.UpdateDetails(
+                null, null, null, new BigDecimal("-12.00"), null, BigDecimal.ZERO, null, null, null,
+                BigDecimal.ZERO, null));
+        assertThatThrownBy(() -> service.quote(id)).hasMessageContaining("outside our standard price list");
     }
 
     @Test
     void walkInSaleSkipsWhatsappAndIsBilledImmediately() {
         var sale = service.walkInSale(new LensDtos.WalkInSale(
-                "Counter Customer", null, "CLEAR", true, null, null,
+                "Counter Customer", null, "CLEAR", true, null, null, null, null, null, null,
                 "CASH", "Staff A", "Main Store", null, null));
 
         assertThat(sale.status()).isEqualTo("SOLD");
-        assertThat(sale.priceMinor()).isEqualTo(25_000L + 8_000L);
+        assertThat(sale.priceMinor()).isEqualTo(36_000L); // Clear BB single vision
 
         var today = service.salesOn(java.time.LocalDate.now(java.time.ZoneOffset.UTC));
         assertThat(today).anySatisfy(s -> {
@@ -172,7 +188,7 @@ class LensInquiryFlowTest {
 
         var pay = service.startPayment(id);
         assertThat(pay.checkoutUrl()).isNotBlank();
-        assertThat(pay.amountMinor()).isEqualTo(25_000L);
+        assertThat(pay.amountMinor()).isEqualTo(32_000L);
 
         String txRef = "LENS-" + id;
         assertThat(LensInquiryService.isLensRef(txRef)).isTrue();
@@ -197,7 +213,7 @@ class LensInquiryFlowTest {
     @Test
     void replayingAWalkInSaleWithTheSameClientReferenceDoesNotDoubleSell() {
         String ref = "device-" + UUID.randomUUID();
-        var req = new LensDtos.WalkInSale("Offline Customer", null, "CLEAR", false, null, null,
+        var req = new LensDtos.WalkInSale("Offline Customer", null, "CLEAR", false, null, null, null, null, null, null,
                 "CASH", "Staff A", "Main Store", ref, null);
 
         var first = service.walkInSale(req);
