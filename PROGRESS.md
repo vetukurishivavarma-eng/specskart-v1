@@ -1,5 +1,28 @@
 # Specskart v1 — build progress
 
+_Last updated: 2026-10-01. Session: session_01WTgxFowKm8na5mEv3SaWQB_
+
+## RESUME HERE — 2026-09-30 / 10-01 (laptop shut down after this)
+
+All pushed to `main` (Render auto-deploys api + web). Backend tests green (175+), frontend tsc + vitest green, POS tsc green. Nothing device-tested.
+
+Shipped this session (v1 `a066c42` -> `c2051d7` -> `99123ef`; pos `dafbf6a` -> `17f8d77` -> `52ca857`):
+1. **Lens pricing = client's 2025 sheet** (V51): 15 SPH-band rows + CYL_EXTRA K200 + 4 RX rows, `LensPricing` picks one row; off-sheet Rx -> 400 PRICE_ON_REQUEST. Clear multifocal priced as Colormatic; multifocal -> RX when SPH>3 / CYL>2 / Add>3 / special axis (user said keep as per sheet). Price edits ADMIN-only (POS More -> Lens pricing).
+2. **2nd admin** V52 `shiva@specskart.local` (password given in chat). V52 uses Postgres-only `on conflict`: FlywayMigrationTest skips executing it on H2 — never edit V52 (checksum).
+3. **Lead tracking**: bot sends signed personal `/lens?l=&exp=&sig=` link (SignedLinks `lead-lens/<id>`, 30d) -> skips number verification; LENS_* events on the lead timeline per step; POS `lead/[id]` screen (stage, Rx, steps + WhatsApp chat, notes, WhatsApp/Call/send-link); stage on Leads list; Rx + WhatsApp on Web order cards; failed WhatsApp delivery statuses now logged WARN with Meta's code.
+4. **Client's frames flow on WhatsApp**: price question -> "frames from K300 up to K3,000, please visit our store" + shop address/map; frames question -> "want to know what suits you?" -> Yes: face-shape chart (`frontend/public/face-shape-chart.jpg`) / Explore: website `/store`.
+5. **Store filters**: shape chips (+Square), "Under K500/1000/2000/3000/4000/5000" (`maxPrice`), sort "Price: Low to High / High to Low"; brand on tiles.
+6. **Products from POS**: staff + admin add frame with photo (expo-image-picker, NEW native dep), code, brand (V53), price, shape. DELETE stays ADMIN.
+7. **Frame sale discount** (K off whole sale, spread per line; backend validates + records subtotal/discount/total).
+8. **Walk-in by typed number** (`POST /api/admin/pos/walk-ins/manual`), WALK_IN lead, no marketing opt-in.
+
+NEXT (user):
+- Wait for GitHub Actions to build POS **1.10.0 / versionCode 15** (15, not 14 — 14 was never published), create GitHub release `v1.10.0` with `specskart-pos-1.10.0.apk`, then POS More -> App releases: version 1.10.0, build 15, minimum 15, mandatory.
+- Verify on Render: https://specskart-web.onrender.com/face-shape-chart.jpg loads; send "price" and "frames" to the bot.
+- **specskart-db (free) EXPIRES 2026-10-03** — upgrade in Render or everything is lost.
+- Nachi (Patience Nachilima, LENS-92EE70F0) order has Rx all 0.00 — confirm her power on WhatsApp before the lab makes it.
+
+
 _Last updated: 2026-09-09. Session: session_01LikGxFAD44keaoNy1Mzp7g_
 
 ## Session 2026-09-09 c — product-accurate AR try-on: Phase A (Python service)
