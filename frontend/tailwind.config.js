@@ -3,47 +3,52 @@ export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      // 2026-10 rebrand: Bricolage Grotesque headings + Plus Jakarta body (same as the POS app).
       fontFamily: {
-        display: ['"Fraunces"', 'Georgia', 'serif'],
-        sans: ['"Inter"', 'system-ui', 'sans-serif'],
+        display: ['"Bricolage Grotesque"', 'system-ui', 'sans-serif'],
+        sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
       },
-      // Four flat colours made every surface the same flat colour. Each one now carries a
-      // scale, so a card can sit off the page, a badge can tint, and a heading can be a
-      // shade rather than the same ink as body text.
+      // Token NAMES kept (ink/bone/clay/moss/slate) so every page restyles at once; the values
+      // are the new identity: navy ink, cool canvas, cobalt primary, teal, coral, lime glint.
       colors: {
         ink: {
-          DEFAULT: '#14110f',
-          soft: '#3a342e',
-          muted: '#6f6a61',
-          faint: '#9c968a',
+          DEFAULT: '#0A0F1F',
+          soft: '#1A2340',
+          muted: '#5B6475',
+          faint: '#9AA1AE',
         },
         bone: {
-          DEFAULT: '#f6f3ee',
-          light: '#fbf9f6',
-          deep: '#ece7de',
+          DEFAULT: '#F4F5F7',
+          light: '#FAFBFC',
+          deep: '#E8EBF0',
         },
+        // "clay" is now the cobalt primary.
         clay: {
-          DEFAULT: '#b4552d',
-          light: '#d4724a',
-          deep: '#8f4223',
-          wash: '#f7e8e0',
+          DEFAULT: '#2342F0',
+          light: '#4B65FF',
+          deep: '#1A33C4',
+          wash: '#E7EBFF',
         },
         moss: {
-          DEFAULT: '#3f4a3c',
-          light: '#5c6b58',
-          wash: '#e6ebe4',
+          DEFAULT: '#0E8C8C',
+          light: '#2BA7A7',
+          wash: '#E1F4F4',
         },
-        // A cool counterweight. Everything was warm, which is why the pages read as one
-        // undifferentiated wash -- this is what makes the warm colours look chosen.
         slate: {
-          DEFAULT: '#2f4858',
-          light: '#4a6b7f',
-          wash: '#e4ebf0',
+          DEFAULT: '#33415C',
+          light: '#5B6B88',
+          wash: '#E8ECF3',
         },
+        coral: {
+          DEFAULT: '#E8492E',
+          wash: '#FFEBE5',
+        },
+        // The logo's lens glint -- only on dark or cobalt grounds.
+        signal: '#C8F04B',
       },
       boxShadow: {
-        card: '0 1px 2px rgba(20,17,15,0.04), 0 8px 24px -12px rgba(20,17,15,0.10)',
-        lift: '0 2px 4px rgba(20,17,15,0.05), 0 16px 40px -16px rgba(20,17,15,0.18)',
+        card: '0 1px 2px rgba(10,15,31,0.04), 0 6px 20px -12px rgba(10,15,31,0.12)',
+        lift: '0 2px 4px rgba(10,15,31,0.05), 0 18px 40px -16px rgba(35,66,240,0.25)',
       },
     },
   },

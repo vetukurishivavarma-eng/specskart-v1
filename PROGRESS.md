@@ -1,6 +1,26 @@
 # Specskart v1 — build progress
 
-_Last updated: 2026-10-01. Session: session_01WTgxFowKm8na5mEv3SaWQB_
+_Last updated: 2026-10-02._
+
+## RESUME HERE — 2026-10-02 (rebrand + lens discount + frames back on sale)
+
+**User's direction (2026-10-02): frames AND lenses are both on sale from now on** — the "lens-only funnel" era is over; frames are no longer hidden.
+
+Shipped (v1 + pos pushed; Render auto-deploys api + web; GitHub Actions builds the APK):
+1. **Discount on lens counter sales.** Root cause of "can't find discount": it was only on the *Frames* sale, and the Sell tab opened on Lens behind a dropdown. Backend: `WalkInSale.discountMinor` (nullable, 400 BAD_DISCOUNT if <0 or > price), net price stored (no separate discount column — `ponytail:` note in `walkInSale`); new `POST /api/admin/lens-sales/walk-in/quote` so the app shows Before discount / Discount / Total. New test `walkInDiscountComesOffThePriceAndCantExceedIt`; lens tests green.
+2. **POS 1.11.0 / versionCode 16**: Sell tab = big Lenses | Frames segmented switch (not a dropdown); lens sale shows price + discount.
+3. **Rebrand (app + web)**: cobalt `#2342F0` primary, navy ink `#0A0F1F`, coral accent, lime `#C8F04B` "lens glint", cool neutrals; Bricolage Grotesque headings (+ Plus Jakarta body); app bevels/heavy shadows → flat hairline cards. Web keeps token NAMES (`clay` is now cobalt) so every page restyled at once.
+4. **New logo**: browline frame (heavy brow bar, tapered lenses, keyhole bridge) + lime glint; white on a cobalt tile for launcher icon/favicon. Paths live in `pos/src/ui/Logo.tsx`, `pos/scripts/mark-svg.js`, `frontend/src/components/Logo.tsx`, `frontend/public/favicon.svg` — keep in step. Icons regenerated (`node scripts/generate-icons.js && node scripts/generate-android-icons.js`, sharp --no-save).
+5. **Website frames back**: nav Frames / Lenses / Frame Finder + cart icon; new dark hero with Frames (K300–K3,000) / Lenses / Frame Finder cards; featured frames grid + "picked for your face" strip re-enabled.
+
+Not done / NEXT:
+- **User: publish POS 1.11.0 / build 16** from the GitHub Actions artifact (release `v1.11.0` + App releases row: 1.11.0, build 16, minimum 16, mandatory).
+- Not device-tested; web checked with headless Edge screenshots only. Only Home/header/footer got a layout redesign — other pages just inherited the new tokens.
+- Possible follow-up: one combined bill for frame + lenses (today they are two separate sales).
+- `ui-ux-pro-max` skill was NOT available (not installed; clone blocked) — redesign done without it.
+- **specskart-db EXPIRES 2026-10-03** — still the top user action.
+
+_Previous: 2026-10-01. Session: session_01WTgxFowKm8na5mEv3SaWQB_
 
 ## RESUME HERE — 2026-09-30 / 10-01 (laptop shut down after this)
 

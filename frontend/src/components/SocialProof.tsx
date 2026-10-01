@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { shop } from '../lib/shop'
 
 /** A quiet, rotating "others are shopping" line. Renders nothing until there's real activity. */
-export default function SocialProof({ className = '' }: { className?: string }) {
+export default function SocialProof({ className = '', dark = false }: { className?: string; dark?: boolean }) {
   const { data } = useQuery({ queryKey: ['social-proof'], queryFn: shop.socialProof, staleTime: 60_000 })
   const [i, setI] = useState(0)
 
@@ -22,7 +22,7 @@ export default function SocialProof({ className = '' }: { className?: string }) 
 
   if (!lines.length) return null
   return (
-    <div className={`text-xs text-ink/50 ${className}`}>
+    <div className={`text-xs ${dark ? 'text-white/60' : 'text-ink/50'} ${className}`}>
       <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-moss align-middle" />
       {lines[i % lines.length]}
     </div>

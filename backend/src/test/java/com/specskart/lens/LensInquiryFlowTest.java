@@ -108,7 +108,7 @@ class LensInquiryFlowTest {
     void walkInSaleSkipsWhatsappAndIsBilledImmediately() {
         var sale = service.walkInSale(new LensDtos.WalkInSale(
                 "Counter Customer", null, "CLEAR", true, null, null, null, null, null, null,
-                "CASH", "Staff A", "Main Store", null, null));
+                "CASH", "Staff A", "Main Store", null, null, null));
 
         assertThat(sale.status()).isEqualTo("SOLD");
         assertThat(sale.priceMinor()).isEqualTo(36_000L); // Clear BB single vision
@@ -120,6 +120,20 @@ class LensInquiryFlowTest {
             assertThat(s.paymentMethod()).isEqualTo("CASH");
         });
         assertThat(service.summaryOn(java.time.LocalDate.now(java.time.ZoneOffset.UTC)).totalMinor()).isGreaterThanOrEqualTo(33_000L);
+    }
+
+    @Test
+    void walkInDiscountComesOffThePriceAndCantExceedIt() {
+        var noDiscount = new LensDtos.WalkInSale("Discount Customer", null, "CLEAR", true, null, null, null, null, null, null,
+                "CASH", "Staff A", "Main Store", null, null, null);
+        assertThat(service.walkInQuote(noDiscount)).isEqualTo(36_000L);
+
+        var sale = service.walkInSale(new LensDtos.WalkInSale("Discount Customer", null, "CLEAR", true, null, null, null, null, null, null,
+                "CASH", "Staff A", "Main Store", null, null, 5_000L));
+        assertThat(sale.priceMinor()).isEqualTo(31_000L);
+
+        assertThatThrownBy(() -> service.walkInSale(new LensDtos.WalkInSale("Too Much", null, "CLEAR", true, null, null, null, null, null, null,
+                "CASH", "Staff A", "Main Store", null, null, 36_001L))).hasMessageContaining("Discount");
     }
 
     @Test
@@ -214,7 +228,7 @@ class LensInquiryFlowTest {
     void replayingAWalkInSaleWithTheSameClientReferenceDoesNotDoubleSell() {
         String ref = "device-" + UUID.randomUUID();
         var req = new LensDtos.WalkInSale("Offline Customer", null, "CLEAR", false, null, null, null, null, null, null,
-                "CASH", "Staff A", "Main Store", ref, null);
+                "CASH", "Staff A", "Main Store", ref, null, null);
 
         var first = service.walkInSale(req);
         var replay = service.walkInSale(req);

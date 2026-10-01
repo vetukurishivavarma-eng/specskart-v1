@@ -54,6 +54,11 @@ public class AdminLensSalesController {
         return service.walkInSale(req);
     }
 
+    @PostMapping("/walk-in/quote")
+    public java.util.Map<String, Long> walkInQuote(@RequestBody LensDtos.WalkInSale req) {
+        return java.util.Map.of("priceMinor", service.walkInQuote(req));
+    }
+
     @GetMapping
     public List<LensDtos.SaleView> onDay(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return service.salesOn(date);

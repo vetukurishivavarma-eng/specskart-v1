@@ -321,6 +321,29 @@ public class LensInquiryService {
             var existing = inquiries.findByClientReference(d.clientReference());
             if (existing.isPresent()) return view(existing.get());
         }
+        LensInquiry q = walkInInquiry(d);
+        long discount = d.discountMinor() == null ? 0 : d.discountMinor();
+        if (discount < 0 || discount > q.getPriceMinor()) {
+            throw ApiException.badRequest("BAD_DISCOUNT", "Discount can't be more than the lens price.");
+        }
+        // ponytail: only the net price is kept; add a discount column if reports need it split out
+        q.setPriceMinor(q.getPriceMinor() - discount);
+        String raw = tokens.newToken();
+        q.setVerifyTokenHash(tokens.hash(raw));
+        q.setPhoneVerifiedAt(Instant.now());
+        q.setStatus("VERIFIED");
+        inquiries.save(q);
+        if (d.storeId() != null) takeLensStock(q, d.storeId());
+        return completeSale(inquiries.save(q).getId(),
+                new LensDtos.CompleteSale(d.paymentMethod(), d.soldBy(), d.shopName()));
+    }
+
+    /** The counter's price before discount, so staff see what they're discounting from. */
+    public long walkInQuote(LensDtos.WalkInSale d) {
+        return walkInInquiry(d).getPriceMinor();
+    }
+
+    private LensInquiry walkInInquiry(LensDtos.WalkInSale d) {
         if (!"CLEAR".equals(d.lensType()) && !"PHOTOCHROMATIC".equals(d.lensType())) {
             throw ApiException.badRequest("BAD_LENS_TYPE", "Choose a lens type first.");
         }
@@ -338,15 +361,8 @@ public class LensInquiryService {
         q.setLensStructure(d.lensStructure());
         q.setSpecialAxis(false); // counter takes SPH/CYL for the price band, not the axis
         q.setClientReference(d.clientReference());
-        String raw = tokens.newToken();
-        q.setVerifyTokenHash(tokens.hash(raw));
-        q.setPhoneVerifiedAt(Instant.now());
-        q.setStatus("VERIFIED");
         q.setPriceMinor(pricing.quote(q));
-        inquiries.save(q);
-        if (d.storeId() != null) takeLensStock(q, d.storeId());
-        return completeSale(inquiries.save(q).getId(),
-                new LensDtos.CompleteSale(d.paymentMethod(), d.soldBy(), d.shopName()));
+        return q;
     }
 
     /** Specskart POS: finish billing on a web order the customer already verified and

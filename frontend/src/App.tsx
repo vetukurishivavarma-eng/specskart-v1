@@ -51,7 +51,7 @@ export default function App() {
         <Route path="/lens/track/:id" element={<LensTracking />} />
       </Route>
       <Route path="/lens/verify/:token" element={<LensVerify />} />
-      {/* Frames flow — kept working, just not linked anywhere while the lens-only funnel is live. */}
+      {/* Frame Finder runs full-screen, outside the site chrome. */}
       <Route path="/frame-finder" element={<FrameFinder />} />
 
       <Route path="/admin/login" element={<Login />} />

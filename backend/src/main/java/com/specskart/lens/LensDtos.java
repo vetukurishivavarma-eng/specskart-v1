@@ -48,7 +48,7 @@ public final class LensDtos {
                              BigDecimal sphRight, BigDecimal sphLeft, BigDecimal cylRight, BigDecimal cylLeft,
                              BigDecimal addPower, String lensStructure,
                              String paymentMethod, String soldBy, String shopName, String clientReference,
-                             UUID storeId) {}
+                             UUID storeId, Long discountMinor) {}
 
     public record CompleteSale(String paymentMethod, String soldBy, String shopName) {}
 
