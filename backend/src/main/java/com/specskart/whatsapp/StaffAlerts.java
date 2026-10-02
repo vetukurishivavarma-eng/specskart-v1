@@ -30,10 +30,12 @@ public class StaffAlerts {
 
     private final WhatsAppProvider whatsapp;
     private final AppProperties props;
+    private final ServiceWindow window;
 
-    public StaffAlerts(WhatsAppProvider whatsapp, AppProperties props) {
+    public StaffAlerts(WhatsAppProvider whatsapp, AppProperties props, ServiceWindow window) {
         this.whatsapp = whatsapp;
         this.props = props;
+        this.window = window;
     }
 
     /**
@@ -56,7 +58,9 @@ public class StaffAlerts {
             if (to.isEmpty()) continue;
             try {
                 boolean sent = false;
-                if (pdfUrl != null && props.whatsapp().staffOrderConfigured()) {
+                // A staff phone that messaged the business in the last 24h gets the plain PDF (free,
+                // and it can't be blocked by billing); otherwise only the template gets through.
+                if (pdfUrl != null && props.whatsapp().staffOrderConfigured() && !window.isOpen(to)) {
                     try {
                         whatsapp.sendDocumentTemplate(to, props.whatsapp().staffOrderTemplate(),
                                 props.whatsapp().followUpTemplateLang(), pdfUrl, pdfName, templateParams);

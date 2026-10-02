@@ -73,6 +73,7 @@ public class LensInquiryService {
     private final AdEventService adEvents;
     private final AnalyticsService analytics;
     private final LeadRepository leads;
+    private final com.specskart.whatsapp.ServiceWindow window;
 
     /** How long a personal /lens link keeps working after the bot sends it. */
     private static final Duration LINK_TTL = Duration.ofDays(30);
@@ -82,7 +83,9 @@ public class LensInquiryService {
                               LensPricing pricing, StaffAlerts staffAlerts, SignedLinks links,
                               PaymentProvider payments, MembershipService memberships,
                               InventoryService inventory, ProductRepository products, StoreRepository stores,
-                              AdEventService adEvents, AnalyticsService analytics, LeadRepository leads) {
+                              AdEventService adEvents, AnalyticsService analytics, LeadRepository leads,
+                              com.specskart.whatsapp.ServiceWindow window) {
+        this.window = window;
         this.adEvents = adEvents;
         this.analytics = analytics;
         this.leads = leads;
@@ -666,7 +669,9 @@ public class LensInquiryService {
         if (blank(q.getWaId())) return;
         String who = blank(q.getCustomerName()) ? "there" : q.getCustomerName().split(" ")[0];
         try {
-            if (props.whatsapp().orderUpdateConfigured()) {
+            // Inside their 24h window a plain message is free and can't be blocked by billing or
+            // template review; the template is for when the window is shut.
+            if (props.whatsapp().orderUpdateConfigured() && !window.isOpen(q.getWaId())) {
                 // {{4}} is the template's "track your order" link. It used to point at
                 // /lens -- the configurator -- so a customer tapping it was handed a blank
                 // form to order a second pair. This is their own order's status page.
@@ -674,7 +679,8 @@ public class LensInquiryService {
                         props.whatsapp().followUpTemplateLang(),
                         List.of(who, line, ref(q), props.frontendBaseUrl() + "/lens/track/" + q.getId()));
             } else {
-                whatsapp.sendText(q.getWaId(), "Hi " + who + " — " + line + " (" + ref(q) + ").");
+                whatsapp.sendText(q.getWaId(), "Hi " + who + " — " + line + " (" + ref(q) + ").\n\nTrack your order: "
+                        + props.frontendBaseUrl() + "/lens/track/" + q.getId());
             }
         } catch (Exception e) {
             log.warn("lens {} customer notification failed: {}", ref(q), e.getMessage());

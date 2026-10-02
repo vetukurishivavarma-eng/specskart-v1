@@ -37,11 +37,14 @@ public class OrderNotificationService {
     private final SignedLinks links;
     private final PrescriptionFileRepository prescriptionFiles;
     private final com.specskart.pos.StoreRepository stores;
+    private final com.specskart.whatsapp.ServiceWindow window;
 
     public OrderNotificationService(LeadRepository leads, OrderItemRepository items, OrderEventRepository orderEvents,
                                     WhatsAppProvider whatsapp, WhatsAppMessageRepository messages, AppProperties props,
                                     StaffAlerts staffAlerts, SignedLinks links, PrescriptionFileRepository prescriptionFiles,
-                                    com.specskart.pos.StoreRepository stores) {
+                                    com.specskart.pos.StoreRepository stores,
+                                    com.specskart.whatsapp.ServiceWindow window) {
+        this.window = window;
         this.stores = stores;
         this.staffAlerts = staffAlerts;
         this.links = links;
@@ -72,7 +75,8 @@ public class OrderNotificationService {
         String logKey = "order-" + status.name().toLowerCase();
 
         try {
-            if (props.whatsapp().orderUpdateConfigured()) {
+            // Inside the 24h window a plain message is free and can't be blocked by billing.
+            if (props.whatsapp().orderUpdateConfigured() && !window.isOpen(waId)) {
                 // Approved template — the only thing Meta delivers outside the customer's 24h window.
                 whatsapp.sendTemplate(waId, props.whatsapp().orderUpdateTemplate(),
                         props.whatsapp().followUpTemplateLang(),
