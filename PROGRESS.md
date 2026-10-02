@@ -13,10 +13,11 @@ Shipped (v1 + pos pushed; Render auto-deploys api + web; GitHub Actions builds t
 4. **New logo**: browline frame (heavy brow bar, tapered lenses, keyhole bridge) + lime glint; white on a cobalt tile for launcher icon/favicon. Paths live in `pos/src/ui/Logo.tsx`, `pos/scripts/mark-svg.js`, `frontend/src/components/Logo.tsx`, `frontend/public/favicon.svg` — keep in step. Icons regenerated (`node scripts/generate-icons.js && node scripts/generate-android-icons.js`, sharp --no-save).
 5. **Website frames back**: nav Frames / Lenses / Frame Finder + cart icon; new dark hero with Frames (K300–K3,000) / Lenses / Frame Finder cards; featured frames grid + "picked for your face" strip re-enabled.
 
+6. **One combined bill for frame + lenses** (user asked, same day): `POST /api/admin/pos/combined-sales` (`pos/CombinedSaleService`) records the frame sale and the lens walk-in in ONE transaction — a rejected lens half rolls the frame sale + stock back (`CombinedSaleTest`). Frame first, lens last (lens sends the customer WhatsApp as its final step). Each half dedupes on its own clientReference (`<ref>-f` / `<ref>-l`) so offline replay is safe. Frame sale notes get "With lenses LENS-XXXXXXXX". POS Sell tab is now one `CounterSale` screen (Frames card + "Add lenses" card + one Bill: one discount split by value, one payment, one total, one receipt); FrameSell/LensSell deleted. Reports still list the two halves as separate rows (totals correct). 183 backend tests green.
+
 Not done / NEXT:
 - **User: publish POS 1.11.0 / build 16** from the GitHub Actions artifact (release `v1.11.0` + App releases row: 1.11.0, build 16, minimum 16, mandatory).
 - Not device-tested; web checked with headless Edge screenshots only. Only Home/header/footer got a layout redesign — other pages just inherited the new tokens.
-- Possible follow-up: one combined bill for frame + lenses (today they are two separate sales).
 - `ui-ux-pro-max` skill was NOT available (not installed; clone blocked) — redesign done without it.
 - **specskart-db EXPIRES 2026-10-03** — still the top user action.
 
