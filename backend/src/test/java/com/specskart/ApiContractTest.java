@@ -57,6 +57,12 @@ class ApiContractTest {
     }
 
     @Test
+    void databaseBackupIsAdminOnly() throws Exception {
+        mvc().perform(get("/api/admin/backup")).andExpect(status().isUnauthorized());
+        mvc().perform(get("/api/admin/backup").with(user("staff").roles("AGENT"))).andExpect(status().isForbidden());
+    }
+
+    @Test
     void expiredFrameFinderSessionReturns410WithCode() throws Exception {
         Lead lead = new Lead();
         lead.setWhatsappWaId("contract-" + System.nanoTime());

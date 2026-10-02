@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
+import BackupButton from './BackupButton'
 
 type Stats = {
   totalLeads: number; todayLeads: number; faceAnalysesCompleted: number; analysisConversionPct: number
@@ -28,7 +29,10 @@ export default function Dashboard() {
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl">Dashboard</h1>
+        <div className="flex flex-wrap items-center gap-4">
+          <h1 className="text-2xl">Dashboard</h1>
+          <BackupButton />
+        </div>
         {sys.data && (
           <div className="flex gap-3 text-xs text-ink/55">
             <span className={`rounded-full px-2 py-1 ${sys.data.whatsappConfigured ? 'bg-moss/15' : 'bg-clay/15 text-clay'}`}>
