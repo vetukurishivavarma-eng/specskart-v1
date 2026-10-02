@@ -49,7 +49,7 @@ class CombinedSaleTest {
 
     private LensDtos.WalkInSale lensHalf(String ref, long discount) {
         return new LensDtos.WalkInSale("Both Customer", null, "CLEAR", true, null, null, null, null, null, null,
-                "CASH", "Staff A", null, ref, null, discount);
+                "CASH", "Staff A", null, ref, null, discount, null, null, null, null, null);
     }
 
     @Test

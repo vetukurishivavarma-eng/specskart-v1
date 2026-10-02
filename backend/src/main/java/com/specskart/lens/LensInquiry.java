@@ -93,10 +93,26 @@ public class LensInquiry extends BaseEntity {
         return paidAt != null || "SOLD".equals(status);
     }
 
+    /** Pupillary distance for the lab: "62" or a dual "31.5/30.5". */
+    @Column(length = 16)
+    private String pd;
+
+    /** Money taken so far. Set at the counter (a deposit or the full price) and topped up to the
+     *  price at pickup. Null on older rows and web orders: they are paid in full or not at all. */
+    private Long paidMinor;
+
+    /** What the customer still owes. */
+    public long balanceMinor() {
+        long price = priceMinor == null ? 0 : priceMinor;
+        if (paidMinor != null) return Math.max(0, price - paidMinor);
+        return isPaid() ? 0 : price;
+    }
+
     /** Collection stage — ORDERED | READY | DELIVERED (DELIVERED meaning collected; the old
      *  name kept so existing rows and queries still read). Separate from {@link #status}, which
      *  is the billing state: a lens is normally ready while still unpaid, since the customer
-     *  pays at pickup. Null for a walk-in. */
+     *  pays at pickup. A counter order joins the same ladder (2026-10); null only for older
+     *  walk-ins. */
     private String fulfilment;
 
     /** Where the finished lens is delivered. Captured on the /lens page after the quote and

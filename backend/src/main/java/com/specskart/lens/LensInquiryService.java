@@ -328,14 +328,45 @@ public class LensInquiryService {
         }
         // ponytail: only the net price is kept; add a discount column if reports need it split out
         q.setPriceMinor(q.getPriceMinor() - discount);
+        long deposit = d.depositMinor() == null ? q.getPriceMinor() : d.depositMinor();
+        if (deposit < 0 || deposit > q.getPriceMinor()) {
+            throw ApiException.badRequest("BAD_DEPOSIT", "The deposit can't be more than the lens price.");
+        }
+        boolean collectedNow = Boolean.TRUE.equals(d.collectedNow());
+        if (collectedNow && deposit < q.getPriceMinor()) {
+            throw ApiException.badRequest("BALANCE_DUE", "Lenses taken away now must be paid in full.");
+        }
+        q.setPaidMinor(deposit);
         String raw = tokens.newToken();
         q.setVerifyTokenHash(tokens.hash(raw));
         q.setPhoneVerifiedAt(Instant.now());
         q.setStatus("VERIFIED");
         inquiries.save(q);
         if (d.storeId() != null) takeLensStock(q, d.storeId());
-        return completeSale(inquiries.save(q).getId(),
-                new LensDtos.CompleteSale(d.paymentMethod(), d.soldBy(), d.shopName()));
+        bill(q, new LensDtos.CompleteSale(d.paymentMethod(), d.soldBy(), d.shopName()));
+        if (collectedNow) {
+            q.setFulfilment("DELIVERED");
+            inquiries.save(q);
+            track(q, LeadEventType.LENS_COLLECTED, "ref", ref(q), "shop", q.getShopName());
+        } else {
+            // Made by the lab like a web order: it joins the same ORDERED -> READY -> collected
+            // queue, and the customer hears from us when it's ready.
+            q.setFulfilment("ORDERED");
+            inquiries.save(q);
+            track(q, LeadEventType.LENS_ORDERED, "ref", ref(q));
+            notifyCustomer(q, "we've got your lens order and we're on it — we'll message you here when it's ready"
+                    + (q.balanceMinor() > 0 ? " (balance at pickup: " + kwacha(q.balanceMinor()) + ")" : ""));
+        }
+        return view(q);
+    }
+
+    private static Integer checkedAxis(Integer a) {
+        if (a != null && (a < 0 || a > 180)) throw ApiException.badRequest("BAD_AXIS", "Axis is 0 to 180.");
+        return a;
+    }
+
+    private static String kwacha(long minor) {
+        return "K" + java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(minor / 100.0);
     }
 
     /** The counter's price before discount, so staff see what they're discounting from. */
@@ -359,7 +390,20 @@ public class LensInquiryService {
         q.setCylLeft(d.cylLeft());
         q.setAddPower(d.addPower());
         q.setLensStructure(d.lensStructure());
-        q.setSpecialAxis(false); // counter takes SPH/CYL for the price band, not the axis
+        // Axis is for the lab only -- the counter's price band is SPH/CYL, so it never makes a
+        // walk-in "special axis" (that would move it to the RX price row).
+        q.setSpecialAxis(false);
+        q.setAxisRight(checkedAxis(d.axisRight()));
+        q.setAxisLeft(checkedAxis(d.axisLeft()));
+        if (d.pd() != null && d.pd().strip().length() > 16) {
+            throw ApiException.badRequest("BAD_PD", "PD looks wrong — e.g. 62 or 31.5/30.5.");
+        }
+        q.setPd(d.pd() == null || d.pd().isBlank() ? null : d.pd().strip());
+        // A phone number given at the counter is where "your lenses are ready" goes.
+        if (d.phone() != null && !d.phone().isBlank()) {
+            String waId = PhoneNumbers.normalize(d.phone(), props.whatsapp().defaultCountryCode());
+            if (waId != null && waId.length() >= 8) q.setWaId(waId);
+        }
         q.setClientReference(d.clientReference());
         q.setPriceMinor(pricing.quote(q));
         return q;
@@ -371,23 +415,37 @@ public class LensInquiryService {
     public LensDtos.InquiryView completeSale(UUID id, LensDtos.CompleteSale d) {
         LensInquiry q = requireVerified(get(id));
         if (q.getPriceMinor() == null) q.setPriceMinor(pricing.quote(q));
-        // Handing the pair over is what moves the shelf -- a web order sitting in the queue has
-        // not consumed anything yet. Idempotent, and a no-op for a walk-in that named its own shop.
-        takeLensStock(q, null);
-        // Paid online already — don't let a handover overwrite that with "CASH".
-        if (q.getPaidAt() == null) q.setPaymentMethod(d.paymentMethod());
-        q.setSoldBy(d.soldBy());
-        // keep the shop the pair came from (takeLensStock) unless staff name another
-        if (d.shopName() != null) q.setShopName(d.shopName());
-        q.setStatus("SOLD");
-        // Billing a web order finishes it however staff got here — the doorstep ladder, or
-        // "mark as sold" straight off the list when the customer collected in person.
-        // Otherwise a sold order would sit on the pending list forever.
-        if (!q.isWalkIn()) q.setFulfilment("DELIVERED");
+        // Anything still owed (a counter deposit's balance, or a web order paid at pickup) is
+        // collected now, so it needs a payment method.
+        long due = q.balanceMinor();
+        if (due > 0 && blank(d.paymentMethod())) {
+            throw ApiException.badRequest("PAYMENT_NEEDED", "Pick how they paid the " + kwacha(due) + " due.");
+        }
+        bill(q, d);
+        q.setPaidMinor(q.getPriceMinor());
+        // Billing finishes the order however staff got here — the collection ladder, or "mark as
+        // sold" straight off the list. Otherwise a sold order would sit on the pending list forever.
+        q.setFulfilment("DELIVERED");
         inquiries.save(q);
         track(q, LeadEventType.LENS_COLLECTED, "ref", ref(q), "shop", q.getShopName());
         notifyCustomer(q, "your lenses have been collected — enjoy them!");
         return view(q);
+    }
+
+    /** Marks the order SOLD (stock, payment method, who sold it) without telling anyone. */
+    private void bill(LensInquiry q, LensDtos.CompleteSale d) {
+        if (q.getPriceMinor() == null) q.setPriceMinor(pricing.quote(q));
+        // Handing the pair over is what moves the shelf -- a web order sitting in the queue has
+        // not consumed anything yet. Idempotent, and a no-op for a walk-in that named its own shop.
+        takeLensStock(q, null);
+        // Paid online already — don't let a handover overwrite that with "CASH"; a pickup with
+        // nothing left to pay keeps the method the deposit was taken with.
+        if (q.getPaidAt() == null && !blank(d.paymentMethod())) q.setPaymentMethod(d.paymentMethod());
+        q.setSoldBy(d.soldBy());
+        // keep the shop the pair came from (takeLensStock) unless staff name another
+        if (d.shopName() != null) q.setShopName(d.shopName());
+        q.setStatus("SOLD");
+        inquiries.save(q);
     }
 
     @Transactional(readOnly = true)
@@ -596,14 +654,16 @@ public class LensInquiryService {
                 q.getFulfilment(), q.isPaid(), q.getCreatedAt(),
                 q.getWaId(), q.getLeadId(), q.getAge(), q.getGender(),
                 q.getSphRight(), q.getCylRight(), q.getAxisRight(),
-                q.getSphLeft(), q.getCylLeft(), q.getAxisLeft(), q.getAddPower());
+                q.getSphLeft(), q.getCylLeft(), q.getAxisLeft(), q.getAddPower(),
+                q.getPd(), q.getPriceMinor() == null ? 0 : q.getPriceMinor() - q.balanceMinor(),
+                q.balanceMinor());
     }
 
-    /** Keep the customer in the loop at the two moments that matter to them -- the order
-     *  landing, and it going out. Reuses the approved order-update template (the only thing
-     *  Meta delivers outside the 24h window); silent for a walk-in, who was handed the lens. */
+    /** Keep the customer in the loop at the moments that matter to them -- the order landing,
+     *  it being ready, it going out. Reuses the approved order-update template (the only thing
+     *  Meta delivers outside the 24h window). A walk-in hears from us only if they left a number. */
     private void notifyCustomer(LensInquiry q, String line) {
-        if (q.isWalkIn() || blank(q.getWaId())) return;
+        if (blank(q.getWaId())) return;
         String who = blank(q.getCustomerName()) ? "there" : q.getCustomerName().split(" ")[0];
         try {
             if (props.whatsapp().orderUpdateConfigured()) {
@@ -867,7 +927,7 @@ public class LensInquiryService {
                 q.getSphRight(), q.getSphLeft(), q.getCylRight(), q.getCylLeft(),
                 q.getAxisRight(), q.getAxisLeft(), q.getAddPower(), q.getLensStructure(),
                 q.isSpecialAxis(), q.getPriceMinor(), q.getCurrency(),
-                q.getFulfilment(), q.isPaid(),
+                q.getFulfilment(), q.isPaid(), q.getPd(), q.balanceMinor(),
                 shop == null ? null : shop.getName(),
                 shop == null ? null : shop.getAddress(),
                 shop == null ? null : mapsLink(shop));

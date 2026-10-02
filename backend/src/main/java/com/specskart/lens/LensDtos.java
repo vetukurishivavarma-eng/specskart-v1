@@ -36,7 +36,7 @@ public final class LensDtos {
                               Integer axisRight, Integer axisLeft,
                               BigDecimal addPower, String lensStructure,
                               boolean specialAxis, Long priceMinor, String currency,
-                              String fulfilment, boolean paid,
+                              String fulfilment, boolean paid, String pd, long balanceMinor,
                               /* where to collect -- the shop's own details, not an address they typed */
                               String shopName, String shopAddress, String shopMapsUrl) {}
 
@@ -48,7 +48,13 @@ public final class LensDtos {
                              BigDecimal sphRight, BigDecimal sphLeft, BigDecimal cylRight, BigDecimal cylLeft,
                              BigDecimal addPower, String lensStructure,
                              String paymentMethod, String soldBy, String shopName, String clientReference,
-                             UUID storeId, Long discountMinor) {}
+                             UUID storeId, Long discountMinor,
+                             /* for the lab -- the counter used to take only what the price needs */
+                             Integer axisRight, Integer axisLeft, String pd,
+                             /* paid now towards the lens; null = in full */
+                             Long depositMinor,
+                             /* fitted while they wait: skips the lab queue (must be paid in full) */
+                             Boolean collectedNow) {}
 
     public record CompleteSale(String paymentMethod, String soldBy, String shopName) {}
 
@@ -65,7 +71,8 @@ public final class LensDtos {
                            String waId, UUID leadId, Integer age, String gender,
                            BigDecimal sphRight, BigDecimal cylRight, Integer axisRight,
                            BigDecimal sphLeft, BigDecimal cylLeft, Integer axisLeft,
-                           BigDecimal addPower) {}
+                           BigDecimal addPower,
+                           String pd, long paidMinor, long balanceMinor) {}
 
     public record DaySummary(long totalMinor, int count, String currency) {}
 }

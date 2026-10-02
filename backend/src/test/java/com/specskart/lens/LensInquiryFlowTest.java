@@ -108,7 +108,7 @@ class LensInquiryFlowTest {
     void walkInSaleSkipsWhatsappAndIsBilledImmediately() {
         var sale = service.walkInSale(new LensDtos.WalkInSale(
                 "Counter Customer", null, "CLEAR", true, null, null, null, null, null, null,
-                "CASH", "Staff A", "Main Store", null, null, null));
+                "CASH", "Staff A", "Main Store", null, null, null, null, null, null, null, null));
 
         assertThat(sale.status()).isEqualTo("SOLD");
         assertThat(sale.priceMinor()).isEqualTo(36_000L); // Clear BB single vision
@@ -125,15 +125,58 @@ class LensInquiryFlowTest {
     @Test
     void walkInDiscountComesOffThePriceAndCantExceedIt() {
         var noDiscount = new LensDtos.WalkInSale("Discount Customer", null, "CLEAR", true, null, null, null, null, null, null,
-                "CASH", "Staff A", "Main Store", null, null, null);
+                "CASH", "Staff A", "Main Store", null, null, null, null, null, null, null, null);
         assertThat(service.walkInQuote(noDiscount)).isEqualTo(36_000L);
 
         var sale = service.walkInSale(new LensDtos.WalkInSale("Discount Customer", null, "CLEAR", true, null, null, null, null, null, null,
-                "CASH", "Staff A", "Main Store", null, null, 5_000L));
+                "CASH", "Staff A", "Main Store", null, null, 5_000L, null, null, null, null, null));
         assertThat(sale.priceMinor()).isEqualTo(31_000L);
 
         assertThatThrownBy(() -> service.walkInSale(new LensDtos.WalkInSale("Too Much", null, "CLEAR", true, null, null, null, null, null, null,
-                "CASH", "Staff A", "Main Store", null, null, 36_001L))).hasMessageContaining("Discount");
+                "CASH", "Staff A", "Main Store", null, null, 36_001L, null, null, null, null, null))).hasMessageContaining("Discount");
+    }
+
+    @Test
+    void counterOrderWithDepositGoesToTheLabQueueAndBalanceIsTakenAtPickup() {
+        String phone = "097" + (1_000_000 + (int) (Math.random() * 8_999_999));
+        var sale = service.walkInSale(new LensDtos.WalkInSale("Deposit Customer", phone, "CLEAR", true,
+                new BigDecimal("-2.00"), new BigDecimal("-1.75"), new BigDecimal("-0.75"), null, null, null,
+                "CASH", "Staff A", "Main Store", "dep-" + UUID.randomUUID(), null, null,
+                90, 85, "62", 10_000L, null));
+
+        assertThat(sale.status()).isEqualTo("SOLD");
+        assertThat(sale.fulfilment()).isEqualTo("ORDERED");
+        assertThat(sale.axisRight()).isEqualTo(90);
+        assertThat(sale.pd()).isEqualTo("62");
+        assertThat(sale.balanceMinor()).isEqualTo(26_000L); // 36,000 - 10,000 deposit
+        assertThat(service.pendingWebOrders(false)).anySatisfy(s -> {
+            assertThat(s.id()).isEqualTo(sale.id());
+            assertThat(s.balanceMinor()).isEqualTo(26_000L);
+        });
+        var toCustomer = ((MockWhatsAppProvider) provider).outbox().stream()
+                .filter(m -> m.toWaId() != null && m.toWaId().endsWith(phone.substring(1)))
+                .map(m -> m.text() == null ? "" : m.text()).toList();
+        assertThat(toCustomer).anyMatch(t -> t.contains("we'll message you here when it's ready") && t.contains("K260"));
+
+        service.advanceFulfilment(sale.id(), new LensDtos.AdvanceFulfilment("READY", null, null, null));
+        assertThatThrownBy(() -> service.advanceFulfilment(sale.id(), new LensDtos.AdvanceFulfilment("DELIVERED", null, "Staff B", null)))
+                .hasMessageContaining("Pick how they paid");
+        var collected = service.advanceFulfilment(sale.id(), new LensDtos.AdvanceFulfilment("DELIVERED", "MOBILE", "Staff B", null));
+        assertThat(collected.fulfilment()).isEqualTo("DELIVERED");
+        assertThat(collected.balanceMinor()).isZero();
+    }
+
+    @Test
+    void lensesTakenAwayNowMustBePaidInFull() {
+        assertThatThrownBy(() -> service.walkInSale(new LensDtos.WalkInSale("Now Customer", null, "CLEAR", true,
+                null, null, null, null, null, null, "CASH", "Staff A", null, null, null, null,
+                null, null, null, 5_000L, true))).hasMessageContaining("paid in full");
+
+        var now = service.walkInSale(new LensDtos.WalkInSale("Now Customer", null, "CLEAR", true,
+                null, null, null, null, null, null, "CASH", "Staff A", null, null, null, null,
+                null, null, null, null, true));
+        assertThat(now.fulfilment()).isEqualTo("DELIVERED");
+        assertThat(service.pendingWebOrders(false)).noneMatch(s -> s.id().equals(now.id()));
     }
 
     @Test
@@ -228,7 +271,7 @@ class LensInquiryFlowTest {
     void replayingAWalkInSaleWithTheSameClientReferenceDoesNotDoubleSell() {
         String ref = "device-" + UUID.randomUUID();
         var req = new LensDtos.WalkInSale("Offline Customer", null, "CLEAR", false, null, null, null, null, null, null,
-                "CASH", "Staff A", "Main Store", ref, null, null);
+                "CASH", "Staff A", "Main Store", ref, null, null, null, null, null, null, null);
 
         var first = service.walkInSale(req);
         var replay = service.walkInSale(req);
