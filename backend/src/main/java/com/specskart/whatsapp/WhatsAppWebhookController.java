@@ -26,8 +26,11 @@ public class WhatsAppWebhookController {
     private final AppProperties props;
     private final WhatsAppInboundService inbound;
     private final ObjectMapper mapper;
+    private final StaffAlerts staffAlerts;
 
-    public WhatsAppWebhookController(AppProperties props, WhatsAppInboundService inbound, ObjectMapper mapper) {
+    public WhatsAppWebhookController(AppProperties props, WhatsAppInboundService inbound, ObjectMapper mapper,
+                                     StaffAlerts staffAlerts) {
+        this.staffAlerts = staffAlerts;
         this.props = props;
         this.inbound = inbound;
         this.mapper = mapper;
@@ -69,8 +72,14 @@ public class WhatsAppWebhookController {
                     // send and only reports here that it never arrived (e.g. 131047, outside the 24h
                     // window), which is how a staff alert used to vanish without a trace.
                     for (JsonNode status : value.path("statuses")) {
+                        JsonNode err = status.path("errors").path(0);
+                        try { // a staff alert's receipt closes it, or re-queues it on failure
+                            staffAlerts.onDeliveryStatus(status.path("id").asText(null), status.path("status").asText(""),
+                                    err.path("code").asText() + " " + err.path("title").asText());
+                        } catch (Exception e) {
+                            log.warn("staff alert status update failed: {}", e.getMessage());
+                        }
                         if ("failed".equals(status.path("status").asText())) {
-                            JsonNode err = status.path("errors").path(0);
                             String to = status.path("recipient_id").asText("");
                             log.warn("wa send FAILED to {}•••• msg={} code={} {}",
                                     to.length() > 4 ? to.substring(0, to.length() - 4) : to,

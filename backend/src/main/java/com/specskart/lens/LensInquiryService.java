@@ -723,7 +723,6 @@ public class LensInquiryService {
     }
 
     private void alertStaff(LensInquiry q) {
-        if (props.whatsapp().staffNumbers().isEmpty()) return;
         String base = props.whatsapp().absoluteAsset("/api/public/staff-docs/lens/" + q.getId());
         String pdfUrl = base == null ? null : base + ".pdf" + links.query("lens/" + q.getId(), StaffDocController.TTL);
         String price = q.getPriceMinor() == null ? "—" : OrderNotificationService.money(q.getPriceMinor(), q.getCurrency());
@@ -732,7 +731,8 @@ public class LensInquiryService {
         // the template as its document header, so repeating its link here bought nothing. This
         // one opens the POS app on this order, where the doorstep ladder is.
         String appLink = props.whatsapp().absoluteAsset("/api/public/open/lens/" + q.getId());
-        List<String> failures = staffAlerts.send(staffLines(q, memberships.discountPercentFor(q.getLeadId())),
+        List<String> failures = staffAlerts.send("LENS", q.getId(), ref(q),
+                staffLines(q, memberships.discountPercentFor(q.getLeadId())),
                 pdfUrl, ref(q) + ".pdf",
                 List.of(ref(q), price, who, appLink == null ? props.frontendBaseUrl() : appLink),
                 appLink, null);

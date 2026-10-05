@@ -7,7 +7,8 @@ public interface WhatsAppProvider {
 
     String mode();
 
-    void sendText(String toWaId, String text);
+    /** @return Meta's message id (wamid), or null if the transport doesn't give one. Same for the other sends that return String. */
+    String sendText(String toWaId, String text);
 
     void sendButtons(String toWaId, String bodyText, List<Button> buttons);
 
@@ -49,10 +50,10 @@ public interface WhatsAppProvider {
     }
 
     /** A document (PDF) by public link with an optional caption (≤1024 chars). Inside the 24h window only. */
-    void sendDocument(String toWaId, String documentUrl, String filename, String caption);
+    String sendDocument(String toWaId, String documentUrl, String filename, String caption);
 
     /** An approved template with a DOCUMENT header — how a PDF reaches a number outside the 24h window. */
-    void sendDocumentTemplate(String toWaId, String templateName, String languageCode,
+    String sendDocumentTemplate(String toWaId, String templateName, String languageCode,
                               String documentUrl, String filename, List<String> bodyParams);
 
     record Button(String id, String title) {}

@@ -37,9 +37,11 @@ public class MockWhatsAppProvider implements WhatsAppProvider {
     }
 
     @Override
-    public synchronized void sendText(String toWaId, String text) {
+    public synchronized String sendText(String toWaId, String text) {
+        failIfAsked();
         outbox.add(new Sent(toWaId, text, List.of()));
         log.info("[MOCK-WA] -> {} : {}", toWaId, text);
+        return "wamid.mock-" + outbox.size();
     }
 
     @Override
@@ -78,19 +80,37 @@ public class MockWhatsAppProvider implements WhatsAppProvider {
     }
 
     @Override
-    public synchronized void sendDocument(String toWaId, String documentUrl, String filename, String caption) {
+    public synchronized String sendDocument(String toWaId, String documentUrl, String filename, String caption) {
+        failIfAsked();
         outbox.add(new Sent(toWaId, caption, List.of(), null, List.of(), null, documentUrl));
         log.info("[MOCK-WA] -> {} : document={} ({}) caption={}", toWaId, documentUrl, filename, caption);
+        return "wamid.mock-" + outbox.size();
     }
 
     @Override
-    public synchronized void sendDocumentTemplate(String toWaId, String templateName, String languageCode,
+    public synchronized String sendDocumentTemplate(String toWaId, String templateName, String languageCode,
                                                   String documentUrl, String filename, List<String> bodyParams) {
+        failIfAsked();
         outbox.add(new Sent(toWaId, null, List.of(), templateName, List.copyOf(bodyParams), null, documentUrl));
         log.info("[MOCK-WA] -> {} : documentTemplate={} doc={} params={}", toWaId, templateName, documentUrl, bodyParams);
+        return "wamid.mock-" + outbox.size();
     }
 
     public synchronized List<Sent> outbox() {
         return List.copyOf(outbox);
+    }
+
+    private int failNext;
+
+    /** Tests: the next {@code n} text/document sends throw, like Meta rejecting them. */
+    public synchronized void failNext(int n) {
+        failNext = n;
+    }
+
+    private void failIfAsked() {
+        if (failNext > 0) {
+            failNext--;
+            throw new IllegalStateException("mock send failure");
+        }
     }
 }

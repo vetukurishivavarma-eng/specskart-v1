@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.JsonNode;
 
 import java.util.List;
 import java.util.Map;
@@ -66,8 +67,8 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
     }
 
     @Override
-    public void sendText(String toWaId, String text) {
-        post(Map.of(
+    public String sendText(String toWaId, String text) {
+        return post(Map.of(
                 "messaging_product", "whatsapp",
                 "to", toWaId,
                 "type", "text",
@@ -186,12 +187,12 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
     }
 
     @Override
-    public void sendDocument(String toWaId, String documentUrl, String filename, String caption) {
+    public String sendDocument(String toWaId, String documentUrl, String filename, String caption) {
         var doc = new java.util.LinkedHashMap<String, Object>();
         doc.put("link", documentUrl);
         doc.put("filename", filename);
         if (caption != null && !caption.isBlank()) doc.put("caption", caption);
-        post(Map.of(
+        return post(Map.of(
                 "messaging_product", "whatsapp",
                 "to", toWaId,
                 "type", "document",
@@ -199,7 +200,7 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
     }
 
     @Override
-    public void sendDocumentTemplate(String toWaId, String templateName, String languageCode,
+    public String sendDocumentTemplate(String toWaId, String templateName, String languageCode,
                                      String documentUrl, String filename, List<String> bodyParams) {
         var components = new java.util.ArrayList<Map<String, Object>>();
         components.add(Map.of("type", "header", "parameters", List.of(Map.of("type", "document",
@@ -208,7 +209,7 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
             components.add(Map.of("type", "body", "parameters", bodyParams.stream()
                     .map(p -> Map.of("type", "text", "text", param(p))).toList()));
         }
-        post(Map.of(
+        return post(Map.of(
                 "messaging_product", "whatsapp",
                 "to", toWaId,
                 "type", "template",
@@ -234,13 +235,15 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
         return s != null && s.length() > max ? s.substring(0, max) : s;
     }
 
-    private void post(Map<String, Object> payload) {
+    /** @return the wamid Meta assigned, which its delivery-status webhooks refer back to. */
+    private String post(Map<String, Object> payload) {
         try {
-            http.post().uri(url())
+            JsonNode body = http.post().uri(url())
                     .header("Authorization", "Bearer " + props.whatsapp().accessToken())
                     .body(payload)
                     .retrieve()
-                    .toBodilessEntity();
+                    .body(JsonNode.class);
+            return body == null ? null : body.path("messages").path(0).path("id").asText(null);
         } catch (Exception e) {
             log.error("WhatsApp send failed: {}", e.getMessage());
             throw e;

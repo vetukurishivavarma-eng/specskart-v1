@@ -94,11 +94,10 @@ public class OrderNotificationService {
 
     /**
      * A WhatsApp to every configured staff number the moment an order is paid — the one
-     * back-office cue that a box needs packing. Best-effort per number; a failure is logged
-     * and also written to the order timeline so it is visible in admin.
+     * back-office cue that a box needs packing. Queued per number and retried until Meta
+     * confirms delivery (see StaffAlerts); a failure is also written to the order timeline.
      */
     public void notifyNewOrder(Order order) {
-        if (props.whatsapp().staffNumbers().isEmpty()) return;
         String no = order.getOrderNo();
         String who = order.getCustomerName() == null || order.getCustomerName().isBlank() ? "Guest" : order.getCustomerName();
 
@@ -118,7 +117,7 @@ public class OrderNotificationService {
         // {{4}} opens the POS app on this order's Deliveries row. The web admin link stays on the
         // slip itself (see staffLines) for whoever is at a desk rather than on the shop floor.
         String appLink = props.whatsapp().absoluteAsset("/api/public/open/order/" + order.getId());
-        List<String> failures = staffAlerts.send(staffLines(order), pdfUrl, no + ".pdf",
+        List<String> failures = staffAlerts.send("ORDER", order.getId(), no, staffLines(order), pdfUrl, no + ".pdf",
                 List.of(no, money(order.getTotalMinor(), order.getCurrency()), who,
                         appLink == null ? adminLink(order) : appLink),
                 appLink, rx);
