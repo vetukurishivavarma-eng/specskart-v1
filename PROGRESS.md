@@ -1,6 +1,34 @@
 # Specskart v1 — build progress
 
-_Last updated: 2026-10-02._
+_Last updated: 2026-10-06._
+
+## RESUME HERE — 2026-10-06 (Render account move + staff alerts that can't get lost)
+
+1. **Moved to a new Render account** (client pays): workspace "My Workspace", narsipalli@gmail.com.
+   NEW: specskart-db `dpg-db1vqt3bc2fs73emnm00-a` (PG16), specskart-api `srv-db1vrogm7kps73d096u0`
+   https://specskart-api-9b08.onrender.com (FREE plan -> sleeps), specskart-web https://specskart-web-sysx.onrender.com.
+   Created via REST API, not a Blueprint. **Bridge:** the OLD account's specskart-api/web
+   (specskart-api.onrender.com / specskart-web.onrender.com, in FB ads) still run, pointed at the NEW db,
+   with `SPECSKART_SCHEDULING_ENABLED=false` (switch added in `b725d29`) so jobs run only on the new one.
+   Old specskart-db DELETED (data verified: 1,982 rows matched). POS app 1.12.0/vc17 (`specskart-pos@5e6c6d3`)
+   points at the new API -- its GitHub Actions build failed twice on a GitHub Actions OUTAGE (not code): re-run it.
+2. **Staff order alerts retried until delivered** (`1abdd33`, V55 `staff_alerts`): every web/lens order alert is a
+   row per staff number; a rejected send or a webhook `failed` status retries with backoff ~16h, alternating
+   template <-> plain document; no receipt in 30 min -> one resend; `delivered`/`read` closes it; give-up = ERROR log.
+   Sends return Meta's wamid. Test `StaffAlertRetryTest`; 187 tests green.
+
+**Delivery still needs these (config, not code) -- without them retries just keep failing:**
+- **Meta Billing hub: set WABA currency + card** (every template send fails 131042 until then). Then templates
+  reach staff phones outside the 24h window.
+- **WHATSAPP_STAFF_NUMBERS** (both old+new specskart-api env) is still ONLY the Indian test number
+  +919390031682 -- add the Zambian shop/lab numbers.
+- Meta webhook URL -> `https://specskart-api-9b08.onrender.com/api/webhooks/whatsapp` (same verify token).
+  Until then receipts go to the old URL, which shares the DB, so it still works.
+- Move the keep-awake pinger to the new specskart-api URL (free plan sleeps ~15 min idle; retry job only runs awake).
+- Old account: turn off old services once every POS is on 1.12.0.
+
+_Previous: 2026-10-02._
+
 
 ## RESUME HERE — 2026-10-02 (rebrand + lens discount + frames back on sale)
 
