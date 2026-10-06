@@ -45,13 +45,25 @@ public class DeviceSessionService {
         return sessions.save(s);
     }
 
+    /**
+     * Every authenticated POS request (X-Device-Id / X-App-Version headers). Without this the
+     * Devices screen only learned the version at sign-in, so a phone that updated in place kept
+     * showing the old one for up to 30 days. Writes only when the version changed or the
+     * last-seen time is more than {@link #SEEN_EVERY} old, so it isn't a write per request.
+     */
     @Transactional
-    public void touch(UUID sessionId, String appVersion) {
-        sessions.findById(sessionId).ifPresent(s -> {
+    public void heartbeat(UUID userId, String deviceId, String appVersion) {
+        sessions.findFirstByUserIdAndDeviceIdAndRevokedAtIsNull(userId, deviceId).ifPresent(s -> {
+            boolean newVersion = appVersion != null && !appVersion.isBlank() && !appVersion.equals(s.getAppVersion());
+            boolean stale = s.getLastSeenAt() == null || s.getLastSeenAt().isBefore(Instant.now().minus(SEEN_EVERY));
+            if (!newVersion && !stale) return;
+            if (newVersion) s.setAppVersion(appVersion);
             s.setLastSeenAt(Instant.now());
-            if (appVersion != null) s.setAppVersion(appVersion);
+            sessions.save(s);
         });
     }
+
+    static final java.time.Duration SEEN_EVERY = java.time.Duration.ofMinutes(5);
 
     @Transactional
     public void release(UUID sessionId, UUID releasedById, String reason) {

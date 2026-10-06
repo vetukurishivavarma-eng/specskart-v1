@@ -8,6 +8,8 @@ import java.util.UUID;
 
 public interface DeviceSessionRepository extends JpaRepository<DeviceSession, UUID> {
     List<DeviceSession> findByUserIdAndRevokedAtIsNull(UUID userId);
+
+    java.util.Optional<DeviceSession> findFirstByUserIdAndDeviceIdAndRevokedAtIsNull(UUID userId, String deviceId);
     Optional<DeviceSession> findByUserIdAndDeviceIdAndRevokedAtIsNull(UUID userId, String deviceId);
     List<DeviceSession> findByUserIdOrderByLastSeenAtDesc(UUID userId);
 }
