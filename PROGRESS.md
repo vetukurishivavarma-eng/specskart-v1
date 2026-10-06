@@ -1,6 +1,17 @@
 # Specskart v1 — build progress
 
-_Last updated: 2026-10-06._
+_Last updated: 2026-10-07._
+
+## 2026-10-07 update
+- **POS devices report their app version on every request** (backend `05e2809`, live; pos `e5dd5dd` = **1.13.0 / vc18**,
+  CI run 37517521663 green). App sends X-Device-Id + X-App-Version; `DeviceSessionService.heartbeat` writes only when
+  the version changed or last-seen is >5 min old. Test `DeviceHeartbeatTest`; 188 backend tests green.
+  Phones on <=1.12.0 still only update their version at sign-in.
+- **USER: publish POS 1.13.0** -- `Downloads\specskart-pos-1.13.0.apk` (verified 1.13.0/18, same signer), release
+  `v1.13.0` + App releases row (build 18, min 18, mandatory). 1.12.0/17 was published 2026-10-06.
+- Keep-awake pinger now on https://specskart-api-9b08.onrender.com/actuator/health (user moved it).
+- NG POS 1.26.0 published 2026-10-06: 5/7 tills updated by 10-06 evening; Chilyabale + Kampekete still on 1.25.0
+  (they update on next open). When all on 1.26.0 -> switch off the OLD ngpos-api.
 
 ## RESUME HERE — 2026-10-06 (Render account move + staff alerts that can't get lost)
 
