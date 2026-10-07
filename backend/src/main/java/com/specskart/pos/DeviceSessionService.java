@@ -74,6 +74,12 @@ public class DeviceSessionService {
         s.setRevokedReason(reason);
     }
 
+    /** Every phone currently holding a login, newest first: the admin's "All devices" screen. */
+    @Transactional(readOnly = true)
+    public List<DeviceSession> allActive() {
+        return sessions.findByRevokedAtIsNullOrderByLastSeenAtDesc();
+    }
+
     @Transactional(readOnly = true)
     public List<DeviceSession> forUser(UUID userId) {
         return sessions.findByUserIdOrderByLastSeenAtDesc(userId);
