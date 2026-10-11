@@ -71,11 +71,13 @@ public class StaffAlerts {
      */
     public List<String> send(String kind, UUID refId, String refNo, List<String> lines, String pdfUrl,
                              String pdfName, List<String> templateParams, String appLink, Attachment prescription) {
-        notifyPhones(kind, refId, refNo, lines);
+        int phones = notifyPhones(kind, refId, refNo, lines);
 
         List<String> numbers = Arrays.stream(String.join(",", props.whatsapp().staffNumbers()).split(","))
                 .map(String::trim).filter(s -> !s.isEmpty()).distinct().toList();
         if (numbers.isEmpty()) {
+            // Staff alerts are phone notifications now; a WhatsApp staff number is optional.
+            if (phones > 0) return List.of();
             log.error("{} {}: WHATSAPP_STAFF_NUMBERS is empty -- no staff member was told about it", kind, refNo);
             return List.of();
         }
@@ -112,7 +114,7 @@ public class StaffAlerts {
      * WhatsApp template, and works whatever the state of the WhatsApp account's billing. Tapping a
      * lens order opens it in the app; frame orders have no POS screen, so they open the app.
      */
-    private void notifyPhones(String kind, UUID refId, String refNo, List<String> lines) {
+    private int notifyPhones(String kind, UUID refId, String refNo, List<String> lines) {
         String title = ("LENS".equals(kind) ? "New lens order " : "New web order ") + refNo;
         String body = lines.stream()
                 .map(l -> l.replaceFirst("^(# |` )", "").trim())
@@ -122,6 +124,7 @@ public class StaffAlerts {
         String path = "LENS".equals(kind) ? "/orders?id=" + refId : null;
         int sent = push.notifyStaff(title, body.isEmpty() ? "Open the app to see it." : body, path);
         if (push.enabled()) log.info("{} {}: push sent to {} phone(s)", kind, refNo, sent);
+        return sent;
     }
 
     /** Every minute: retry what failed, and resend once what Meta never acknowledged. */
