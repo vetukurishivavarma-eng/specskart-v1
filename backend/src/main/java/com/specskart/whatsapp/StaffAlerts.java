@@ -1,6 +1,7 @@
 package com.specskart.whatsapp;
 
 import com.specskart.config.AppProperties;
+import com.specskart.push.PushService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -47,13 +48,15 @@ public class StaffAlerts {
     private final AppProperties props;
     private final ServiceWindow window;
     private final StaffAlertRepository alerts;
+    private final PushService push;
 
     public StaffAlerts(WhatsAppProvider whatsapp, AppProperties props, ServiceWindow window,
-                       StaffAlertRepository alerts) {
+                       StaffAlertRepository alerts, PushService push) {
         this.whatsapp = whatsapp;
         this.props = props;
         this.window = window;
         this.alerts = alerts;
+        this.push = push;
     }
 
     /**
@@ -68,6 +71,8 @@ public class StaffAlerts {
      */
     public List<String> send(String kind, UUID refId, String refNo, List<String> lines, String pdfUrl,
                              String pdfName, List<String> templateParams, String appLink, Attachment prescription) {
+        notifyPhones(kind, refId, refNo, lines);
+
         List<String> numbers = Arrays.stream(String.join(",", props.whatsapp().staffNumbers()).split(","))
                 .map(String::trim).filter(s -> !s.isEmpty()).distinct().toList();
         if (numbers.isEmpty()) {
@@ -100,6 +105,23 @@ public class StaffAlerts {
             if (error != null) failures.add(mask(to) + ": " + error + " -- will retry");
         }
         return failures;
+    }
+
+    /**
+     * A real phone notification to every staff phone signed in to the POS app -- free, unlike a
+     * WhatsApp template, and works whatever the state of the WhatsApp account's billing. Tapping a
+     * lens order opens it in the app; frame orders have no POS screen, so they open the app.
+     */
+    private void notifyPhones(String kind, UUID refId, String refNo, List<String> lines) {
+        String title = ("LENS".equals(kind) ? "New lens order " : "New web order ") + refNo;
+        String body = lines.stream()
+                .map(l -> l.replaceFirst("^(# |` )", "").trim())
+                .filter(l -> !l.isEmpty() && !l.contains(refNo))
+                .limit(3)
+                .collect(Collectors.joining("\n"));
+        String path = "LENS".equals(kind) ? "/orders?id=" + refId : null;
+        int sent = push.notifyStaff(title, body.isEmpty() ? "Open the app to see it." : body, path);
+        if (push.enabled()) log.info("{} {}: push sent to {} phone(s)", kind, refNo, sent);
     }
 
     /** Every minute: retry what failed, and resend once what Meta never acknowledged. */
