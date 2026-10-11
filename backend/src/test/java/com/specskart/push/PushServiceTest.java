@@ -87,6 +87,9 @@ class PushServiceTest {
             var claims = Jwts.parser().verifyWith(kp.getPublic()).build().parseSignedClaims(assertions.get(0)).getPayload();
             assertThat(claims.getIssuer()).isEqualTo("svc@proj.iam.gserviceaccount.com");
             assertThat(claims.get("scope", String.class)).contains("firebase.messaging");
+            // ...with "aud" as a plain string -- Google refuses the array form jjwt emits by default.
+            String payload = new String(Base64.getUrlDecoder().decode(assertions.get(0).split("\\.")[1]), StandardCharsets.UTF_8);
+            assertThat(payload).contains("\"aud\":\"" + base + "/token\"");
             // Each phone gets the notification, on the orders channel, with where to go on tap.
             assertThat(sends).anyMatch(s -> s.startsWith("Bearer at-1") && s.contains(live)
                     && s.contains("New lens order LENS-1") && s.contains("/orders?id=abc") && s.contains("\"channel_id\":\"orders\""));

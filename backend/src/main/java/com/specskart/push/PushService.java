@@ -122,7 +122,9 @@ public class PushService {
         Date now = new Date();
         String assertion = Jwts.builder()
                 .issuer(clientEmail)
-                .audience().add(tokenUri).and()
+                // Google's token endpoint rejects "aud" as a one-element array ("Failed audience
+                // check"); it must be a plain string.
+                .audience().single(tokenUri)
                 .claim("scope", SCOPE)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + 3_600_000))
