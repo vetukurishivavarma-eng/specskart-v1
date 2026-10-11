@@ -100,4 +100,7 @@ public class Lead extends BaseEntity {
 
     /** When we last nudged them for an eye test. Null = never; a year on from this we nudge again. */
     private Instant eyeTestRecalledAt;
+
+    /** Staff are chatting with this customer from the business number until then; the bot stays quiet. */
+    private Instant agentChatUntil;
 }

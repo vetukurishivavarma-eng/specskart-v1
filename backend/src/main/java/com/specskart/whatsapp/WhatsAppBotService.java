@@ -111,6 +111,13 @@ public class WhatsAppBotService {
         logInbound(lead.getId(), waMessageId, text, buttonId);
         followUp.onInbound(lead.getId(), text); // opt-out keyword, or defer the automated touches
 
+        // A staff member is talking to them from the POS chat: the reply is for that person, not
+        // for the menu. Logged above, so it shows up in the chat.
+        if (lead.getAgentChatUntil() != null && lead.getAgentChatUntil().isAfter(java.time.Instant.now())) {
+            log.info("bot quiet for lead {} (staff chat until {})", lead.getId(), lead.getAgentChatUntil());
+            return;
+        }
+
         // A bare "1".."5" only means a star rating when a post-purchase ask is pending —
         // otherwise it falls through to the ordinary welcome-menu shortcuts below.
         if (buttonId == null && text != null && text.trim().matches("[1-5]")
