@@ -1,6 +1,22 @@
 # Specskart v1 — build progress
 
-_Last updated: 2026-10-07._
+_Last updated: 2026-10-11._
+
+## RESUME HERE — 2026-10-11
+Shipped and verified on device today:
+- **Staff WhatsApp chat from the business number** (POS 1.15.0 / vc20).
+- **Free Firebase push for staff** (POS 1.16.0 / vc21, published): "New lens order" and "Reply from <name>"
+  (a customer reply during an active staff chat; tap opens /chat/<waId>). Backend `2eb8190`, `e6ffa73`
+  (Google OAuth JWT `aud` must be a string, not an array — that was the `invalid_grant` failure).
+- No WABA billing, by choice (shop is in loss) — do not push billing.
+
+Pending (user said "we will do the other later"):
+1. Confirm the customer "ready for pickup" WhatsApp arrives (free text, only inside the 24h window).
+2. Staff: install POS 1.16.0, sign in once, tap Allow (registers the push token).
+3. Delete `WHATSAPP_STAFF_NUMBERS` on BOTH Render accounts' specskart-api (alerts now go by push).
+4. On a quiet day move the Meta webhook to https://specskart-api-9b08.onrender.com/api/webhooks/whatsapp,
+   then suspend/delete the OLD specskart services (old account).
+5. Templates `staff_reconnect` / `staff_message` written but not created or wired (moot without billing).
 
 ## 2026-10-07 update
 - **POS devices report their app version on every request** (backend `05e2809`, live; pos `e5dd5dd` = **1.13.0 / vc18**,
