@@ -82,6 +82,7 @@ public class WhatsAppBotService {
     private final LensInquiryService lensInquiries;
     private final MembershipService memberships;
     private final FaqRepository faqs;
+    private final com.specskart.push.PushService push;
 
     public WhatsAppBotService(WhatsAppProvider provider, WhatsAppMessageRepository messages,
                               FrameFinderService frameFinder, LeadService leadService,
@@ -89,8 +90,9 @@ public class WhatsAppBotService {
                               CatalogService catalog, CartService carts, LeadFollowUpService followUp,
                               ReviewCaptureService reviewCapture, OrderQueryService orderQuery,
                               LensInquiryService lensInquiries, MembershipService memberships,
-                              FaqRepository faqs) {
+                              FaqRepository faqs, com.specskart.push.PushService push) {
         this.faqs = faqs;
+        this.push = push;
         this.orderQuery = orderQuery;
         this.lensInquiries = lensInquiries;
         this.memberships = memberships;
@@ -115,6 +117,11 @@ public class WhatsAppBotService {
         // for the menu. Logged above, so it shows up in the chat.
         if (lead.getAgentChatUntil() != null && lead.getAgentChatUntil().isAfter(java.time.Instant.now())) {
             log.info("bot quiet for lead {} (staff chat until {})", lead.getId(), lead.getAgentChatUntil());
+            // Nobody is watching the chat screen all day: tell the staff phones there's a reply.
+            String who = lead.getName() != null && !lead.getName().isBlank() ? lead.getName() : "+" + waId(lead);
+            String said = text == null || text.isBlank() ? "(sent a photo or file)" : text;
+            push.notifyStaff("Reply from " + who, said.length() > 200 ? said.substring(0, 200) + "…" : said,
+                    "/chat/" + waId(lead));
             return;
         }
 
