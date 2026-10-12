@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { shop, money, assetUrl } from '../lib/shop'
@@ -36,6 +36,7 @@ export default function ProductDetail() {
   const nav = useNavigate()
   const qc = useQueryClient()
   const [img, setImg] = useState(0)
+  const strip = useRef<HTMLDivElement>(null)
   const [tryOn, setTryOn] = useState(false)
   const [justAdded, setJustAdded] = useState(false)
 
@@ -76,16 +77,23 @@ export default function ProductDetail() {
   return (
     <div className="container-x grid gap-10 py-12 md:grid-cols-2">
       <div>
-        <div className="aspect-[4/3] overflow-hidden rounded-2xl border border-ink/10 bg-white">
-          {gallery[img]
-            ? <img src={assetUrl(gallery[img].url)} alt={gallery[img].alt ?? p.name} className="h-full w-full object-cover" />
-            : <div className="flex h-full items-center justify-center text-ink/30">No image</div>}
+        {/* Swipeable strip: native scroll-snap, no carousel library. The active index follows the scroll. */}
+        <div ref={strip}
+          onScroll={(e) => setImg(Math.round(e.currentTarget.scrollLeft / e.currentTarget.clientWidth))}
+          className="flex aspect-[4/3] snap-x snap-mandatory overflow-x-auto overflow-y-hidden rounded-2xl border border-ink/10 bg-white [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {gallery.length
+            ? gallery.map((g, i) => (
+                <img key={i} src={assetUrl(g.url)} alt={g.alt ?? p.name} loading={i ? 'lazy' : undefined}
+                  className="h-full w-full flex-none snap-center object-cover" />
+              ))
+            : <div className="flex h-full w-full items-center justify-center text-ink/30">No image</div>}
         </div>
         {gallery.length > 1 && (
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex gap-2 overflow-x-auto">
             {gallery.map((g, i) => (
-              <button key={i} onClick={() => setImg(i)}
-                className={`h-16 w-16 overflow-hidden rounded-lg border ${i === img ? 'border-ink' : 'border-ink/15'}`}>
+              <button key={i} aria-label={`Photo ${i + 1}`}
+                onClick={() => strip.current?.scrollTo({ left: i * strip.current.clientWidth, behavior: 'smooth' })}
+                className={`h-16 w-16 flex-none overflow-hidden rounded-lg border ${i === img ? 'border-ink' : 'border-ink/15'}`}>
                 <img src={assetUrl(g.url)} alt="" className="h-full w-full object-cover" />
               </button>
             ))}
