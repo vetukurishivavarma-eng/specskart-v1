@@ -113,15 +113,21 @@ public class WhatsAppBotService {
         logInbound(lead.getId(), waMessageId, text, buttonId);
         followUp.onInbound(lead.getId(), text); // opt-out keyword, or defer the automated touches
 
-        // A staff member is talking to them from the POS chat: the reply is for that person, not
-        // for the menu. Logged above, so it shows up in the chat.
-        if (lead.getAgentChatUntil() != null && lead.getAgentChatUntil().isAfter(java.time.Instant.now())) {
-            log.info("bot quiet for lead {} (staff chat until {})", lead.getId(), lead.getAgentChatUntil());
-            // Nobody is watching the chat screen all day: tell the staff phones there's a reply.
+        // Nobody is watching the chat screen all day: tell the staff phones someone wrote in, so they
+        // can take over from the bot. A menu-button tap is the bot's own conversation -- not pushed,
+        // or browsing the menu would buzz every phone -- unless a staff chat is open.
+        boolean staffChat = lead.getAgentChatUntil() != null && lead.getAgentChatUntil().isAfter(java.time.Instant.now());
+        if (staffChat || buttonId == null) {
             String who = lead.getName() != null && !lead.getName().isBlank() ? lead.getName() : "+" + waId(lead);
             String said = text == null || text.isBlank() ? "(sent a photo or file)" : text;
-            push.notifyStaff("Reply from " + who, said.length() > 200 ? said.substring(0, 200) + "…" : said,
-                    "/chat/" + waId(lead));
+            push.notifyStaff((staffChat ? "Reply from " : "Message from ") + who,
+                    said.length() > 200 ? said.substring(0, 200) + "…" : said, "/chat/" + waId(lead));
+        }
+
+        // A staff member is talking to them from the POS chat: the reply is for that person, not
+        // for the menu. Logged above, so it shows up in the chat.
+        if (staffChat) {
+            log.info("bot quiet for lead {} (staff chat until {})", lead.getId(), lead.getAgentChatUntil());
             return;
         }
 
