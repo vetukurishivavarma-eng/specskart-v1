@@ -1,6 +1,7 @@
 package com.specskart.pos;
 
 import com.specskart.audit.AuditLogService;
+import com.specskart.push.PushService;
 import com.specskart.shared.ApiException;
 import com.specskart.shared.CurrentUser;
 import org.springframework.security.core.Authentication;
@@ -23,11 +24,14 @@ public class AdminAppReleaseController {
     private final AppReleaseRepository releases;
     private final CurrentUser currentUser;
     private final AuditLogService audit;
+    private final PushService push;
 
-    public AdminAppReleaseController(AppReleaseRepository releases, CurrentUser currentUser, AuditLogService audit) {
+    public AdminAppReleaseController(AppReleaseRepository releases, CurrentUser currentUser, AuditLogService audit,
+                                     PushService push) {
         this.releases = releases;
         this.currentUser = currentUser;
         this.audit = audit;
+        this.push = push;
     }
 
     @GetMapping
@@ -51,6 +55,13 @@ public class AdminAppReleaseController {
         releases.save(r);
         audit.record("APP_RELEASE", r.getId().toString(), "PUBLISH", currentUser.idOf(auth), currentUser.nameOf(auth),
                 null, "v" + r.getVersion() + " build " + r.getBuildNumber());
+        // Tills left open never re-check on their own; "/update" makes the app check now and start
+        // the download (the app's push.ts). Best effort -- a failed push never fails the publish.
+        if (r.isMandatory()) {
+            try {
+                push.notifyStaff("Update required", "Specskart POS " + r.getVersion() + " is downloading. Tap Install when asked.", "/update");
+            } catch (RuntimeException ignored) { }
+        }
         return r;
     }
 }
