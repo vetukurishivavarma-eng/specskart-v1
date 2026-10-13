@@ -74,6 +74,19 @@ public class DeviceSessionService {
         s.setRevokedReason(reason);
     }
 
+    /** Signing out on the phone frees this login for another phone. Before this, sign-out only
+     *  cleared the handset and the server kept the login bound until an admin released it. */
+    @Transactional
+    public boolean signOut(UUID userId, String deviceId) {
+        if (userId == null || deviceId == null || deviceId.isBlank()) return false;
+        return sessions.findFirstByUserIdAndDeviceIdAndRevokedAtIsNull(userId, deviceId).map(s -> {
+            s.setRevokedAt(Instant.now());
+            s.setRevokedById(userId);
+            s.setRevokedReason("Signed out");
+            return true;
+        }).orElse(false);
+    }
+
     /** Every phone currently holding a login, newest first: the admin's "All devices" screen. */
     @Transactional(readOnly = true)
     public List<DeviceSession> allActive() {

@@ -68,6 +68,13 @@ public class AdminDeviceController {
         return devices.forUser(userId).stream().map(AdminDeviceController::view).toList();
     }
 
+    /** The app's Sign out: release the phone making the call (its X-Device-Id). */
+    @PostMapping("/me/sign-out")
+    public Map<String, Object> signOut(@RequestHeader(value = "X-Device-Id", required = false) String deviceId,
+                                       Authentication auth) {
+        return Map.of("released", devices.signOut(currentUser.idOf(auth), deviceId));
+    }
+
     @PostMapping("/{sessionId}/release")
     public void release(@PathVariable UUID sessionId, @RequestBody(required = false) ReleaseRequest req, Authentication auth) {
         // Anyone can release their own device; only an admin can release someone else's.
