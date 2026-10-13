@@ -41,8 +41,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/public/**").permitAll()
                 .requestMatchers("/api/sim/**").permitAll()
                 .requestMatchers("/actuator/health", "/actuator/info").permitAll()
-                // Leads are customers' phone numbers; staff (AGENT) run the till and don't need them.
-                .requestMatchers("/api/admin/leads", "/api/admin/leads/**").hasRole("ADMIN")
+                // Staff work leads (inbox, notes, status, WhatsApp replies); deleting one is permanent -> owner only.
+                .requestMatchers(HttpMethod.DELETE, "/api/admin/leads/**").hasRole("ADMIN")
                 // The whole database -- customers' numbers included -- as one download.
                 .requestMatchers("/api/admin/backup", "/api/admin/backup/**").hasRole("ADMIN")
                 // Supplier invoices are buying prices; staff (AGENT) must never see cost.

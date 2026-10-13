@@ -51,9 +51,12 @@ class ApiContractTest {
     }
 
     @Test
-    void leadsAreAdminOnly() throws Exception {
-        mvc().perform(get("/api/admin/leads").with(user("staff").roles("AGENT"))).andExpect(status().isForbidden());
+    void staffWorkLeadsButOnlyAdminDeletes() throws Exception {
+        mvc().perform(get("/api/admin/leads").with(user("staff").roles("AGENT"))).andExpect(status().isOk());
         mvc().perform(get("/api/admin/leads").with(user("owner").roles("ADMIN"))).andExpect(status().isOk());
+        mvc().perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/admin/leads/" + java.util.UUID.randomUUID()).with(user("staff").roles("AGENT")))
+                .andExpect(status().isForbidden());
     }
 
     @Test
