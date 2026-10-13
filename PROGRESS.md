@@ -1,6 +1,29 @@
 # Specskart v1 — build progress
 
-_Last updated: 2026-10-11._
+_Last updated: 2026-10-14._
+
+## RESUME HERE — 2026-10-14
+Shipped (all pushed; backend auto-deploys on Render; POS APKs built by GitHub Actions):
+- **Staff (AGENT) vs admin split.** Admin-only now: cost price (hidden + can't be set by staff), supplier
+  invoices, profit in Top products, shop price overrides, staff list (`/api/admin/users`), deleting a lead.
+  Staff CAN work Leads (list/detail/notes/status/WhatsApp) and reply to customers. (`80c3839`, `9f51313`, `2442b89`)
+- **Denied requests return 403, not 401** — secured `/error` turned "not allowed" into "not signed in" and the POS
+  app logged staff out (`f26452f`, verified live).
+- **Generic staff login** `staff@specskart.local` (name "Staff", password given in chat) via V58+V59. The prod admin
+  password is not on this machine, so users are added by migration (portable SQL, no `on conflict`).
+- **Mandatory update auto-starts** (`38c9516` + POS 1.21.0): a mandatory release pushes `/update` to every phone, the
+  app force-checks and auto-downloads even on mobile data. Android still needs the Install tap.
+- **Sign out now releases the device** (`7332bbb` + POS 1.22.0/vc27 `f3a1784`): `POST /api/admin/pos/devices/me/sign-out`
+  with X-Device-Id. Before, sign-out was local only and the login stayed bound until an admin released it.
+
+Pending:
+1. USER: publish **POS 1.22.0 / build 27** (includes 1.20.0 + 1.21.0 changes) — GitHub release + More -> App releases
+   (build 27, min 27, mandatory). APK = the GitHub Actions artifact for `f3a1784` (or ask Claude to fetch it to Downloads).
+   1.21.0 APK already in `Downloads\specskart-pos-1.21.0.apk` — superseded, skip it.
+2. Not device-tested: cost hiding, leads for staff, auto-update, sign-out release.
+3. Phones still on <=1.21.0 do NOT release on sign-out — an admin releases them from More -> Devices & logins until updated.
+4. User wants "common features with NG POS in sync" — scope not decided yet (rule going forward / audit+port / permissions).
+5. Older pending list (2026-10-11) below still applies.
 
 ## RESUME HERE — 2026-10-11
 Shipped and verified on device today:
