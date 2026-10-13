@@ -45,6 +45,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/leads", "/api/admin/leads/**").hasRole("ADMIN")
                 // The whole database -- customers' numbers included -- as one download.
                 .requestMatchers("/api/admin/backup", "/api/admin/backup/**").hasRole("ADMIN")
+                // Supplier invoices are buying prices; staff (AGENT) must never see cost.
+                .requestMatchers("/api/admin/pos/invoices", "/api/admin/pos/invoices/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/admin/**").hasAnyRole("ADMIN", "AGENT")
                 .requestMatchers(HttpMethod.GET, "/api/admin/users").hasAnyRole("ADMIN", "AGENT")
                 // Staff add frames (photo, code, brand, price, shape) from the POS app; only an

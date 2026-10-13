@@ -1,5 +1,6 @@
 package com.specskart.catalog;
 
+import org.springframework.security.core.context.SecurityContextHolder;
 import com.specskart.shared.ApiException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -310,7 +311,7 @@ public class AdminCatalogService {
         if (in.kind() != null) p.setKind("ACCESSORY".equalsIgnoreCase(in.kind()) ? "ACCESSORY" : "FRAME");
         if (in.sku() != null) p.setSku(in.sku().isBlank() ? null : in.sku().trim());
         if (in.barcode() != null) p.setBarcode(in.barcode().isBlank() ? null : in.barcode().trim());
-        if (in.costPriceMinor() != null) p.setCostPriceMinor(Math.max(0, in.costPriceMinor()));
+        if (in.costPriceMinor() != null && callerIsAdmin()) p.setCostPriceMinor(Math.max(0, in.costPriceMinor()));
         if (in.brand() != null) p.setBrand(in.brand().isBlank() ? null : in.brand().trim());
         // a lens blank is POS stock, never a website product (V45) — whatever the edit form sent
         if (p.getSku() != null && p.getSku().toUpperCase(Locale.ROOT).startsWith("LENS-")) {
@@ -346,7 +347,13 @@ public class AdminCatalogService {
                 p.getPriceMinor(), p.getCompareAtMinor(), p.getCurrency(), p.getStockQty(),
                 p.isLensable(), p.getStatus(), p.isFeatured(), imgs,
                 p.getDropsAt(), p.isLimitedEdition(), p.getTryOnImageUrl(), p.getKind(),
-                p.getSku(), p.getBarcode(), p.getCostPriceMinor(), p.getBrand());
+                p.getSku(), p.getBarcode(), callerIsAdmin() ? p.getCostPriceMinor() : null, p.getBrand());
+    }
+
+    /** Cost price is admin-only: staff (AGENT) add/edit frames but never see or set what we paid. */
+    private static boolean callerIsAdmin() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
     }
 
     // ---- promos ----

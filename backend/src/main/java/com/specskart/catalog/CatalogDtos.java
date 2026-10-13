@@ -39,7 +39,7 @@ public final class CatalogDtos {
                                long priceMinor, Long compareAtMinor, String currency, int stockQty,
                                boolean lensable, String status, boolean featured, List<ImageDto> images,
                                java.time.Instant dropsAt, boolean limitedEdition, String tryOnImageUrl, String kind,
-                               String sku, String barcode, long costPriceMinor, String brand) {}
+                               String sku, String barcode, Long costPriceMinor, String brand) {}
 
     public record ProductUpsert(String slug, String name, String description, String frameCategoryCode,
                                 String material, String colour, String gender, Long priceMinor,

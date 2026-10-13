@@ -33,6 +33,11 @@ public class AdminAnalyticsController {
             @RequestParam(defaultValue = "20") int limit,
             Authentication auth) {
         currentUser.assertStoreAccess(auth, storeId);
-        return analytics.topProducts(storeId, from, to, metric, limit);
+        if (currentUser.isAdmin(auth)) return analytics.topProducts(storeId, from, to, metric, limit);
+        // profit = price - cost, so staff get neither the figure nor a profit ranking
+        String safeMetric = "profit".equalsIgnoreCase(metric) ? "revenue" : metric;
+        return analytics.topProducts(storeId, from, to, safeMetric, limit).stream()
+                .map(r -> new PosAnalyticsService.ProductRank(r.productId(), r.productName(), r.revenueMinor(), 0, r.quantity()))
+                .toList();
     }
 }
