@@ -34,6 +34,10 @@ public class SecurityConfig {
             .exceptionHandling(e -> e.authenticationEntryPoint((req, res, ex) ->
                     res.sendError(401, "Authentication required")))
             .authorizeHttpRequests(auth -> auth
+                // A denied request is forwarded to /error; if that's secured too, a staff "403 not allowed"
+                // comes back as "401 not signed in" and the POS app logs them out.
+                .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ERROR).permitAll()
+                .requestMatchers("/error").permitAll()
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers("/api/webhooks/**").permitAll()
                 .requestMatchers("/api/frame-finder/**").permitAll()
