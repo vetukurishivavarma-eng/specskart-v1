@@ -47,8 +47,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/backup", "/api/admin/backup/**").hasRole("ADMIN")
                 // Supplier invoices are buying prices; staff (AGENT) must never see cost.
                 .requestMatchers("/api/admin/pos/invoices", "/api/admin/pos/invoices/**").hasRole("ADMIN")
+                // Shop price overrides and the staff list (logins/emails) are the owner's call only.
+                .requestMatchers("/api/admin/pos/stores/*/prices", "/api/admin/pos/stores/*/prices/**").hasRole("ADMIN")
+                .requestMatchers("/api/admin/users", "/api/admin/users/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/admin/**").hasAnyRole("ADMIN", "AGENT")
-                .requestMatchers(HttpMethod.GET, "/api/admin/users").hasAnyRole("ADMIN", "AGENT")
                 // Staff add frames (photo, code, brand, price, shape) from the POS app; only an
                 // admin removes one.
                 .requestMatchers(HttpMethod.DELETE, "/api/admin/catalog/**").hasRole("ADMIN")

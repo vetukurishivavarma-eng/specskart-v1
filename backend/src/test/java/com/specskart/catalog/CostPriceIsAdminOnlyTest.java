@@ -54,4 +54,13 @@ class CostPriceIsAdminOnlyTest {
     void supplierInvoicesAreAdminOnly() throws Exception {
         mvc().perform(get("/api/admin/pos/invoices").with(user("staff").roles("AGENT"))).andExpect(status().isForbidden());
     }
+
+    @Test
+    void shopPricesAndStaffListAreAdminOnly() throws Exception {
+        mvc().perform(put("/api/admin/pos/stores/" + java.util.UUID.randomUUID() + "/prices/" + java.util.UUID.randomUUID())
+                        .with(user("staff").roles("AGENT")).contentType(MediaType.APPLICATION_JSON).content("{\"priceMinor\":1}"))
+                .andExpect(status().isForbidden());
+        mvc().perform(get("/api/admin/users").with(user("staff").roles("AGENT"))).andExpect(status().isForbidden());
+        mvc().perform(get("/api/admin/users").with(user("owner").roles("ADMIN"))).andExpect(status().isOk());
+    }
 }
