@@ -70,4 +70,19 @@ class AdminChatTest {
                 .hasMessageContaining("24 hours");
         assertThat(sentTo(waId)).isZero();
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void customerPhotoShowsInTheChatAndOnlyThisChatsMediaCanBeFetched() {
+        String waId = newLead();
+        bot.handleInbound(leads.findByWhatsappWaId(waId).orElseThrow(), "[image]", null,
+                "wamid." + UUID.randomUUID(), "media-" + waId);
+
+        var msgs = (java.util.List<java.util.Map<String, Object>>) chat.get(waId).get("messages");
+        assertThat(msgs).anyMatch(m -> "image".equals(m.get("type")) && ("media-" + waId).equals(m.get("mediaId")));
+
+        assertThatThrownBy(() -> chat.media(waId, "someone-elses-media")).hasMessageContaining("isn't in this chat");
+        // the mock provider can't download: reported as gone, not a 500
+        assertThatThrownBy(() -> chat.media(waId, "media-" + waId)).hasMessageContaining("no longer has");
+    }
 }

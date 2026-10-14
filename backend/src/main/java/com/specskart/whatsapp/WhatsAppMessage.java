@@ -25,5 +25,8 @@ public class WhatsAppMessage extends BaseEntity {
     @Column(length = 4000)
     private String body;
 
-    private String status; // sent | delivered | read | failed
+    private String status;
+
+    /** Meta media id of an inbound photo/file -- fetched on demand, never stored by us. */
+    private String mediaId; // sent | delivered | read | failed
 }

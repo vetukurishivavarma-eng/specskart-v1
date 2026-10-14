@@ -124,7 +124,7 @@ public class WhatsAppWebhookController {
                     text = i.path("list_reply").path("title").asText(null);
                 }
             }
-            default -> text = "[" + type + "]";
+            default -> text = "[" + type + "]"; // image/document/...: media id picked up below
         }
         Map<String, Object> referral = null;
         if (msg.has("referral")) {
@@ -133,7 +133,7 @@ public class WhatsAppWebhookController {
             referral.put("ctwa_clid", msg.path("referral").path("ctwa_clid").asText(null));
         }
         return new InboundMessage(waId, phone, profileName, text, buttonId,
-                msg.path("id").asText(null), referral);
+                msg.path("id").asText(null), referral, msg.path(type).path("id").asText(null));
     }
 
     private boolean validSignature(byte[] body, String header, String secret) {

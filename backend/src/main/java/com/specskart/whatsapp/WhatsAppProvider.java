@@ -56,6 +56,13 @@ public interface WhatsAppProvider {
     String sendDocumentTemplate(String toWaId, String templateName, String languageCode,
                               String documentUrl, String filename, List<String> bodyParams);
 
+    /** Download a customer's inbound photo/file by Meta media id. */
+    default Media downloadMedia(String mediaId) {
+        throw new UnsupportedOperationException("media download needs the Meta provider");
+    }
+
+    record Media(byte[] bytes, String mimeType) {}
+
     record Button(String id, String title) {}
 
     /** One row of a list message. {@code description} may be null. */

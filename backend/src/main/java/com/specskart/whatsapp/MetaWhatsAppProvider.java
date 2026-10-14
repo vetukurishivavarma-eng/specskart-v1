@@ -235,6 +235,19 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
         return s != null && s.length() > max ? s.substring(0, max) : s;
     }
 
+    /** Two hops, both with our token: media id -> short-lived download URL -> the bytes. */
+    @Override
+    public Media downloadMedia(String mediaId) {
+        String auth = "Bearer " + props.whatsapp().accessToken();
+        JsonNode meta = http.get().uri(props.whatsapp().graphBaseUrl() + "/" + mediaId)
+                .header("Authorization", auth).retrieve().body(JsonNode.class);
+        String url = meta == null ? null : meta.path("url").asText(null);
+        if (url == null) throw new IllegalStateException("no download url for media " + mediaId);
+        byte[] bytes = http.get().uri(java.net.URI.create(url))
+                .header("Authorization", auth).retrieve().body(byte[].class);
+        return new Media(bytes, meta.path("mime_type").asText("application/octet-stream"));
+    }
+
     /** @return the wamid Meta assigned, which its delivery-status webhooks refer back to. */
     private String post(Map<String, Object> payload) {
         try {

@@ -4,9 +4,13 @@ import com.specskart.config.AppProperties;
 import com.specskart.lead.Lead;
 import com.specskart.lead.LeadRepository;
 import com.specskart.shared.ApiException;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
@@ -70,7 +74,8 @@ public class AdminChatController {
                         "at", m.getCreatedAt(),
                         "direction", m.getDirection(),
                         "body", m.getBody() == null ? "" : m.getBody(),
-                        "type", m.getMessageType() == null ? "" : m.getMessageType()))
+                        "type", m.getMessageType() == null ? "" : m.getMessageType(),
+                        "mediaId", m.getMediaId() == null ? "" : m.getMediaId()))
                 .toList());
         return out;
     }
@@ -108,6 +113,28 @@ public class AdminChatController {
         lead.setLastContactAt(Instant.now());
         leads.save(lead);
         return get(waId);
+    }
+
+    /**
+     * A photo/file the customer sent, streamed from Meta (their URL needs our token, so the app
+     * can't load it directly). Only media that arrived in THIS chat -- not any id a caller guesses.
+     */
+    @GetMapping("/media/{mediaId}")
+    public ResponseEntity<byte[]> media(@PathVariable String waId, @PathVariable String mediaId) {
+        if (!messages.existsByLeadIdAndMediaId(lead(waId).getId(), mediaId)) {
+            throw ApiException.notFound("NO_MEDIA", "That photo isn't in this chat.");
+        }
+        WhatsAppProvider.Media media;
+        try {
+            media = provider.downloadMedia(mediaId);
+        } catch (Exception e) {
+            // Meta keeps inbound media for a limited time; older photos are simply gone
+            throw ApiException.notFound("MEDIA_GONE", "WhatsApp no longer has this photo.");
+        }
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(media.mimeType()))
+                .cacheControl(CacheControl.maxAge(Duration.ofDays(7)).cachePrivate())
+                .body(media.bytes());
     }
 
     /** Outside the 24h window: the approved re-engagement template, the only thing Meta allows. */

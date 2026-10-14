@@ -7,6 +7,8 @@ import java.util.UUID;
 
 public interface WhatsAppMessageRepository extends JpaRepository<WhatsAppMessage, UUID> {
     List<WhatsAppMessage> findByLeadIdOrderByCreatedAtAsc(UUID leadId);
+
+    boolean existsByLeadIdAndMediaId(UUID leadId, String mediaId);
     long countByLeadId(UUID leadId);
     Optional<WhatsAppMessage> findFirstByLeadIdAndDirectionOrderByCreatedAtDesc(UUID leadId, String direction);
 }

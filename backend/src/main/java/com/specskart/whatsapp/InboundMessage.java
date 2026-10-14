@@ -10,5 +10,11 @@ public record InboundMessage(
         String text,
         String buttonId,
         String waMessageId,
-        Map<String, Object> referral
-) {}
+        Map<String, Object> referral,
+        String mediaId // inbound photo/file, else null
+) {
+    public InboundMessage(String waId, String phoneNumber, String profileName, String text, String buttonId,
+                          String waMessageId, Map<String, Object> referral) {
+        this(waId, phoneNumber, profileName, text, buttonId, waMessageId, referral, null);
+    }
+}
