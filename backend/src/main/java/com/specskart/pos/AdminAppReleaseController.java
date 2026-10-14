@@ -42,8 +42,13 @@ public class AdminAppReleaseController {
     @PostMapping
     public AppRelease publish(@RequestBody PublishRelease req, Authentication auth) {
         if (!currentUser.isAdmin(auth)) throw ApiException.forbidden("ADMIN_ONLY", "Admin only.");
-        AppRelease r = new AppRelease();
-        r.setPlatform(req.platform() == null ? "android" : req.platform());
+        String platform = req.platform() == null ? "android" : req.platform();
+        // (platform, build_number) is unique, so publishing a build again corrects that row
+        // (a mistyped URL, a wrong minimumBuild) instead of failing on the constraint.
+        AppRelease r = releases.findByPlatformAndBuildNumber(platform, req.buildNumber()).orElseGet(AppRelease::new);
+        r.setPlatform(platform);
+        r.setActive(true);
+        r.setPublishedAt(java.time.Instant.now());
         r.setVersion(req.version());
         r.setBuildNumber(req.buildNumber());
         r.setMinimumBuild(req.minimumBuild());

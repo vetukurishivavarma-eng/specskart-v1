@@ -4,6 +4,7 @@ import com.specskart.shared.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -13,7 +14,8 @@ import java.time.Instant;
  *  what the current build is on every launch/foreground — a shop running a build below
  *  {@code minimumBuild} is stopped at the door, matching NG POS's own forced-update rule. */
 @Entity
-@Table(name = "app_releases")
+// Declared here too so the create-drop test schema has prod's (V32) constraint.
+@Table(name = "app_releases", uniqueConstraints = @UniqueConstraint(columnNames = {"platform", "build_number"}))
 @Getter
 @Setter
 public class AppRelease extends BaseEntity {

@@ -1,12 +1,22 @@
 package com.specskart.pos;
 
+import com.specskart.auth.JwtService;
+import com.specskart.auth.Role;
+import com.specskart.auth.User;
+import com.specskart.auth.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Two generations of till read this one endpoint and must both behave.
@@ -22,6 +32,9 @@ class AppVersionCheckTest {
 
     @Autowired AppVersionController controller;
     @Autowired AppReleaseRepository releases;
+    @Autowired WebApplicationContext ctx;
+    @Autowired UserRepository users;
+    @Autowired JwtService jwt;
 
     @BeforeEach
     void clear() {
@@ -84,17 +97,30 @@ class AppVersionCheckTest {
 
     /**
      * There is no edit or delete for a release, so the only way to correct one published with
-     * the wrong floor is to publish that build again. The later row has to win, or the fix is
-     * a coin toss against the mistake.
+     * a wrong URL or floor is to publish that build again through the admin endpoint. (platform,
+     * build_number) is unique, so that must overwrite the row, not 500 on the constraint -- which
+     * is exactly what happened in prod on 2026-10-15 with a mistyped download URL.
      */
     @Test
-    void republishingTheSameBuildCorrectsIt() throws InterruptedException {
-        publish(9, 7, true, 2);   // the mistake: a till on build 7 is not below the floor
-        Thread.sleep(5);          // publishedAt is the tie-break; don't tie it
-        publish(9, 9, true, 0);   // the correction
+    void republishingTheSameBuildCorrectsIt() throws Exception {
+        User admin = new User();
+        admin.setEmail("rel-" + System.nanoTime() + "@specskart.local");
+        admin.setPasswordHash("x");
+        admin.setFullName("Admin");
+        admin.setRole(Role.ADMIN);
+        String auth = "Bearer " + jwt.issue(users.save(admin));
+        MockMvc mvc = MockMvcBuilders.webAppContextSetup(ctx).apply(springSecurity()).build();
+        String body = "{\"version\":\"1.9.0\",\"buildNumber\":9,\"minimumBuild\":%d,\"downloadUrl\":\"%s\",\"mandatory\":true}";
+
+        mvc.perform(post("/api/admin/pos/releases").header("Authorization", auth).contentType("application/json")
+                .content(body.formatted(7, "https://bad\\n\\n/app.apk"))).andExpect(status().isOk());
+        mvc.perform(post("/api/admin/pos/releases").header("Authorization", auth).contentType("application/json")
+                .content(body.formatted(9, "https://good/app.apk"))).andExpect(status().isOk());
 
         var v = controller.version("android", 7);
         assertThat(v.minimumBuild()).isEqualTo(9);
+        assertThat(v.downloadUrl()).isEqualTo("https://good/app.apk");
+        assertThat(releases.count()).isEqualTo(1);
     }
 
     /**
