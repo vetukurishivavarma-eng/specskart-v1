@@ -9,7 +9,11 @@ _Last updated: 2026-10-14._
   **Then 1.24.0 / build 29**: PDFs/videos/voice notes = "tap to open" (downloads to cache, opens in the phone's app via
   VIEW intent; backend sends a filename with a real extension), stickers inline.
   **Then 1.25.0 / build 30**: documents show their real filename (stored as the message body; never fed to the bot).
-  Publish 1.25.0 (includes 1.22-1.24).
+  **Then 1.26.0 / build 31** (v1 `6e05712`, POS `c740dcb`): device test showed photos as a GREY BOX. Likely cause
+  (not confirmed -- the app's API svc specskart-api-9b08 is in the other Render acct, no log access): the media
+  download used RestClient.create() = JDK client, no redirects/no User-Agent -> Meta served an HTML page as "the
+  photo". Now JDK HttpClient w/ redirects + curl UA + checks status/HTML + logs `chat media ... failed`. App now
+  downloads to cache then shows, with visible "Couldn't load, tap to retry". If still failing: read 9b08 logs for that line.
   Not device-tested.
 Shipped (all pushed; backend auto-deploys on Render; POS APKs built by GitHub Actions):
 - **Staff (AGENT) vs admin split.** Admin-only now: cost price (hidden + can't be set by staff), supplier
