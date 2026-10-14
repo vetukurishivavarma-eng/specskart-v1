@@ -7,7 +7,9 @@ _Last updated: 2026-10-14._
   `GET /api/admin/chat/{waId}/media/{mediaId}` streams it (only media from that chat); app shows thumbnail, tap = full screen.
   Only photos received AFTER deploy show -- older ones were stored as "[image]" with no id. PDFs/docs still show "(media)".
   **Then 1.24.0 / build 29**: PDFs/videos/voice notes = "tap to open" (downloads to cache, opens in the phone's app via
-  VIEW intent; backend sends a filename with a real extension), stickers inline. Publish 1.24.0 (includes 1.22/1.23).
+  VIEW intent; backend sends a filename with a real extension), stickers inline.
+  **Then 1.25.0 / build 30**: documents show their real filename (stored as the message body; never fed to the bot).
+  Publish 1.25.0 (includes 1.22-1.24).
   Not device-tested.
 Shipped (all pushed; backend auto-deploys on Render; POS APKs built by GitHub Actions):
 - **Staff (AGENT) vs admin split.** Admin-only now: cost price (hidden + can't be set by staff), supplier

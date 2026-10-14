@@ -133,7 +133,8 @@ public class WhatsAppWebhookController {
             referral.put("ctwa_clid", msg.path("referral").path("ctwa_clid").asText(null));
         }
         return new InboundMessage(waId, phone, profileName, text, buttonId,
-                msg.path("id").asText(null), referral, msg.path(type).path("id").asText(null));
+                msg.path("id").asText(null), referral, msg.path(type).path("id").asText(null),
+                msg.path(type).path("filename").asText(null));
     }
 
     private boolean validSignature(byte[] body, String header, String secret) {

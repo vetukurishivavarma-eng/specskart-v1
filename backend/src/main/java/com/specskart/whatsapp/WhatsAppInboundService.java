@@ -51,7 +51,7 @@ public class WhatsAppInboundService {
                 ? in.referral() : Map.of("utm_source", sourceFromText(in.text()));
         Lead lead = leadService.onWhatsAppContact(in.waId(), in.phoneNumber(), in.profileName(), referral);
         if (walkIns.tryVerify(lead, in.text())) return; // shop walk-in QR sign-up, not a bot conversation
-        bot.handleInbound(lead, in.text(), in.buttonId(), in.waMessageId(), in.mediaId());
+        bot.handleInbound(lead, in.text(), in.buttonId(), in.waMessageId(), in.mediaId(), in.mediaName());
     }
 
     /**

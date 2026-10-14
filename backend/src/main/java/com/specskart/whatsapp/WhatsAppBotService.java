@@ -110,12 +110,13 @@ public class WhatsAppBotService {
 
     @Transactional
     public void handleInbound(Lead lead, String text, String buttonId, String waMessageId) {
-        handleInbound(lead, text, buttonId, waMessageId, null);
+        handleInbound(lead, text, buttonId, waMessageId, null, null);
     }
 
     @Transactional
-    public void handleInbound(Lead lead, String text, String buttonId, String waMessageId, String mediaId) {
-        logInbound(lead.getId(), waMessageId, text, buttonId, mediaId);
+    public void handleInbound(Lead lead, String text, String buttonId, String waMessageId, String mediaId, String mediaName) {
+        // the filename is only logged for the chat -- never fed to the bot/opt-out matching below
+        logInbound(lead.getId(), waMessageId, mediaName != null ? mediaName : text, buttonId, mediaId);
         followUp.onInbound(lead.getId(), text); // opt-out keyword, or defer the automated touches
 
         // Nobody is watching the chat screen all day: tell the staff phones someone wrote in, so they
@@ -607,11 +608,16 @@ public class WhatsAppBotService {
         m.setDirection("INBOUND");
         m.setWaMessageId(waMessageId);
         // a photo/file arrives as text "[image]" / "[document]" -- that bracketed word is its type
-        m.setMessageType(buttonId != null ? "button_reply" : mediaId != null ? text.replace("[", "").replace("]", "") : "text");
+        m.setMessageType(buttonId != null ? "button_reply" : mediaId != null ? mediaType(text) : "text");
         m.setMediaId(mediaId);
         m.setBody(buttonId != null ? "[" + buttonId + "] " + (text == null ? "" : text) : text);
         m.setStatus("received");
         messages.save(m);
+    }
+
+    /** "[document]" -> "document"; a filename (no brackets) is only ever a document's. */
+    private static String mediaType(String text) {
+        return text != null && text.startsWith("[") ? text.replace("[", "").replace("]", "") : "document";
     }
 
     private void logOutbound(UUID leadId, String type, String body) {

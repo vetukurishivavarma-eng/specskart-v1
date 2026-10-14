@@ -76,10 +76,15 @@ class AdminChatTest {
     void customerPhotoShowsInTheChatAndOnlyThisChatsMediaCanBeFetched() {
         String waId = newLead();
         bot.handleInbound(leads.findByWhatsappWaId(waId).orElseThrow(), "[image]", null,
-                "wamid." + UUID.randomUUID(), "media-" + waId);
+                "wamid." + UUID.randomUUID(), "media-" + waId, null);
 
         var msgs = (java.util.List<java.util.Map<String, Object>>) chat.get(waId).get("messages");
         assertThat(msgs).anyMatch(m -> "image".equals(m.get("type")) && ("media-" + waId).equals(m.get("mediaId")));
+
+        bot.handleInbound(leads.findByWhatsappWaId(waId).orElseThrow(), "[document]", null,
+                "wamid." + UUID.randomUUID(), "doc-" + waId, "prescription.pdf");
+        msgs = (java.util.List<java.util.Map<String, Object>>) chat.get(waId).get("messages");
+        assertThat(msgs).anyMatch(m -> "document".equals(m.get("type")) && "prescription.pdf".equals(m.get("body")));
 
         assertThatThrownBy(() -> chat.media(waId, "someone-elses-media")).hasMessageContaining("isn't in this chat");
         // the mock provider can't download: reported as gone, not a 500
