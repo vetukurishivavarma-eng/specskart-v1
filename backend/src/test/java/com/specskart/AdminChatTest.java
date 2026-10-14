@@ -85,4 +85,11 @@ class AdminChatTest {
         // the mock provider can't download: reported as gone, not a 500
         assertThatThrownBy(() -> chat.media(waId, "media-" + waId)).hasMessageContaining("no longer has");
     }
+
+    @Test
+    void mediaGetsAnExtensionThePhoneCanOpen() {
+        assertThat(AdminChatController.extension("application/pdf")).isEqualTo("pdf");
+        assertThat(AdminChatController.extension("audio/ogg; codecs=opus")).isEqualTo("ogg");
+        assertThat(AdminChatController.extension("something/odd")).isEqualTo("bin");
+    }
 }

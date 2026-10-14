@@ -5,6 +5,7 @@ import com.specskart.lead.Lead;
 import com.specskart.lead.LeadRepository;
 import com.specskart.shared.ApiException;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -134,6 +135,8 @@ public class AdminChatController {
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(media.mimeType()))
                 .cacheControl(CacheControl.maxAge(Duration.ofDays(7)).cachePrivate())
+                // a real extension so the phone knows which app opens it (PDF viewer, video player...)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + mediaId + "." + extension(media.mimeType()) + "\"")
                 .body(media.bytes());
     }
 
@@ -152,6 +155,32 @@ public class AdminChatController {
         lead.setAgentChatUntil(null);
         leads.save(lead);
         return get(waId);
+    }
+
+    /** What WhatsApp lets customers send; anything else downloads as .bin. */
+    public static String extension(String mime) {
+        String m = mime == null ? "" : mime.split(";")[0].trim().toLowerCase();
+        return switch (m) {
+            case "application/pdf" -> "pdf";
+            case "image/jpeg" -> "jpg";
+            case "image/png" -> "png";
+            case "image/webp" -> "webp";
+            case "video/mp4" -> "mp4";
+            case "video/3gpp" -> "3gp";
+            case "audio/ogg" -> "ogg";
+            case "audio/mpeg" -> "mp3";
+            case "audio/mp4" -> "m4a";
+            case "audio/aac" -> "aac";
+            case "audio/amr" -> "amr";
+            case "text/plain" -> "txt";
+            case "application/msword" -> "doc";
+            case "application/vnd.openxmlformats-officedocument.wordprocessingml.document" -> "docx";
+            case "application/vnd.ms-excel" -> "xls";
+            case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" -> "xlsx";
+            case "application/vnd.ms-powerpoint" -> "ppt";
+            case "application/vnd.openxmlformats-officedocument.presentationml.presentation" -> "pptx";
+            default -> "bin";
+        };
     }
 
     private Lead lead(String waId) {

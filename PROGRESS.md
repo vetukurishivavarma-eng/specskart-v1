@@ -6,7 +6,9 @@ _Last updated: 2026-10-14._
 - **Customer photos visible in POS chat** (V60 `media_id`, POS 1.23.0/vc28): inbound WhatsApp images keep Meta's media id;
   `GET /api/admin/chat/{waId}/media/{mediaId}` streams it (only media from that chat); app shows thumbnail, tap = full screen.
   Only photos received AFTER deploy show -- older ones were stored as "[image]" with no id. PDFs/docs still show "(media)".
-  **Publish 1.23.0 / build 28 instead of 1.22.0** (it includes it). Not device-tested.
+  **Then 1.24.0 / build 29**: PDFs/videos/voice notes = "tap to open" (downloads to cache, opens in the phone's app via
+  VIEW intent; backend sends a filename with a real extension), stickers inline. Publish 1.24.0 (includes 1.22/1.23).
+  Not device-tested.
 Shipped (all pushed; backend auto-deploys on Render; POS APKs built by GitHub Actions):
 - **Staff (AGENT) vs admin split.** Admin-only now: cost price (hidden + can't be set by staff), supplier
   invoices, profit in Top products, shop price overrides, staff list (`/api/admin/users`), deleting a lead.
