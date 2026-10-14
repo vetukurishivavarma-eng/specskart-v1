@@ -3,6 +3,10 @@
 _Last updated: 2026-10-14._
 
 ## RESUME HERE — 2026-10-14
+**NEXT SESSION (2026-10-15): user will ask for the link -> give `https://github.com/vetukurishivavarma-eng/specskart-pos/releases/download/v1.26.0/specskart-pos-1.26.0.apk`**
+GitHub release v1.26.0 PUBLISHED (build 31, verified versionCode 31 + same signer; APK also in Downloads). STILL TO DO by
+user: More -> App releases: version 1.26.0, build 30->**31**, min 31, mandatory, that URL. Then re-test a customer photo.
+(v1.25.0 GitHub release exists too but superseded -- do not add an app_releases row for 30.)
 - **Customer photos visible in POS chat** (V60 `media_id`, POS 1.23.0/vc28): inbound WhatsApp images keep Meta's media id;
   `GET /api/admin/chat/{waId}/media/{mediaId}` streams it (only media from that chat); app shows thumbnail, tap = full screen.
   Only photos received AFTER deploy show -- older ones were stored as "[image]" with no id. PDFs/docs still show "(media)".
