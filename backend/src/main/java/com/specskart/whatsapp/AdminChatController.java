@@ -36,6 +36,8 @@ import java.util.Map;
 @RequestMapping("/api/admin/chat/{waId}")
 public class AdminChatController {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AdminChatController.class);
+
     /** How long one staff message keeps the bot quiet. Matches Meta's service window. */
     private static final long QUIET_HOURS = 24;
 
@@ -129,6 +131,7 @@ public class AdminChatController {
         try {
             media = provider.downloadMedia(mediaId);
         } catch (Exception e) {
+            log.warn("chat media {} for {} failed: {}", mediaId, waId, e.toString());
             // Meta keeps inbound media for a limited time; older photos are simply gone
             throw ApiException.notFound("MEDIA_GONE", "WhatsApp no longer has this photo.");
         }

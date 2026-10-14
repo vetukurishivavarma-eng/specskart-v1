@@ -235,6 +235,12 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
         return s != null && s.length() > max ? s.substring(0, max) : s;
     }
 
+    /** Meta's media host redirects and refuses clients without a browser/curl-like User-Agent (it serves an HTML error page instead). */
+    private static final java.net.http.HttpClient MEDIA_HTTP = java.net.http.HttpClient.newBuilder()
+            .followRedirects(java.net.http.HttpClient.Redirect.NORMAL)
+            .connectTimeout(java.time.Duration.ofSeconds(15))
+            .build();
+
     /** Two hops, both with our token: media id -> short-lived download URL -> the bytes. */
     @Override
     public Media downloadMedia(String mediaId) {
@@ -242,10 +248,27 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
         JsonNode meta = http.get().uri(props.whatsapp().graphBaseUrl() + "/" + mediaId)
                 .header("Authorization", auth).retrieve().body(JsonNode.class);
         String url = meta == null ? null : meta.path("url").asText(null);
-        if (url == null) throw new IllegalStateException("no download url for media " + mediaId);
-        byte[] bytes = http.get().uri(java.net.URI.create(url))
-                .header("Authorization", auth).retrieve().body(byte[].class);
-        return new Media(bytes, meta.path("mime_type").asText("application/octet-stream"));
+        if (url == null) throw new IllegalStateException("no download url for media " + mediaId + ": " + meta);
+        String mime = meta.path("mime_type").asText("application/octet-stream");
+        try {
+            var res = MEDIA_HTTP.send(java.net.http.HttpRequest.newBuilder(java.net.URI.create(url))
+                            .header("Authorization", auth)
+                            .header("User-Agent", "curl/8.4.0")
+                            .timeout(java.time.Duration.ofSeconds(60))
+                            .GET().build(),
+                    java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+            String got = res.headers().firstValue("Content-Type").orElse("");
+            if (res.statusCode() != 200 || res.body().length == 0 || (got.startsWith("text/html") && !mime.startsWith("text/"))) {
+                throw new IllegalStateException("media " + mediaId + " download got HTTP " + res.statusCode() + " "
+                        + got + " (" + res.body().length + " bytes)");
+            }
+            return new Media(res.body(), mime);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException("media " + mediaId + " download failed: " + e.getMessage(), e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("media download interrupted", e);
+        }
     }
 
     /** @return the wamid Meta assigned, which its delivery-status webhooks refer back to. */
