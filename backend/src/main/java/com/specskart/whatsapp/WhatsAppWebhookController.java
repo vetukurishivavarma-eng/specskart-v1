@@ -124,6 +124,19 @@ public class WhatsAppWebhookController {
                     text = i.path("list_reply").path("title").asText(null);
                 }
             }
+            // Meta hides the content of some messages from the Cloud API (edited, poll, view-once, some
+            // ad replies...) and sends only an error. Say so plainly, and keep the raw JSON so we can see why.
+            case "unsupported" -> {
+                log.warn("wa unsupported message from {}: {}", waId, msg);
+                JsonNode err = msg.path("errors").path(0);
+                String kind = msg.path("unsupported").path("type").asText(""); // e.g. "edit", "poll"
+                String why = !kind.isBlank() ? kind
+                        : err.path("error_data").path("details").asText(err.path("title").asText(""));
+                String ad = msg.path("referral").path("headline").asText(msg.path("referral").path("body").asText(""));
+                text = "(Customer sent a message WhatsApp doesn't show us"
+                        + (why.isBlank() ? "" : ": " + why) + (ad.isBlank() ? "" : " | from ad: " + ad)
+                        + ". Check the WhatsApp app or ask them to type it again.)";
+            }
             default -> text = "[" + type + "]"; // image/document/...: media id picked up below
         }
         Map<String, Object> referral = null;

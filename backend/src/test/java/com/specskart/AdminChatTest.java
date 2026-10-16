@@ -24,6 +24,7 @@ class AdminChatTest {
     @Autowired WhatsAppBotService bot;
     @Autowired LeadRepository leads;
     @Autowired WhatsAppProvider provider;
+    @Autowired com.specskart.whatsapp.WhatsAppWebhookController webhook;
 
     private String newLead() {
         String waId = "26097" + (300000 + (int) (Math.random() * 600000));
@@ -96,5 +97,19 @@ class AdminChatTest {
         assertThat(AdminChatController.extension("application/pdf")).isEqualTo("pdf");
         assertThat(AdminChatController.extension("audio/ogg; codecs=opus")).isEqualTo("ogg");
         assertThat(AdminChatController.extension("something/odd")).isEqualTo("bin");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void aMessageMetaWillNotShowUsStillAppearsInTheChatInPlainWords() {
+        String waId = "26097" + (300000 + (int) (Math.random() * 600000));
+        String payload = """
+            {"entry":[{"changes":[{"value":{"contacts":[{"profile":{"name":"Bana"},"wa_id":"%s"}],
+              "messages":[{"from":"%s","id":"wamid.%s","type":"unsupported","unsupported":{"type":"edit"},
+                "errors":[{"code":131051,"title":"Message type unknown"}]}]}}]}]}
+            """.formatted(waId, waId, UUID.randomUUID());
+        webhook.receive(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8), null);
+        var msgs = (java.util.List<java.util.Map<String, Object>>) chat.get(waId).get("messages");
+        assertThat(msgs).anyMatch(m -> String.valueOf(m.get("body")).contains("WhatsApp doesn't show us: edit"));
     }
 }
