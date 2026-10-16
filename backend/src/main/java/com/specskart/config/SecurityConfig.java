@@ -54,6 +54,8 @@ public class SecurityConfig {
                 // Shop price overrides and the staff list (logins/emails) are the owner's call only.
                 .requestMatchers("/api/admin/pos/stores/*/prices", "/api/admin/pos/stores/*/prices/**").hasRole("ADMIN")
                 .requestMatchers("/api/admin/users", "/api/admin/users/**").hasRole("ADMIN")
+                // A broadcast messages every customer at once, and Meta bills each one.
+                .requestMatchers("/api/admin/whatsapp/broadcast/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/admin/**").hasAnyRole("ADMIN", "AGENT")
                 // Staff add frames (photo, code, brand, price, shape) from the POS app; only an
                 // admin removes one.

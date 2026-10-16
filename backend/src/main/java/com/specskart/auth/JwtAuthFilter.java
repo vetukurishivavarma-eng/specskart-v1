@@ -26,10 +26,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final DeviceSessionService deviceSessions;
+    private final UserRepository users;
 
-    public JwtAuthFilter(JwtService jwtService, DeviceSessionService deviceSessions) {
+    public JwtAuthFilter(JwtService jwtService, DeviceSessionService deviceSessions, UserRepository users) {
         this.jwtService = jwtService;
         this.deviceSessions = deviceSessions;
+        this.users = users;
     }
 
     @Override
@@ -40,10 +42,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ")) {
             try {
                 Claims claims = jwtService.parse(header.substring(7));
-                String role = claims.get("role", String.class);
+                // Role and active flag come from the database, not the token: a deactivated or
+                // demoted login must lose access now, not when its 12h token runs out.
+                User user = users.findById(UUID.fromString(claims.getSubject()))
+                        .filter(User::isActive).orElseThrow();
                 var auth = new UsernamePasswordAuthenticationToken(
-                        claims.get("email", String.class), null,
-                        List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+                        user.getEmail(), null,
+                        List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())));
                 SecurityContextHolder.getContext().setAuthentication(auth);
                 heartbeat(claims.getSubject(), request);
             } catch (Exception ignored) {
