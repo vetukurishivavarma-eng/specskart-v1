@@ -1,6 +1,18 @@
 # Specskart v1 — build progress
 
-_Last updated: 2026-10-14._
+_Last updated: 2026-10-16._
+
+## RESUME HERE — 2026-10-16
+- **WhatsApp "unsupported" messages** (`9e0ca19`): Meta hid a lead's (Bana Mpundu) text "Hello good afternoon, is the 50%
+  sale still on?" -- arrived as type=unsupported (likely ad reply or edited msg). Chat now shows a plain-words note
+  (+ reason / ad headline) instead of `[unsupported]`, raw payload logged as `wa unsupported message`. Text itself is
+  never recoverable. User: leave it, customer continued the chat.
+- **Security pass** (`cfcdb52`): JwtAuthFilter now loads the user each request (role + active from DB, not the token)
+  -> deactivate/demote takes effect immediately; WhatsApp broadcast admin-only. 202 tests green. Probed live: /api/sim
+  404, unsigned WA webhook 401 on both old + new svc. Rated ~7/10.
+- **Open (user's call):** make the 3 GitHub repos private; per-person staff logins instead of shared
+  staff@specskart.local (+ 2FA later); move Meta webhook to specskart-api-9b08 then retire old svc; restrict DB
+  access from 0.0.0.0/0; backup-restore drill + dependency scanning.
 
 ## RESUME HERE — 2026-10-14
 **NEXT SESSION (2026-10-15): user will ask for the link -> give `https://github.com/vetukurishivavarma-eng/specskart-pos/releases/download/v1.26.0/specskart-pos-1.26.0.apk`**
