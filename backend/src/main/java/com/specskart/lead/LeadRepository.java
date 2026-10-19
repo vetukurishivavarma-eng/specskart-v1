@@ -43,6 +43,29 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
             """)
     List<Lead> findDueForEyeTestRecall(@Param("cutoff") Instant cutoff, Pageable page);
 
+    /** Eye-checkup reminder: people who've messaged us (but not in the last day), never in this
+     *  sequence, not opted out, not mid-nurture -- most recently in touch first. */
+    @Query("""
+            select l from Lead l
+            where l.whatsappWaId is not null
+              and l.checkupStartedAt is null
+              and l.archivedAt is null
+              and l.lastContactAt < :quietSince
+              and (l.followUpState is null or l.followUpState not in
+                   (com.specskart.lead.FollowUpState.OPTED_OUT, com.specskart.lead.FollowUpState.ACTIVE))
+              and exists (select 1 from com.specskart.whatsapp.WhatsAppMessage m
+                          where m.leadId = l.id and m.direction = 'INBOUND')
+            order by l.lastContactAt desc
+            """)
+    List<Lead> findReadyForCheckupReminder(@Param("quietSince") Instant quietSince, Pageable page);
+
+    long countByCheckupStartedAtAfter(Instant since);
+
+    @Query("select count(o) > 0 from com.specskart.order.Order o where o.leadId = :leadId and o.createdAt > :since")
+    boolean hasOrderSince(@Param("leadId") java.util.UUID leadId, @Param("since") Instant since);
+
+    List<Lead> findTop100ByCheckupNextAtLessThanEqualOrderByCheckupNextAtAsc(Instant when);
+
     /** Leads whose next nurture touch is due (job picks these up each hour). */
     List<Lead> findTop50ByFollowUpStateAndFollowUpNextAtLessThanEqualOrderByFollowUpNextAtAsc(
             FollowUpState state, Instant when);

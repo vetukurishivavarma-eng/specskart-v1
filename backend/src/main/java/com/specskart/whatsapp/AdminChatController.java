@@ -150,6 +150,45 @@ public class AdminChatController {
         return get(waId);
     }
 
+    public record StartRequest(String name) {}
+
+    /**
+     * Staff message a number that has never messaged us: here {waId} is whatever number they
+     * typed. Saves them as a lead and sends the approved follow-up template -- the only first
+     * message Meta delivers to a new contact. Checked before saving, so no template = no junk lead.
+     */
+    @PostMapping("/start")
+    @Transactional
+    public Map<String, Object> start(@PathVariable String waId, @RequestBody(required = false) StartRequest req) {
+        if (!props.whatsapp().followUpConfigured()) {
+            throw ApiException.conflict("FOLLOW_UP_TEMPLATE_NOT_CONFIGURED",
+                    "Messaging a new number needs an approved WhatsApp template, which isn't set up yet.");
+        }
+        String digits = com.specskart.shared.PhoneNumbers.normalize(waId, props.whatsapp().defaultCountryCode());
+        if (digits == null || digits.length() < 10 || digits.length() > 15) {
+            throw ApiException.badRequest("BAD_NUMBER", "That doesn't look like a phone number. Include the full number, e.g. 0971234567.");
+        }
+        String name = req == null || req.name() == null || req.name().isBlank() ? null : req.name().trim();
+        Lead lead = leads.findByWhatsappWaId(digits).orElseGet(() -> {
+            Lead l = new Lead();
+            l.setWhatsappWaId(digits);
+            l.setWhatsappNumber(digits);
+            l.setFirstContactAt(Instant.now());
+            return l;
+        });
+        if (name != null && (lead.getName() == null || lead.getName().isBlank())) lead.setName(name);
+        lead.setLastContactAt(Instant.now());
+        leads.save(lead);
+        try {
+            bot.sendManualFollowUp(lead);
+        } catch (ApiException e) {
+            throw e;
+        } catch (Exception e) {
+            throw ApiException.badRequest("SEND_FAILED", "WhatsApp didn't accept the message. Check the number and try again.");
+        }
+        return get(digits);
+    }
+
     /** Hand the conversation back to the bot before the quiet period runs out. */
     @PostMapping("/bot")
     @Transactional

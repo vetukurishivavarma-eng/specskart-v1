@@ -114,7 +114,12 @@ public record AppProperties(
                             *  Blank = plain text (only reaches numbers with an open session). */
                            String recallTemplate,
                            /** How long after a delivered order to nudge them for an eye test. */
-                           Integer recallAfterMonths) {
+                           Integer recallAfterMonths,
+                           /** Approved template for the eye-checkup reminder to everyone who has messaged us.
+                            *  {{1}} = first name, {{2}} = shop link. Blank = the reminder sequence is off. */
+                           String checkupTemplate,
+                           /** Link in the checkup reminder. Blank = the website's /store page. */
+                           String checkupLink) {
 
         public List<String> staffNumbers() {
             return staffNumbers == null ? List.of() : staffNumbers;
@@ -166,6 +171,11 @@ public record AppProperties(
         /** Months between a delivered order and its eye-test recall (and between repeat recalls). */
         public int recallMonths() {
             return recallAfterMonths == null || recallAfterMonths < 1 ? 12 : recallAfterMonths;
+        }
+
+        /** The eye-checkup reminder only ever sends an approved template, so no template = off. */
+        public boolean checkupConfigured() {
+            return checkupTemplate != null && !checkupTemplate.isBlank();
         }
 
         /** Approved template configured for the lens-inquiry verification link. */

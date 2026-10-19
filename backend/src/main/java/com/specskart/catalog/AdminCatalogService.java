@@ -310,6 +310,14 @@ public class AdminCatalogService {
         if (in.tryOnImageUrl() != null) p.setTryOnImageUrl(in.tryOnImageUrl().isBlank() ? null : in.tryOnImageUrl().trim());
         if (in.kind() != null) p.setKind("ACCESSORY".equalsIgnoreCase(in.kind()) ? "ACCESSORY" : "FRAME");
         if (in.sku() != null) p.setSku(in.sku().isBlank() ? null : in.sku().trim());
+        // uq_product_sku would otherwise surface as a bare 500 "Something went wrong."
+        if (p.getSku() != null) {
+            products.findBySkuIgnoreCase(p.getSku())
+                    .filter(other -> !java.util.Objects.equals(other.getId(), p.getId()))
+                    .ifPresent(other -> { throw ApiException.conflict("SKU_TAKEN",
+                            "Code " + p.getSku() + " is already used by \"" + other.getName()
+                            + "\". Use a different code, or edit that frame instead."); });
+        }
         if (in.barcode() != null) p.setBarcode(in.barcode().isBlank() ? null : in.barcode().trim());
         if (in.costPriceMinor() != null && callerIsAdmin()) p.setCostPriceMinor(Math.max(0, in.costPriceMinor()));
         if (in.brand() != null) p.setBrand(in.brand().isBlank() ? null : in.brand().trim());

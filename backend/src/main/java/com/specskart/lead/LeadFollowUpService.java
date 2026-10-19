@@ -88,6 +88,7 @@ public class LeadFollowUpService {
     public void enroll(UUID leadId) {
         Lead lead = leads.findById(leadId).orElse(null);
         if (lead == null || lead.getFollowUpState() != null) return;
+        if (lead.getCheckupNextAt() != null) return; // already on the checkup reminder -- one sequence at a time
         if (!props.whatsapp().nurtureOn()) return;
         if (lead.getStatus() == LeadStatus.CONVERTED || lead.getStatus() == LeadStatus.LOST) return;
         if (waId(lead) == null) return;

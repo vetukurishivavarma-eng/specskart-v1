@@ -121,6 +121,12 @@ specskart:
     # Yearly eye-test recall for customers who already bought.
     recall-template: ${WHATSAPP_RECALL_TEMPLATE:}
     recall-after-months: ${WHATSAPP_RECALL_AFTER_MONTHS:12}
+    # Eye-checkup reminder to everyone who has ever messaged us: every 2 days, up to 4 times,
+    # stops on any reply, an order, or STOP. {{1}} = first name, {{2}} = shop link.
+    # Blank = OFF (it never sends plain text, which Meta wouldn't deliver anyway).
+    checkup-template: ${WHATSAPP_CHECKUP_TEMPLATE:}
+    # Link in that reminder (shop page or Google Maps pin). Blank = <frontend>/store.
+    checkup-link: ${WHATSAPP_CHECKUP_LINK:}
   payments:
     provider: ${PAYMENTS_PROVIDER:mock}   # mock | flutterwave
     flutterwave:

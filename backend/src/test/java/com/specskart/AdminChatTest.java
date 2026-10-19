@@ -65,6 +65,15 @@ class AdminChatTest {
     }
 
     @Test
+    void newNumberChatIsRefusedAndSavesNothingWithoutATemplate() {
+        String waId = "26097" + (300000 + (int) (Math.random() * 600000));
+        assertThatThrownBy(() -> chat.start(waId, new AdminChatController.StartRequest("X")))
+                .hasMessageContaining("template");
+        assertThat(leads.findByWhatsappWaId(waId)).isEmpty();
+        assertThat(sentTo(waId)).isZero();
+    }
+
+    @Test
     void refusesPlainTextOutsideTheServiceWindow() {
         String waId = newLead();                     // never messaged us: window shut
         assertThatThrownBy(() -> chat.send(waId, new AdminChatController.SendRequest("Hello")))
