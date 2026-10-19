@@ -1,6 +1,24 @@
 # Specskart v1 — build progress
 
-_Last updated: 2026-10-16._
+_Last updated: 2026-10-20._
+
+## RESUME HERE — 2026-10-20
+**DONE + LIVE:** backend `6e1bb87` (206 tests green) deployed on specskart-api-9b08 (user confirmed Live). POS 1.27.0 /
+build 32 (`29c8adf`) GitHub release v1.27.0 published + app_releases row added (min 31, not mandatory; verified via
+/api/public/app/version). Not device-tested.
+- **Frame "Something went wrong"** (client screenshot): reused frame code hit `uq_product_sku` -> bare 500. Now 409
+  `SKU_TAKEN` "Code X is already used by "<frame>"". Works now, no config.
+- **Eye-checkup reminder** (`EyeCheckupReminderService/Job`, V61): everyone who has ever messaged us, every 2 days, max 4,
+  stops on reply / order / STOP, 50 new people per day, skips leads mid-nurture. Template-only. **OFF until env set.**
+- **Staff "New chat"** to a number that never messaged: POS Leads -> New chat -> `POST /api/admin/chat/{number}/start`
+  (saves lead, sends follow-up template). Refused, nothing saved, until the template is set. Existing "Send follow-up
+  template" button in chat (window closed) uses the same template.
+- **NEXT (user says client adds Meta payment card 2026-10-21):** submit 2 Marketing templates (text given in session):
+  `eye_checkup_reminder` ({{1}} first name, {{2}} shop link, footer "Reply STOP to unsubscribe") and `specskart_followup`
+  ({{1}} first name, {{2}} store name). After approval set on Render: `WHATSAPP_CHECKUP_TEMPLATE=eye_checkup_reminder`,
+  `WHATSAPP_CHECKUP_LINK=<shop link from client>`, `WHATSAPP_FOLLOW_UP_TEMPLATE=specskart_followup` (+
+  `WHATSAPP_FOLLOW_UP_TEMPLATE_LANG=en_US` if Meta shows English (US)). Then test New chat on a staff phone.
+- Client was told: no WhatsApp Business app on the Cloud API number; chat stays in the POS.
 
 ## RESUME HERE — 2026-10-16
 - **WhatsApp "unsupported" messages** (`9e0ca19`): Meta hid a lead's (Bana Mpundu) text "Hello good afternoon, is the 50%
