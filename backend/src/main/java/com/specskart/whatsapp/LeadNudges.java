@@ -1,5 +1,9 @@
 package com.specskart.whatsapp;
 
+import com.specskart.analytics.AnalyticsService;
+import com.specskart.analytics.LeadEvent;
+import com.specskart.analytics.LeadEventRepository;
+import com.specskart.analytics.LeadEventType;
 import com.specskart.config.AppProperties;
 import com.specskart.lead.FollowUpState;
 import com.specskart.lead.Lead;
@@ -19,6 +23,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -58,9 +63,14 @@ public class LeadNudges {
     private final PushService push;
     private final LensInquiryService lensInquiries;
     private final AppProperties props;
+    private final AnalyticsService analytics;
+    private final LeadEventRepository events;
 
     public LeadNudges(LeadRepository leads, WhatsAppMessageRepository messages, WhatsAppProvider provider,
-                      ServiceWindow window, PushService push, LensInquiryService lensInquiries, AppProperties props) {
+                      ServiceWindow window, PushService push, LensInquiryService lensInquiries, AppProperties props,
+                      AnalyticsService analytics, LeadEventRepository events) {
+        this.analytics = analytics;
+        this.events = events;
         this.leads = leads;
         this.messages = messages;
         this.provider = provider;
@@ -96,16 +106,19 @@ public class LeadNudges {
     /** The bot promised a person (or they wrote into a staff chat): start the staff reminders. */
     public void awaitingStaff(UUID leadId) {
         update(leadId, lead -> {
-            if (lead.getAwaitingStaffSince() != null) return;
+            // a wait from over a day ago that nobody answered is over -- this is a new one
+            if (lead.getAwaitingStaffSince() != null && lead.getAwaitingStaffSince().isAfter(Instant.now().minus(Duration.ofHours(24)))) return;
             lead.setAwaitingStaffSince(Instant.now());
             lead.setStaffNudges(0);
             lead.setStaffNudgedAt(null);
+            analytics.record(LeadEventType.STAFF_NEEDED, lead.getId(), null);
         });
     }
 
     /** A staff member answered from the POS chat. */
     public void staffReplied(UUID leadId) {
         update(leadId, lead -> {
+            if (lead.getAwaitingStaffSince() != null) analytics.record(LeadEventType.STAFF_REPLIED, lead.getId(), null);
             lead.setAwaitingStaffSince(null);
             lead.setStaffNudges(0);
             lead.setStaffNudgedAt(null);
@@ -125,7 +138,27 @@ public class LeadNudges {
         lead.setVisitMissedOn(null);
         lead.setQuoteFollowUpDueAt(null);
         leads.save(lead);
+        analytics.record(LeadEventType.EYE_TEST_BOOKED, lead.getId(), null, null, null, Map.of("day", day.toString()));
         push.notifyStaff("👁️ Eye test booked: " + who(lead), DAY.format(day), BOOKINGS_PATH);
+    }
+
+    /**
+     * A till sale with this customer's number: the chat became a sale. Marks them bought, counts
+     * as their visit (no "sorry we missed you"), and cancels a pending "just checking in".
+     * Returns the lead, or null when the number isn't one of ours.
+     */
+    public Lead bought(String phone, String receipt, long totalMinor) {
+        String digits = com.specskart.shared.PhoneNumbers.normalize(phone, props.whatsapp().defaultCountryCode());
+        if (digits == null || digits.length() < 8) return null;
+        Lead lead = leads.findByWhatsappWaId(digits).or(() -> leads.findByWhatsappNumber(digits)).orElse(null);
+        if (lead == null) return null;
+        lead.setStatus(LeadStatus.CONVERTED);
+        if (lead.getVisitOn() != null && lead.getVisitedOn() == null) lead.setVisitedOn(LocalDate.now(LUSAKA));
+        lead.setQuoteFollowUpDueAt(null);
+        leads.save(lead);
+        analytics.record(LeadEventType.LEAD_CONVERTED, lead.getId(), null, "SHOP", null,
+                Map.of("receipt", receipt == null ? "" : receipt, "totalMinor", totalMinor));
+        return lead;
     }
 
     // ---- the job -----------------------------------------------------------------------------
@@ -141,6 +174,73 @@ public class LeadNudges {
         }
         nudgeStaff(now);
         staffDigest(now);
+        staffScore(now);
+    }
+
+    private LocalDate scoreSentOn; // ponytail: in memory, same as digestSentOn
+
+    /** 8:00-9:00: how yesterday's customers were answered, and last week's chat -> sale funnel. */
+    void staffScore(ZonedDateTime now) {
+        LocalDate today = now.toLocalDate();
+        if (now.getHour() != 8 || today.equals(scoreSentOn)) return;
+        scoreSentOn = today;
+        Score s = score(today);
+        if (s.needed() == 0 && s.chats() == 0) return;
+        push.notifyStaff(s.title(), s.body(), "/leads");
+    }
+
+    record Score(int needed, int unanswered, long averageMin, long slowestMin, long chats, long booked, long came, long bought) {
+        String title() {
+            return needed == 0 ? "📊 Nobody needed a reply yesterday"
+                    : unanswered == 0 ? "📊 Yesterday: all " + needed + " customers got a reply 👏"
+                    : "📊 Yesterday: " + unanswered + " of " + needed + " customers got no reply";
+        }
+
+        String body() {
+            String replies = slowestMin < 0 ? "" : "Replies: average " + mins(averageMin) + ", slowest " + mins(slowestMin) + ". ";
+            return replies + "Last 7 days: " + chats + " new chats → " + booked + " booked → " + came + " came → " + bought + " bought.";
+        }
+    }
+
+    /** Reply times count shop hours only: a 22:00 message answered at 8:10 waited 10 minutes. */
+    Score score(LocalDate today) {
+        Instant from = today.minusDays(1).atStartOfDay(LUSAKA).toInstant(), to = today.atStartOfDay(LUSAKA).toInstant();
+        List<LeadEvent> needed = events.findByEventTypeAndCreatedAtBetween(LeadEventType.STAFF_NEEDED, from, to);
+        List<LeadEvent> replies = events.findByEventTypeAndCreatedAtAfter(LeadEventType.STAFF_REPLIED, from);
+        int unanswered = 0;
+        List<Long> waits = new java.util.ArrayList<>();
+        for (LeadEvent n : needed) {
+            var reply = replies.stream().filter(r -> r.getLeadId().equals(n.getLeadId()) && !r.getCreatedAt().isBefore(n.getCreatedAt()))
+                    .map(LeadEvent::getCreatedAt).min(Instant::compareTo);
+            if (reply.isEmpty()) unanswered++;
+            else waits.add(Math.max(0, Duration.between(shopClock(n.getCreatedAt()), reply.get()).toMinutes()));
+        }
+        Instant weekAgo = today.minusDays(7).atStartOfDay(LUSAKA).toInstant();
+        return new Score(needed.size(), unanswered,
+                waits.isEmpty() ? -1 : Math.round(waits.stream().mapToLong(Long::longValue).average().orElse(0)),
+                waits.stream().mapToLong(Long::longValue).max().orElse(-1),
+                events.findByEventTypeAndCreatedAtBetween(LeadEventType.WHATSAPP_CONVERSATION_STARTED, weekAgo, to).size(),
+                distinctLeads(LeadEventType.EYE_TEST_BOOKED, weekAgo, to),
+                leads.countByVisitedOnBetween(today.minusDays(7), today.minusDays(1)),
+                distinctLeads(LeadEventType.LEAD_CONVERTED, weekAgo, to));
+    }
+
+    private long distinctLeads(LeadEventType type, Instant from, Instant to) {
+        return events.findByEventTypeAndCreatedAtBetween(type, from, to).stream().map(LeadEvent::getLeadId).distinct().count();
+    }
+
+    /** When a message starts "waiting": now if the shop is open, else when it next opens. */
+    static Instant shopClock(Instant t) {
+        ZonedDateTime z = t.atZone(LUSAKA);
+        for (int i = 0; i < 14 && !WhatsAppBotService.isOpen(z); i++) {
+            z = (z.getHour() < WhatsAppBotService.OPENS_AT ? z : z.plusDays(1))
+                    .withHour(WhatsAppBotService.OPENS_AT).withMinute(0).withSecond(0).withNano(0);
+        }
+        return z.toInstant();
+    }
+
+    private static String mins(long m) {
+        return m < 60 ? m + " min" : m / 60 + "h " + m % 60 + "m";
     }
 
     // ponytail: in memory -- a restart between 8:00 and 9:00 sends the day's list twice; a column if that bites
@@ -242,6 +342,7 @@ public class LeadNudges {
 
     /** While the shop is open: 5 min after the promise, then every 5 min, at most {@link #MAX_NUDGES} pushes. */
     void nudgeStaff(ZonedDateTime now) {
+        leads.clearStaleAwaiting(Instant.now().minus(Duration.ofHours(24)));
         if (!WhatsAppBotService.isOpen(now)) return;
         Instant at = now.toInstant();
         for (Lead lead : leads.findTop100ByAwaitingStaffSinceLessThanEqualAndStaffNudgesLessThan(at.minus(FIRST_NUDGE), MAX_NUDGES)) {

@@ -2,6 +2,17 @@
 
 _Last updated: 2026-10-20._
 
+## 2026-10-20 (6): staff reply score, waiting-first leads, sale -> lead (backend only, no APK)
+- 8:00 push "📊 Yesterday: X of Y customers got no reply" + average/slowest reply (shop hours only,
+  `LeadNudges.shopClock`) + last-7-days funnel chats -> booked -> came -> bought; tap opens Leads.
+  Counted from new lead_events STAFF_NEEDED / STAFF_REPLIED / EYE_TEST_BOOKED (no history before this deploy).
+- Leads list (POS + web): customers waiting for a person sorted first, stage "⏰ Waiting N min for a reply";
+  CONVERTED with no lens stage shows "✅ Bought". Stale waits (>24h, customer quiet) cleared each minute;
+  a fresh handoff after a stale unanswered wait now restarts the staff reminders (was stuck forever after 6).
+- Till sale (frame, walk-in lenses, combined) with a phone that matches a lead -> `LeadNudges.bought`: status
+  CONVERTED, booked visit marked done, pending quote follow-up cancelled, LEAD_CONVERTED event (source SHOP).
+  Only works when staff type the customer's number on the sale.
+
 ## RESUME HERE — 2026-10-20 (2): lead audit + bot fixes
 Audited all 46 real Zambian leads since 10-01 (fresh backup). 0 real orders. Bot was the main leak:
 - Map pin sent to customers was the TEST shop "Shop1" at **Mumbai** coords. V62: `stores.map_url` (client link

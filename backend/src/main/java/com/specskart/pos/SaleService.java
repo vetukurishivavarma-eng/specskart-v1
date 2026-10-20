@@ -27,10 +27,12 @@ public class SaleService {
     private final StoreRepository stores;
     private final ProductRepository products;
     private final InventoryService inventory;
+    private final com.specskart.whatsapp.LeadNudges leadNudges;
 
     public SaleService(PosSaleRepository sales, PosSaleItemRepository saleItems, PosPaymentRepository payments,
                        ReceiptCounterRepository counters, StoreRepository stores, ProductRepository products,
-                       InventoryService inventory) {
+                       InventoryService inventory, com.specskart.whatsapp.LeadNudges leadNudges) {
+        this.leadNudges = leadNudges;
         this.sales = sales;
         this.saleItems = saleItems;
         this.payments = payments;
@@ -112,7 +114,9 @@ public class SaleService {
         sale.setSubtotalMinor(subtotal);
         sale.setDiscountMinor(discountTotal);
         sale.setTotalMinor(total);
-        return view(sales.save(sale));
+        sales.save(sale);
+        leadNudges.bought(sale.getCustomerPhone(), sale.getReceiptNumber(), total); // a chat that became a sale
+        return view(sale);
     }
 
     @Transactional

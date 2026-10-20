@@ -67,11 +67,13 @@ public class AdminLeadController {
                                                  @RequestParam(defaultValue = "0") int page,
                                                  @RequestParam(defaultValue = "20") int size) {
         LeadStatus ls = status == null || status.isBlank() ? null : LeadStatus.valueOf(status);
-        var pr = PageRequest.of(page, Math.min(size, 100), Sort.by(Sort.Direction.DESC, "createdAt"));
+        // customers waiting for a person come first, longest wait on top; then newest
+        var pr = PageRequest.of(page, Math.min(size, 100),
+                Sort.by(Sort.Order.asc("awaitingStaffSince").nullsLast(), Sort.Order.desc("createdAt")));
         var result = leads.search(ls, campaignId, source, q == null || q.isBlank() ? null : q, archived, pr);
         Map<UUID, String> names = campaignNames();
         Map<UUID, String> stages = lens.stagesFor(result.map(Lead::getId).getContent());
-        var rows = result.map(l -> AdminMapper.row(l, names.get(l.getCampaignId())).withStage(stages.get(l.getId()))).getContent();
+        var rows = result.map(l -> AdminMapper.row(l, names.get(l.getCampaignId())).withStage(stage(l, stages.get(l.getId())))).getContent();
         return new AdminDtos.Page<>(rows, result.getNumber(), result.getSize(),
                 result.getTotalElements(), result.getTotalPages());
     }
@@ -191,6 +193,16 @@ public class AdminLeadController {
     public Map<String, Object> delete(@PathVariable UUID id) {
         leadService.hardDelete(id);
         return Map.of("deleted", id);
+    }
+
+    /** The list's one line of status: a waiting customer beats everything, then the lens funnel. */
+    static String stage(Lead l, String lensStage) {
+        if (l.getAwaitingStaffSince() != null) {
+            long mins = java.time.Duration.between(l.getAwaitingStaffSince(), java.time.Instant.now()).toMinutes();
+            return "⏰ Waiting " + (mins < 120 ? mins + " min" : mins / 60 + "h") + " for a reply";
+        }
+        if (lensStage == null && l.getStatus() == LeadStatus.CONVERTED) return "✅ Bought";
+        return lensStage;
     }
 
     private Map<UUID, String> campaignNames() {

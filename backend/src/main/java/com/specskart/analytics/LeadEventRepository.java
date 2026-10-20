@@ -8,4 +8,6 @@ public interface LeadEventRepository extends JpaRepository<LeadEvent, UUID> {
     List<LeadEvent> findByLeadIdOrderByCreatedAtAsc(UUID leadId);
     long countByEventType(LeadEventType type);
     long countByEventTypeAndCampaignId(LeadEventType type, UUID campaignId);
+    List<LeadEvent> findByEventTypeAndCreatedAtBetween(LeadEventType type, java.time.Instant from, java.time.Instant to);
+    List<LeadEvent> findByEventTypeAndCreatedAtAfter(LeadEventType type, java.time.Instant from);
 }

@@ -114,4 +114,11 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
     List<Lead> findTop100ByVisitOnBetweenAndVisitedOnIsNullAndVisitMissedOnIsNull(java.time.LocalDate from, java.time.LocalDate to);
     List<Lead> findTop100ByQuoteFollowUpDueAtLessThanEqual(Instant due);
     List<Lead> findTop100ByAwaitingStaffSinceLessThanEqualAndStaffNudgesLessThan(Instant since, int nudges);
+    long countByVisitedOnBetween(java.time.LocalDate from, java.time.LocalDate to);
+
+    /** Nobody answered and the customer has gone quiet for a day: they're no longer "waiting". */
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.transaction.annotation.Transactional
+    @Query("update Lead l set l.awaitingStaffSince = null where l.awaitingStaffSince < :cutoff and (l.lastContactAt is null or l.lastContactAt < :cutoff)")
+    int clearStaleAwaiting(@Param("cutoff") Instant cutoff);
 }

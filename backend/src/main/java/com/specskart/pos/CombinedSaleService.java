@@ -21,8 +21,11 @@ public class CombinedSaleService {
     private final SaleService sales;
     private final LensInquiryService lenses;
     private final PosSaleRepository posSales;
+    private final com.specskart.whatsapp.LeadNudges leadNudges;
 
-    public CombinedSaleService(SaleService sales, LensInquiryService lenses, PosSaleRepository posSales) {
+    public CombinedSaleService(SaleService sales, LensInquiryService lenses, PosSaleRepository posSales,
+                               com.specskart.whatsapp.LeadNudges leadNudges) {
+        this.leadNudges = leadNudges;
         this.sales = sales;
         this.lenses = lenses;
         this.posSales = posSales;
@@ -38,6 +41,7 @@ public class CombinedSaleService {
         // nothing goes out unless everything before it succeeded.
         PosDtos.SaleView frame = hasFrame ? sales.createSale(req.frame(), cashierId, cashierName) : null;
         LensDtos.InquiryView lens = hasLens ? lenses.walkInSale(req.lens()) : null;
+        if (lens != null && frame == null) leadNudges.bought(req.lens().phone(), "lenses", lens.priceMinor() == null ? 0 : lens.priceMinor());
 
         if (frame != null && lens != null) {
             String link = "With lenses LENS-" + lens.id().toString().substring(0, 8).toUpperCase(java.util.Locale.ROOT);

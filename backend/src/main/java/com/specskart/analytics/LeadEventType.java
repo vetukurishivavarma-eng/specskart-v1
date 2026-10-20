@@ -27,6 +27,10 @@ public enum LeadEventType {
     EYE_TEST_RECALL_SENT,
     CHECKUP_REMINDER_SENT,
     LEAD_CONVERTED,
+    // chat -> shop (LeadNudges): what the 8:00 staff score is counted from
+    STAFF_NEEDED,
+    STAFF_REPLIED,
+    EYE_TEST_BOOKED,
     // the lens funnel, step by step (LensInquiryService) — what staff read on a lead to follow up
     LENS_LINK_OPENED,
     LENS_STARTED,

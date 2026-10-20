@@ -226,6 +226,68 @@ class LeadNudgesTest {
     }
 
     @Test
+    void replyTimesOnlyCountShopHours() {
+        // Friday 22:00 -> Saturday 8:00; Saturday 15:00 (after the 14:00 close) -> Monday 8:00
+        Instant fri10pm = ZonedDateTime.of(2030, 1, 11, 22, 0, 0, 0, LeadNudges.LUSAKA).toInstant();
+        assertThat(LeadNudges.shopClock(fri10pm)).isEqualTo(ZonedDateTime.of(2030, 1, 12, 8, 0, 0, 0, LeadNudges.LUSAKA).toInstant());
+        Instant sat3pm = ZonedDateTime.of(2030, 1, 12, 15, 0, 0, 0, LeadNudges.LUSAKA).toInstant();
+        assertThat(LeadNudges.shopClock(sat3pm)).isEqualTo(ZonedDateTime.of(2030, 1, 14, 8, 0, 0, 0, LeadNudges.LUSAKA).toInstant());
+        Instant open = TUESDAY_10AM.toInstant();
+        assertThat(LeadNudges.shopClock(open)).isEqualTo(open);
+    }
+
+    @Test
+    void theMorningScoreCountsWhoGotNoReply() {
+        String answered = someNumber(), ignored = someNumber();
+        for (String w : List.of(answered, ignored)) {
+            inbound.process(new InboundMessage(w, w, "Audrina", "[image]", null, "score:" + w, Map.of(), "media-s" + w, null));
+        }
+        nudges.staffReplied(lead(answered).getId());
+
+        var s = nudges.score(LocalDate.now(LeadNudges.LUSAKA).plusDays(1));
+        assertThat(s.needed()).isGreaterThanOrEqualTo(2);
+        assertThat(s.unanswered()).isGreaterThanOrEqualTo(1).isLessThan(s.needed());
+        assertThat(s.slowestMin()).isGreaterThanOrEqualTo(0);
+        assertThat(s.title()).contains("got no reply");
+        assertThat(new LeadNudges.Score(3, 0, 12, 75, 9, 2, 1, 1).body())
+                .isEqualTo("Replies: average 12 min, slowest 1h 15m. Last 7 days: 9 new chats → 2 booked → 1 came → 1 bought.");
+    }
+
+    @Test
+    void aTillSaleToAChatCustomerMarksThemBoughtAndStopsTheNudges() {
+        String waId = someNumber();
+        say(waId, "How much for -2 lenses", null, "t1");
+        Lead l = lead(waId);
+        l.setVisitOn(LocalDate.now(LeadNudges.LUSAKA));
+        leads.save(l);
+        assertThat(lead(waId).getQuoteFollowUpDueAt()).isNotNull();
+
+        assertThat(nudges.bought("+" + waId, "R-1", 45000)).isNotNull();
+        Lead b = lead(waId);
+        assertThat(b.getStatus()).isEqualTo(com.specskart.lead.LeadStatus.CONVERTED);
+        assertThat(b.getVisitedOn()).isEqualTo(LocalDate.now(LeadNudges.LUSAKA));
+        assertThat(b.getQuoteFollowUpDueAt()).isNull();
+        assertThat(nudges.bought("0970000001", "R-2", 100)).isNull(); // not a lead: nothing happens
+    }
+
+    @Autowired com.specskart.admin.AdminLeadController leadList;
+
+    @Test
+    void waitingCustomersComeFirstInTheLeadsList() {
+        String waId = someNumber();
+        inbound.process(new InboundMessage(waId, waId, "Audrina", "[image]", null, "list:" + waId, Map.of(), "media-l" + waId, null));
+        var rows = leadList.list(null, null, null, null, false, 0, 100).content();
+        assertThat(rows).anyMatch(r -> r.whatsappNumber().equals(waId) && r.stage().startsWith("⏰ Waiting"));
+        // every waiting row is above every other row
+        int lastWaiting = -1, firstOther = Integer.MAX_VALUE;
+        for (int i = 0; i < rows.size(); i++) {
+            boolean waiting = rows.get(i).stage() != null && rows.get(i).stage().startsWith("⏰");
+            if (waiting) lastWaiting = i; else firstOther = Math.min(firstOther, i);
+        }
+        assertThat(lastWaiting).isLessThan(firstOther);
+    }
+
+    @Test
     void theBookingsPageGroupsByState() {
         LocalDate today = LocalDate.now(LeadNudges.LUSAKA);
         Lead l = new Lead();

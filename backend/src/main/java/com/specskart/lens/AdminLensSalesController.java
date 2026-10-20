@@ -18,8 +18,11 @@ public class AdminLensSalesController {
 
     private final LensInquiryService service;
     private final CurrentUser currentUser;
+    private final com.specskart.whatsapp.LeadNudges leadNudges;
 
-    public AdminLensSalesController(LensInquiryService service, CurrentUser currentUser) {
+    public AdminLensSalesController(LensInquiryService service, CurrentUser currentUser,
+                                    com.specskart.whatsapp.LeadNudges leadNudges) {
+        this.leadNudges = leadNudges;
         this.service = service;
         this.currentUser = currentUser;
     }
@@ -51,7 +54,9 @@ public class AdminLensSalesController {
     public LensDtos.InquiryView walkIn(@RequestBody LensDtos.WalkInSale req, Authentication auth) {
         // the pair of lens blanks comes off this shop's shelf
         if (req.storeId() != null) currentUser.assertStoreAccess(auth, req.storeId());
-        return service.walkInSale(req);
+        LensDtos.InquiryView sale = service.walkInSale(req);
+        leadNudges.bought(req.phone(), "lenses", sale.priceMinor() == null ? 0 : sale.priceMinor());
+        return sale;
     }
 
     @PostMapping("/walk-in/quote")
