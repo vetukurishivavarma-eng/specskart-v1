@@ -53,10 +53,17 @@ class BotClassifyTest {
         var saturdayAfternoon = java.time.ZonedDateTime.of(2026, 10, 24, 15, 0, 0, 0, lusaka);
         var mondayEarly = java.time.ZonedDateTime.of(2026, 10, 26, 7, 0, 0, 0, lusaka);
         assertThat(WhatsAppBotService.openNowLine(tuesdayNoon)).contains("open now, until 17:00");
-        assertThat(WhatsAppBotService.openNowLine(fridayEvening)).contains("closed").contains("tomorrow");
+        assertThat(WhatsAppBotService.openNowLine(fridayEvening.plusWeeks(1))).contains("closed").contains("tomorrow");
         assertThat(WhatsAppBotService.openNowLine(saturdayAfternoon)).contains("on Monday");
         assertThat(WhatsAppBotService.openNowLine(mondayEarly)).contains("today at 8:00");
         assertThat(WhatsAppBotService.isOpen(mondayEarly.withHour(8).withMinute(30))).isTrue();
+        // holidays: Fri 23 Oct evening -> Sat 24 is Independence Day -> Monday; Christmas (Fri) -> Saturday
+        var independenceDay = java.time.ZonedDateTime.of(2026, 10, 24, 10, 0, 0, 0, lusaka);
+        var christmas = java.time.ZonedDateTime.of(2026, 12, 25, 10, 0, 0, 0, lusaka);
+        assertThat(WhatsAppBotService.openNowLine(fridayEvening)).contains("on Monday");
+        assertThat(WhatsAppBotService.isOpen(independenceDay)).isFalse();
+        assertThat(WhatsAppBotService.openNowLine(independenceDay)).contains("closed today for Independence Day").contains("on Monday");
+        assertThat(WhatsAppBotService.openNowLine(christmas)).contains("Christmas").contains("tomorrow");
         assertThat(WhatsAppBotService.kwacha(45_000)).isEqualTo("K450");
         assertThat(WhatsAppBotService.kwacha(99_900)).isEqualTo("K999");
     }

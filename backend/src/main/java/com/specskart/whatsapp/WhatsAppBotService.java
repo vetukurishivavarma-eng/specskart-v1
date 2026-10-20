@@ -767,25 +767,42 @@ public class WhatsAppBotService {
      * ponytail: hours mirror the FAQ and ignore public holidays; read them from the shop if that matters.
      */
     static String openNowLine(java.time.ZonedDateTime now) {
-        return isOpen(now) ? "🟢 We're open now, until " + closingHour(now) + ":00 today."
-                : "🔴 We're closed right now. We open " + nextOpening(now) + " at " + OPENS_AT + ":00.";
+        if (isOpen(now)) return "🟢 We're open now, until " + closingHour(now.toLocalDate()) + ":00 today.";
+        String holiday = HOLIDAYS.get(now.toLocalDate());
+        return (holiday != null ? "🔴 We're closed today for " + holiday + "." : "🔴 We're closed right now.")
+                + " We open " + nextOpening(now) + " at " + OPENS_AT + ":00.";
     }
 
     /** Opening hour every open day (Google Maps listing: 8:00). */
     static final int OPENS_AT = 8;
 
-    /** 17 weekdays, 14 Saturday, 0 = closed all day (Sunday). */
-    private static int closingHour(java.time.ZonedDateTime now) {
-        return switch (now.getDayOfWeek()) { case SUNDAY -> 0; case SATURDAY -> 14; default -> 17; };
+    /**
+     * Public holidays the shop closes on (client's list, 2026-10-20).
+     * ponytail: hardcoded for 2026 -- add next year's dates here when the client sends them.
+     */
+    static final Map<java.time.LocalDate, String> HOLIDAYS = Map.of(
+            java.time.LocalDate.of(2026, 10, 24), "Independence Day",
+            java.time.LocalDate.of(2026, 12, 25), "Christmas");
+
+    /** 17 weekdays, 14 Saturday, 0 = closed all day (Sunday or a holiday). */
+    private static int closingHour(java.time.LocalDate day) {
+        if (HOLIDAYS.containsKey(day)) return 0;
+        return switch (day.getDayOfWeek()) { case SUNDAY -> 0; case SATURDAY -> 14; default -> 17; };
     }
 
     static boolean isOpen(java.time.ZonedDateTime now) {
-        return now.getHour() >= OPENS_AT && now.getHour() < closingHour(now);
+        return now.getHour() >= OPENS_AT && now.getHour() < closingHour(now.toLocalDate());
     }
 
+    /** "today", "tomorrow" or "on Monday": the next day the shop opens, skipping Sundays and holidays. */
     static String nextOpening(java.time.ZonedDateTime now) {
-        if (closingHour(now) > 0 && now.getHour() < OPENS_AT) return "today";
-        return switch (now.getDayOfWeek()) { case SATURDAY, SUNDAY -> "on Monday"; default -> "tomorrow"; };
+        for (int i = 0; i < 14; i++) {
+            java.time.LocalDate day = now.toLocalDate().plusDays(i);
+            if (closingHour(day) == 0 || (i == 0 && now.getHour() >= OPENS_AT)) continue;
+            return i == 0 ? "today" : i == 1 ? "tomorrow"
+                    : "on " + day.getDayOfWeek().getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH);
+        }
+        return "soon";
     }
 
     private static java.time.ZonedDateTime lusakaNow() {
