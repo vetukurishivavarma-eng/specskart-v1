@@ -86,6 +86,12 @@ class ChatMenuTest {
         assertThat(texts.get(1)).contains("50%");
         assertThat(texts.get(2)).contains("free");
         assertThat(texts.get(3)).contains("K200").contains("photo of your prescription").doesNotContain("/lens?");
+
+        // asking the same question again gets the answer again, not silence (2026-10-20 device test)
+        int again = mark();
+        inbound.process(new InboundMessage(waId, waId, "Cathy", "how much does it cost for a eye check up", null, msgId(waId, "q5"), Map.of()));
+        assertThat(since(again).stream().filter(s -> waId.equals(s.toWaId())))
+                .anyMatch(s -> s.text() != null && s.text().contains("free"));
     }
 
     private void faq(String title, String answer) {

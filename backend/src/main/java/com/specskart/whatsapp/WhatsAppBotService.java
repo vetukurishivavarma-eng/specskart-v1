@@ -245,10 +245,10 @@ public class WhatsAppBotService {
             case BUDGET_MED -> sendBudgetPicks(lead, "mid");
             case BUDGET_HIGH -> sendBudgetPicks(lead, "high");
             case SUITS_YOU -> sendFaceChart(lead);
-            case EXPLORE_FRAMES -> sendText(lead, "Browse all our frames here — filter by shape and price:\n"
+            case EXPLORE_FRAMES -> sendLink(lead, "Browse all our frames here — filter by shape and price:\n"
                     + props.frontendBaseUrl() + "/store");
             case PRICE -> sendPrice(lead, text);
-            case VISIT_WEBSITE -> sendText(lead, "Here's our website: " + props.frontendBaseUrl());
+            case VISIT_WEBSITE -> sendLink(lead, "Here's our website: " + props.frontendBaseUrl());
             case EXPLORE_LENS -> sendLensLink(lead);
             case TRACK_ORDER -> sendOrderStatus(lead);
             case CARE -> sendCare(lead);
@@ -376,7 +376,7 @@ public class WhatsAppBotService {
                 .toList();
 
         if (options.isEmpty()) {
-            sendText(lead, "I can't find an order under this number yet. "
+            sendLink(lead, "I can't find an order under this number yet. "
                     + "Configure your lenses here and I'll keep you posted at every step:\n"
                     + lensInquiries.personalLink(lead));
             return;
@@ -443,7 +443,6 @@ public class WhatsAppBotService {
         String text = (withQuestion ? "*" + f.getQuestion() + "*\n\n" : "")
                 + (hours ? openNowLine(lusakaNow()) + "\n\n" : "") + f.getAnswer();
         if (!f.getTitle().equalsIgnoreCase("Eye check-up")) { sendText(lead, text); return; }
-        if (sentRecently(lead, text)) { sendHandoff(lead); return; }
         provider.sendButtons(waId(lead), text, List.of(new WhatsAppProvider.Button(LeadNudges.BTN_BOOK, "Book my visit")));
         logOutbound(lead.getId(), "interactive", text);
     }
@@ -544,7 +543,7 @@ public class WhatsAppBotService {
     }
 
     private void sendLensLink(Lead lead) {
-        sendText(lead, "Take a look and configure your lenses here — clear or photochromatic, "
+        sendLink(lead, "Take a look and configure your lenses here — clear or photochromatic, "
                 + "with or without blue-block:\n" + lensInquiries.personalLink(lead));
     }
 
@@ -552,7 +551,7 @@ public class WhatsAppBotService {
         leadService.saveStyleProfile(lead.getId(), null, null, tier, null);
         List<Product> picks = catalog.forBudget(lead.getFaceShape(), tier, 3);
         if (picks.isEmpty()) {
-            sendText(lead, "Nothing in that range right now — here's the full shop:\n" + shopLink(lead));
+            sendLink(lead, "Nothing in that range right now — here's the full shop:\n" + shopLink(lead));
             return;
         }
         leadService.rememberPicks(lead.getId(), picks.stream().map(Product::getSlug).toList());
@@ -763,7 +762,7 @@ public class WhatsAppBotService {
     }
 
     private void sendShop(Lead lead, String intro) {
-        sendText(lead, intro + shopLink(lead));
+        sendLink(lead, intro + shopLink(lead));
     }
 
     /** Post-analysis "Show Me Frames": send the actual matched products with prices + a buy link. */
@@ -781,9 +780,17 @@ public class WhatsAppBotService {
         sendText(lead, "Or browse the full set & check out here:\n" + link);
     }
 
-    private void sendText(Lead lead, String text) {
-        // The same link four times in a row is what a customer reads as "nobody is there".
+    /**
+     * A link (configurator, website, shop) -- the same one four times in a row is what a customer
+     * reads as "nobody is there", so a repeat within the window becomes the "a person will reply"
+     * note. Answers to a question (FAQ, price, booking) go through sendText and are always sent.
+     */
+    private void sendLink(Lead lead, String text) {
         if (sentRecently(lead, text)) { sendHandoff(lead); return; }
+        sendText(lead, text);
+    }
+
+    private void sendText(Lead lead, String text) {
         provider.sendText(waId(lead), text);
         logOutbound(lead.getId(), "text", text);
         analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
