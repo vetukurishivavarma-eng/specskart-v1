@@ -47,9 +47,11 @@ public class AdminChatController {
     private final ServiceWindow window;
     private final WhatsAppBotService bot;
     private final AppProperties props;
+    private final LeadNudges nudges;
 
     public AdminChatController(LeadRepository leads, WhatsAppMessageRepository messages, WhatsAppProvider provider,
-                               ServiceWindow window, WhatsAppBotService bot, AppProperties props) {
+                               ServiceWindow window, WhatsAppBotService bot, AppProperties props, LeadNudges nudges) {
+        this.nudges = nudges;
         this.leads = leads;
         this.messages = messages;
         this.provider = provider;
@@ -115,6 +117,7 @@ public class AdminChatController {
         lead.setAgentChatUntil(Instant.now().plus(QUIET_HOURS, ChronoUnit.HOURS));
         lead.setLastContactAt(Instant.now());
         leads.save(lead);
+        nudges.staffReplied(lead.getId()); // stop the "still waiting" pushes; schedule the one follow-up
         return get(waId);
     }
 

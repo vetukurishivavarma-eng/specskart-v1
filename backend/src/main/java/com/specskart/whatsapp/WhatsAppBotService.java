@@ -54,6 +54,9 @@ public class WhatsAppBotService {
     static final String BTN_CARE = "CARE";
     static final String BTN_FAQ = "FAQ";
     static final String BTN_SUITS = "SUITS_YOU";
+    static final String BTN_FRAME_PHOTOS = "FRAME_PHOTOS";
+    /** How many frame photos one "show me frames" sends -- enough to browse, not a flood. */
+    static final int FRAME_PHOTOS = 5;
     /** A tapped FAQ row: {@code FAQ:<uuid>}, or {@code FAQ_MORE:<offset>} for the next page. */
     static final String ROW_FAQ_PREFIX = "FAQ:";
     static final String ROW_FAQ_MORE_PREFIX = "FAQ_MORE:";
@@ -116,6 +119,8 @@ public class WhatsAppBotService {
     private final MembershipService memberships;
     private final FaqRepository faqs;
     private final com.specskart.push.PushService push;
+    private final LeadNudges nudges;
+    private final com.specskart.catalog.ProductImageRepository productImages;
 
     public WhatsAppBotService(WhatsAppProvider provider, WhatsAppMessageRepository messages,
                               FrameFinderService frameFinder, LeadService leadService,
@@ -123,7 +128,10 @@ public class WhatsAppBotService {
                               CatalogService catalog, CartService carts, LeadFollowUpService followUp,
                               ReviewCaptureService reviewCapture, OrderQueryService orderQuery,
                               LensInquiryService lensInquiries, MembershipService memberships,
-                              FaqRepository faqs, com.specskart.push.PushService push) {
+                              FaqRepository faqs, com.specskart.push.PushService push,
+                              LeadNudges nudges, com.specskart.catalog.ProductImageRepository productImages) {
+        this.nudges = nudges;
+        this.productImages = productImages;
         this.faqs = faqs;
         this.push = push;
         this.orderQuery = orderQuery;
@@ -152,6 +160,7 @@ public class WhatsAppBotService {
         logInbound(lead.getId(), waMessageId, mediaName != null ? mediaName : text, buttonId, mediaId);
         // opt-out keyword (answered there -- a menu after "STOP" reads as ignoring it), or defer the automated touches
         if (followUp.onInbound(lead.getId(), text)) return;
+        nudges.customerWrote(lead.getId());
 
         // Nobody is watching the chat screen all day: tell the staff phones someone wrote in, so they
         // can take over from the bot. A menu-button tap is the bot's own conversation -- not pushed,
@@ -168,6 +177,7 @@ public class WhatsAppBotService {
         // for the menu. Logged above, so it shows up in the chat.
         if (staffChat) {
             log.info("bot quiet for lead {} (staff chat until {})", lead.getId(), lead.getAgentChatUntil());
+            nudges.awaitingStaff(lead.getId());
             return;
         }
 
@@ -202,6 +212,10 @@ public class WhatsAppBotService {
             handleFaqRow(lead, buttonId.substring(ROW_FAQ_PREFIX.length()));
             return;
         }
+        if (buttonId != null && buttonId.startsWith(LeadNudges.ROW_BOOK_PREFIX)) {
+            handleBook(lead, buttonId.substring(LeadNudges.ROW_BOOK_PREFIX.length()));
+            return;
+        }
         if (buttonId != null && buttonId.startsWith(ROW_FAQ_MORE_PREFIX)) {
             sendFaqs(lead, Integer.parseInt(buttonId.substring(ROW_FAQ_MORE_PREFIX.length())));
             return;
@@ -210,12 +224,10 @@ public class WhatsAppBotService {
         if (buttonId == null) {
             // A photo is nearly always a prescription (or the frame they want): a person has to look.
             if (mediaId != null) { sendHandoff(lead, true); return; }
+            java.time.LocalDate asked = text == null ? null : requestedDay(text.toLowerCase(), lusakaNow().toLocalDate());
+            if (asked != null && VISIT_WORDS.matcher(text.toLowerCase()).find()) { sendDayAnswer(lead, asked); return; }
             Optional<Faq> faq = faqFor(text);
-            if (faq.isPresent()) {
-                boolean hours = faq.get().getTitle().equalsIgnoreCase("Opening hours");
-                sendText(lead, (hours ? openNowLine(lusakaNow()) + "\n\n" : "") + faq.get().getAnswer());
-                return;
-            }
+            if (faq.isPresent()) { sendFaqAnswer(lead, faq.get(), false); return; }
         }
 
         BotIntent intent = classify(text, buttonId);
@@ -226,6 +238,8 @@ public class WhatsAppBotService {
             // suits you?" -> Yes: the face-shape chart / Explore: the website with its shape +
             // price filters. A price question gets the range and the shop's address.
             case FRAMES, HELP_CHOOSE -> sendSuitsPrompt(lead);
+            case FRAME_PHOTOS -> sendFramePhotos(lead);
+            case BOOK_VISIT -> sendBookingDays(lead);
             // budget buttons still sitting in older chats keep working
             case BUDGET_LOW -> sendBudgetPicks(lead, "low");
             case BUDGET_MED -> sendBudgetPicks(lead, "mid");
@@ -263,11 +277,12 @@ public class WhatsAppBotService {
     public void sendWelcome(Lead lead) {
         String name = lead.getName() != null ? " " + lead.getName().split(" ")[0] : "";
         List<WhatsAppProvider.Button> buttons = new ArrayList<>();
-        buttons.add(new WhatsAppProvider.Button(BTN_EXPLORE_LENS, "Explore Lens 🔍"));
+        // The free eye test is what gets people through the door, so it leads (Meta allows 3 buttons).
+        buttons.add(new WhatsAppProvider.Button(LeadNudges.BTN_BOOK, "Free eye test 👁️"));
         // Only worth a button to someone who has actually ordered — a fresh lead has nothing to track.
-        if (latestOrderUpdate(lead).isPresent()) {
-            buttons.add(new WhatsAppProvider.Button(BTN_TRACK_ORDER, "Track my order 📦"));
-        }
+        buttons.add(latestOrderUpdate(lead).isPresent()
+                ? new WhatsAppProvider.Button(BTN_TRACK_ORDER, "Track my order 📦")
+                : new WhatsAppProvider.Button(BTN_EXPLORE_LENS, "Explore Lens 🔍"));
         buttons.add(new WhatsAppProvider.Button(BTN_FAQ, "FAQs ❓"));
         provider.sendButtons(waId(lead),
                 "Hi" + name + " 👋\nWelcome to " + props.storeName() + ".", buttons);
@@ -288,6 +303,10 @@ public class WhatsAppBotService {
 
     private List<WhatsAppProvider.Row> menuRows() {
         List<WhatsAppProvider.Row> rows = new ArrayList<>(List.of(
+                new WhatsAppProvider.Row(LeadNudges.BTN_BOOK, "Book a free eye test",
+                        "Pick a day and we'll expect you"),
+                new WhatsAppProvider.Row(BTN_FRAME_PHOTOS, "See our frames",
+                        "Photos and prices, right here in the chat"),
                 new WhatsAppProvider.Row(BTN_EXPLORE_LENS, "Lenses",
                         "Clear or photochromatic, with or without blue-block"),
                 new WhatsAppProvider.Row(BTN_TRACK_ORDER, "Track my order",
@@ -414,8 +433,114 @@ public class WhatsAppBotService {
     private void handleFaqRow(Lead lead, String id) {
         Optional<Faq> faq;
         try { faq = faqs.findById(UUID.fromString(id)); } catch (IllegalArgumentException e) { faq = Optional.empty(); }
-        faq.ifPresentOrElse(f -> sendText(lead, "*" + f.getQuestion() + "*\n\n" + f.getAnswer()),
+        faq.ifPresentOrElse(f -> sendFaqAnswer(lead, f, true),
                 () -> sendFaqs(lead, 0)); // deleted since the list went out
+    }
+
+    /** An FAQ answer. Opening hours lead with open/closed right now; the eye test offers to book it. */
+    private void sendFaqAnswer(Lead lead, Faq f, boolean withQuestion) {
+        boolean hours = f.getTitle().equalsIgnoreCase("Opening hours");
+        String text = (withQuestion ? "*" + f.getQuestion() + "*\n\n" : "")
+                + (hours ? openNowLine(lusakaNow()) + "\n\n" : "") + f.getAnswer();
+        if (!f.getTitle().equalsIgnoreCase("Eye check-up")) { sendText(lead, text); return; }
+        if (sentRecently(lead, text)) { sendHandoff(lead); return; }
+        provider.sendButtons(waId(lead), text, List.of(new WhatsAppProvider.Button(LeadNudges.BTN_BOOK, "Book my visit")));
+        logOutbound(lead.getId(), "interactive", text);
+    }
+
+    /**
+     * "Book my visit": the next three days the shop is open. Today only while there's at least an
+     * hour left, so nobody books a 16:55 slot they can't make.
+     */
+    private void sendBookingDays(Lead lead) {
+        sendBookingDays(lead, lusakaNow().toLocalDate(), "When would you like to come in for your free eye check-up? 👁️\n"
+                + "Pick a day and we'll expect you. There's no fee and no fixed time: come any time we're open.");
+    }
+
+    /**
+     * "Can I come on 1 Jan?" / "are you open on Saturday?": that day's answer, and day buttons
+     * starting from it -- so a holiday or a Sunday is said out loud, with the next open days offered.
+     */
+    private void sendDayAnswer(Lead lead, java.time.LocalDate day) {
+        var today = lusakaNow().toLocalDate();
+        if (day.isBefore(today)) day = today;
+        String name = LeadNudges.DAY.format(day) + (day.getYear() != today.getYear() ? " " + day.getYear() : "");
+        String holiday = HOLIDAYS.get(day);
+        String body = day.equals(today)
+                ? openNowLine(lusakaNow()) + "\nTap a day and we'll expect you for your free eye check-up 👁️"
+                : closingHour(day) == 0
+                ? "🔴 We're closed on " + name + (holiday != null ? " (" + holiday + ")" : "") + ".\n"
+                        + "The next days we're open are below. Tap one and we'll expect you for your free eye check-up 👁️"
+                : "🟢 Yes, we're open on " + name + ", " + OPENS_AT + ":00–" + closingHour(day) + ":00.\n"
+                        + "Tap the day and we'll expect you for your free eye check-up 👁️";
+        sendBookingDays(lead, day, body);
+    }
+
+    private void sendBookingDays(Lead lead, java.time.LocalDate from, String body) {
+        var now = lusakaNow();
+        List<WhatsAppProvider.Button> days = new ArrayList<>();
+        for (int i = 0; i < 14 && days.size() < 3; i++) {
+            java.time.LocalDate day = from.plusDays(i);
+            int close = closingHour(day);
+            if (close == 0 || (day.equals(now.toLocalDate()) && now.getHour() >= close - 1)) continue;
+            long ahead = java.time.temporal.ChronoUnit.DAYS.between(now.toLocalDate(), day);
+            String label = ahead == 0 ? "Today" : ahead == 1 ? "Tomorrow"
+                    : java.time.format.DateTimeFormatter.ofPattern("EEE d MMM", java.util.Locale.ENGLISH).format(day);
+            days.add(new WhatsAppProvider.Button(LeadNudges.ROW_BOOK_PREFIX + day, label));
+        }
+        provider.sendButtons(waId(lead), body, days);
+        logOutbound(lead.getId(), "interactive", "booking-days");
+        analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
+    }
+
+    private void handleBook(Lead lead, String isoDay) {
+        java.time.LocalDate day;
+        try { day = java.time.LocalDate.parse(isoDay); } catch (java.time.format.DateTimeParseException e) { day = null; }
+        // an old button from last week, or a holiday since: offer fresh days rather than book a closed one
+        if (day == null || day.isBefore(lusakaNow().toLocalDate()) || closingHour(day) == 0) {
+            sendBookingDays(lead);
+            return;
+        }
+        nudges.book(lead.getId(), day);
+        leadService.advanceStatusSoft(lead.getId(), LeadStatus.INTERESTED);
+        boolean today = day.equals(lusakaNow().toLocalDate());
+        String shops = lensInquiries.shopLines();
+        sendText(lead, "✅ You're booked for a free eye check-up " + (today ? "today" : "on " + LeadNudges.DAY.format(day)) + ".\n"
+                + "We're open " + OPENS_AT + ":00–" + closingHour(day) + ":00 that day. Come any time and "
+                + "bring your old glasses or prescription if you have them."
+                + (shops.isBlank() ? "" : "\n\n" + shops)
+                + (today ? "" : "\n\nWe'll send you a reminder that morning."));
+    }
+
+    /**
+     * "Can you share frames on WhatsApp?" -- asked by leads who then went quiet when sent a website.
+     * A few real frames from the catalogue, photo + price, then the way into the shop. Only frames
+     * with a photo Meta can fetch; the web stock count isn't kept up from the till, so it isn't a filter.
+     */
+    private void sendFramePhotos(Lead lead) {
+        if (recentOutbound(lead).stream().anyMatch(m -> "frame-photos".equals(m.getBody()))) { sendHandoff(lead); return; }
+        int sent = 0;
+        for (Product p : catalog.trending(12)) {
+            if (sent == FRAME_PHOTOS || !"FRAME".equals(p.getKind())) continue;
+            String url = productImages.findByProductIdOrderBySortAsc(p.getId()).stream()
+                    .map(i -> props.whatsapp().absoluteAsset(i.getUrl())).filter(java.util.Objects::nonNull)
+                    .findFirst().orElse(null);
+            if (url == null) continue;
+            try {
+                provider.sendImage(waId(lead), url, p.getName() + " · " + kwacha(p.getPriceMinor()));
+                logOutbound(lead.getId(), "image", "frame-photo:" + p.getSlug());
+                sent++;
+            } catch (Exception e) {
+                log.warn("frame photo {} failed for lead {}: {}", p.getSlug(), lead.getId(), e.getMessage());
+            }
+        }
+        if (sent == 0) { sendVisitStore(lead); return; }
+        provider.sendButtons(waId(lead), "A few of our frames 👆 There are many more in the shop, from K300. "
+                        + "Come and try them on: the eye check-up is free.",
+                List.of(new WhatsAppProvider.Button(LeadNudges.BTN_BOOK, "Book my visit"),
+                        new WhatsAppProvider.Button(BTN_EXPLORE, "See more online")));
+        logOutbound(lead.getId(), "interactive", "frame-photos");
+        analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
     }
 
     private void sendLensLink(Lead lead) {
@@ -553,6 +678,8 @@ public class WhatsAppBotService {
                     case BTN_MENU -> BotIntent.MENU;
                     case BTN_CARE -> BotIntent.CARE;
                     case BTN_FAQ -> BotIntent.FAQ;
+                    case LeadNudges.BTN_BOOK -> BotIntent.BOOK_VISIT;
+                    case BTN_FRAME_PHOTOS -> BotIntent.FRAME_PHOTOS;
                     case BTN_SUITS -> BotIntent.SUITS_YOU;
                     case BTN_BUDGET_LOW -> BotIntent.BUDGET_LOW;
                     case BTN_BUDGET_MED -> BotIntent.BUDGET_MED;
@@ -564,8 +691,14 @@ public class WhatsAppBotService {
         String t = text == null ? "" : text.toLowerCase().trim();
         if (t.isBlank()) return BotIntent.GREETING;
         if (t.matches(".*(hi|hello|hey|start|namaste).*") && t.length() < 15) return BotIntent.GREETING;
+        // "can you send pics of your specs" -- before MORE_INFO, the ad prefill often rides along with it
+        if ((t.matches(".*\\b(pics?|pictures?|photos?|images?|catalog(ue)?|share)\\b.*")
+                        || t.matches(".*\\b(see|show)\\b.*\\b(frames?|specs|glasses|spectacles)\\b.*"))
+                && !t.matches(".*\\b(prescription|rx)\\b.*")
+                && !LENS_WORDS.matcher(t).find()) return BotIntent.FRAME_PHOTOS; // "photo chromatic"
         if (t.contains("information") || t.contains("more info") || t.contains("details")) return BotIntent.MORE_INFO;
         if (t.contains("menu") || t.contains("options")) return BotIntent.MENU;
+        if (t.matches(".*\\b(book|booking|appointment)\\b.*")) return BotIntent.BOOK_VISIT;
         if (t.contains("faq") || t.contains("question")) return BotIntent.FAQ;
         if (MembershipService.ENABLED && (t.contains("care") || t.contains("member"))) return BotIntent.CARE;
         // Before the lens check on purpose — "where is my lens order" is a tracking question.
@@ -579,7 +712,7 @@ public class WhatsAppBotService {
         if (LENS_WORDS.matcher(t).find()) return BotIntent.EXPLORE_LENS;
         if (t.contains("help") || t.contains("choose") || t.contains("recommend") || t.contains("suggest")) return BotIntent.HELP_CHOOSE;
         if (t.matches(".*\\bfaces?\\b.*") || t.contains("suit") || t.contains("frame finder") || t.equals("1")) return BotIntent.FIND_FRAMES;
-        if (t.contains("explore") || t.contains("latest") || t.contains("catalog") || t.equals("2")) return BotIntent.EXPLORE_FRAMES;
+        if (t.contains("explore") || t.contains("latest") || t.equals("2")) return BotIntent.EXPLORE_FRAMES;
         if (t.contains("website") || t.contains("site") || t.equals("3")) return BotIntent.VISIT_WEBSITE;
         if (t.matches(".*\\b(frames?|spectacles?|specs|glasses|eyewear|sunglasses)\\b.*")) return BotIntent.FRAMES;
         return BotIntent.UNKNOWN;
@@ -600,6 +733,7 @@ public class WhatsAppBotService {
     private void sendSuitsPrompt(Lead lead) {
         provider.sendButtons(waId(lead), "Would you like to know which frames suit your face? 👓",
                 List.of(new WhatsAppProvider.Button(BTN_SUITS, "Yes, show me"),
+                        new WhatsAppProvider.Button(BTN_FRAME_PHOTOS, "See photos 📸"),
                         new WhatsAppProvider.Button(BTN_EXPLORE, "Explore frames")));
         logOutbound(lead.getId(), "interactive", "suits-prompt");
     }
@@ -659,6 +793,7 @@ public class WhatsAppBotService {
 
     /** "A person will reply" -- once per window, then quiet until staff pick the chat up. */
     private void sendHandoff(Lead lead, boolean photo) {
+        nudges.awaitingStaff(lead.getId()); // even when the note itself isn't repeated
         if (recentOutbound(lead).stream().anyMatch(m -> m.getBody() != null && m.getBody().contains(HANDOFF_MARK))) return;
         var now = lusakaNow();
         String text = (photo ? "Got your photo, thanks 📸 " : "Thanks! ")
@@ -710,6 +845,7 @@ public class WhatsAppBotService {
      * it into a real quote -- the configurator link it used to get converted nobody.
      */
     private void sendPrice(Lead lead, String text) {
+        nudges.quoted(lead.getId());
         String t = text == null ? "" : text.toLowerCase();
         boolean lens = LENS_WORDS.matcher(t).find() || RX_NUMBER.matcher(t).find();
         boolean frames = t.matches(".*\\b(frames?|spectacles?|specs|glasses|sunglasses)\\b.*");
@@ -744,6 +880,45 @@ public class WhatsAppBotService {
             if (v > bestAbs) { bestAbs = v; best = (m.group(1) == null ? "" : m.group(1).trim()) + m.group(2); }
         }
         return best;
+    }
+
+    static final java.util.regex.Pattern VISIT_WORDS = java.util.regex.Pattern.compile(
+            "visit|\\bcome\\b|coming|\\bopen\\b|book|appointment|drop in|pass by|available|working");
+    private static final String MONTHS = "jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec";
+    private static final java.util.regex.Pattern DAY_MONTH = java.util.regex.Pattern.compile(
+            "\\b(\\d{1,2})(?:st|nd|rd|th)?\\s*(?:of\\s+)?(" + MONTHS + ")[a-z]*\\.?(?:,?\\s*(20\\d\\d))?");
+    private static final java.util.regex.Pattern MONTH_DAY = java.util.regex.Pattern.compile(
+            "\\b(" + MONTHS + ")[a-z]*\\.?\\s*(\\d{1,2})(?:st|nd|rd|th)?\\b(?:,?\\s*(20\\d\\d))?");
+    private static final java.util.regex.Pattern WEEKDAY = java.util.regex.Pattern.compile(
+            "\\b(mon|tue|wed|thu|fri|sat|sun)(day|sday|nesday|rsday|urday)\\b|\\b(mon|tues?|wed|thurs?|fri|sat)\\b");
+
+    /**
+     * The day a customer names: "today", "tomorrow", "saturday", "1 jan", "january 1st 2027".
+     * A date with no year that has passed means next year. Null when there's none.
+     */
+    static java.time.LocalDate requestedDay(String t, java.time.LocalDate today) {
+        if (t.matches(".*\\btomorrow\\b.*")) return today.plusDays(1);
+        if (t.matches(".*\\btoday\\b.*")) return today;
+        java.util.regex.Matcher m = DAY_MONTH.matcher(t);
+        Integer day = null, year = null;
+        String month = null;
+        if (m.find()) { day = Integer.valueOf(m.group(1)); month = m.group(2); year = m.group(3) == null ? null : Integer.valueOf(m.group(3)); }
+        else if ((m = MONTH_DAY.matcher(t)).find()) { month = m.group(1); day = Integer.valueOf(m.group(2)); year = m.group(3) == null ? null : Integer.valueOf(m.group(3)); }
+        if (month != null) {
+            int mon = MONTHS.indexOf(month) / 4 + 1;
+            try {
+                java.time.LocalDate d = java.time.LocalDate.of(year != null ? year : today.getYear(), mon, day);
+                return year == null && d.isBefore(today) ? d.plusYears(1) : d;
+            } catch (java.time.DateTimeException badDate) { return null; }
+        }
+        m = WEEKDAY.matcher(t);
+        if (m.find()) {
+            String[] names = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"};
+            String abbr = (m.group(1) != null ? m.group(1) : m.group(3)).substring(0, 3);
+            java.time.DayOfWeek dow = java.time.DayOfWeek.of(java.util.Arrays.asList(names).indexOf(abbr) + 1);
+            return today.with(java.time.temporal.TemporalAdjusters.nextOrSame(dow));
+        }
+        return null;
     }
 
     private void sendLensQuote(Lead lead, String power, Map<String, Long> prices) {
@@ -800,7 +975,7 @@ public class WhatsAppBotService {
             Map.entry(java.time.LocalDate.of(2027, 12, 25), "Christmas"));
 
     /** 17 weekdays, 14 Saturday, 0 = closed all day (Sunday or a holiday). */
-    private static int closingHour(java.time.LocalDate day) {
+    static int closingHour(java.time.LocalDate day) {
         if (HOLIDAYS.containsKey(day)) return 0;
         return switch (day.getDayOfWeek()) { case SUNDAY -> 0; case SATURDAY -> 14; default -> 17; };
     }
@@ -820,7 +995,7 @@ public class WhatsAppBotService {
         return "soon";
     }
 
-    private static java.time.ZonedDateTime lusakaNow() {
+    static java.time.ZonedDateTime lusakaNow() {
         return java.time.ZonedDateTime.now(java.time.ZoneId.of("Africa/Lusaka"));
     }
 

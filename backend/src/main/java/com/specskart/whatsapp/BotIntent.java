@@ -18,5 +18,7 @@ public enum BotIntent {
     PRICE, FRAMES,
     // "Yes" to "would you like to know what suits you?" — the face-shape chart
     SUITS_YOU,
+    // Chat -> shop visit (2026-10-20): book the free eye test; frame photos in the chat
+    BOOK_VISIT, FRAME_PHOTOS,
     GREETING, UNKNOWN
 }

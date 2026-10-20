@@ -18,6 +18,13 @@ Audited all 46 real Zambian leads since 10-01 (fresh backup). 0 real orders. Bot
 - (3) Typed power ("how much for -2 lenses", "colourmatic 0.5") -> real pair prices from the lens price list
   (single vision; CYL/ADD/bifocal -> photo ask). "Are you open?" / handoff note say open/closed NOW in Lusaka
   time. Opening hour 8:00 (Google Maps listing) -- V63 fixes FAQ text. Public holidays not handled.
+- (4) Chat -> shop visit (V65, `LeadNudges`, 5-min job): "Free eye test" button (welcome/menu/eye-test FAQ) ->
+  next 3 open days -> booked (`leads.visit_on`), staff pushed, reminder 7-12h that morning; named days understood
+  ("visit on jan 1 2027" -> closed + New Year's Day + next open days; "open saturday?"); ONE "would you like to come
+  in?" + Book button ~20h after their last message when a price/staff answer went quiet (7-21h, 24h window only,
+  max 1/week); staff re-pushed "X is waiting" at 20 min then every 40 min (max 3, open hours) until a staff reply;
+  "see frames"/"pics" -> 5 frame photos + prices from the catalogue (needs WHATSAPP_ASSET_BASE_URL). Holidays
+  2026+2027 hardcoded in WhatsAppBotService.HOLIDAYS.
 - Not fixed by code (people): staff first-reply took 6-22h for a third of leads; 31 of 46 never got a human reply.
 
 ## RESUME HERE — 2026-10-20

@@ -106,4 +106,9 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
                       @Param("q") String q,
                       @Param("archived") boolean archived,
                       Pageable pageable);
+
+    // LeadNudges (chat -> shop visit)
+    List<Lead> findTop100ByVisitOnAndVisitRemindedOnIsNull(java.time.LocalDate day);
+    List<Lead> findTop100ByQuoteFollowUpDueAtLessThanEqual(Instant due);
+    List<Lead> findTop100ByAwaitingStaffSinceLessThanEqualAndStaffNudgesLessThan(Instant since, int nudges);
 }

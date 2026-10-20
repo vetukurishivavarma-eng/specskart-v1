@@ -108,4 +108,18 @@ public class Lead extends BaseEntity {
 
     /** Staff are chatting with this customer from the business number until then; the bot stays quiet. */
     private Instant agentChatUntil;
+
+    /** The day they booked a free eye test from the chat, and the day we sent that morning's reminder. */
+    private java.time.LocalDate visitOn;
+    private java.time.LocalDate visitRemindedOn;
+
+    /** One "would you like to come in?" after a price went quiet; null = nothing pending. */
+    private Instant quoteFollowUpDueAt;
+    private Instant quoteFollowedUpAt;
+
+    /** A customer was promised a person and no staff reply has come yet; staff phones are re-pushed. */
+    private Instant awaitingStaffSince;
+    private Instant staffNudgedAt;
+    @Column(nullable = false)
+    private int staffNudges;
 }
