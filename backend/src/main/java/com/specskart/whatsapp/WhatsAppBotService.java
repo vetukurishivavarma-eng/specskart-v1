@@ -777,12 +777,27 @@ public class WhatsAppBotService {
     static final int OPENS_AT = 8;
 
     /**
-     * Public holidays the shop closes on (client's list, 2026-10-20).
-     * ponytail: hardcoded for 2026 -- add next year's dates here when the client sends them.
+     * Public holidays the shop closes on (client's lists for 2026 and 2027, sent 2026-10-20).
+     * ponytail: hardcoded -- add 2028's dates here when the client sends them.
      */
-    static final Map<java.time.LocalDate, String> HOLIDAYS = Map.of(
-            java.time.LocalDate.of(2026, 10, 24), "Independence Day",
-            java.time.LocalDate.of(2026, 12, 25), "Christmas");
+    static final Map<java.time.LocalDate, String> HOLIDAYS = Map.ofEntries(
+            Map.entry(java.time.LocalDate.of(2026, 10, 24), "Independence Day"),
+            Map.entry(java.time.LocalDate.of(2026, 12, 25), "Christmas"),
+            Map.entry(java.time.LocalDate.of(2027, 1, 1), "New Year's Day"),
+            Map.entry(java.time.LocalDate.of(2027, 3, 8), "International Women's Day"),
+            Map.entry(java.time.LocalDate.of(2027, 3, 12), "Youth Day"),
+            Map.entry(java.time.LocalDate.of(2027, 3, 26), "Good Friday"),
+            Map.entry(java.time.LocalDate.of(2027, 3, 27), "Holy Saturday"),
+            Map.entry(java.time.LocalDate.of(2027, 3, 29), "Easter Monday"),
+            Map.entry(java.time.LocalDate.of(2027, 4, 28), "Kenneth Kaunda Day"),
+            Map.entry(java.time.LocalDate.of(2027, 5, 1), "Labour Day"),
+            Map.entry(java.time.LocalDate.of(2027, 5, 25), "African Freedom Day"),
+            Map.entry(java.time.LocalDate.of(2027, 7, 5), "Heroes' Day"),
+            Map.entry(java.time.LocalDate.of(2027, 7, 6), "Unity Day"),
+            Map.entry(java.time.LocalDate.of(2027, 8, 2), "Farmers' Day"),
+            Map.entry(java.time.LocalDate.of(2027, 10, 24), "Independence Day"),
+            Map.entry(java.time.LocalDate.of(2027, 10, 25), "Independence Day (holiday in lieu)"),
+            Map.entry(java.time.LocalDate.of(2027, 12, 25), "Christmas"));
 
     /** 17 weekdays, 14 Saturday, 0 = closed all day (Sunday or a holiday). */
     private static int closingHour(java.time.LocalDate day) {

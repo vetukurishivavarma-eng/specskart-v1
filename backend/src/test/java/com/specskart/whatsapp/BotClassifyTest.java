@@ -64,6 +64,9 @@ class BotClassifyTest {
         assertThat(WhatsAppBotService.isOpen(independenceDay)).isFalse();
         assertThat(WhatsAppBotService.openNowLine(independenceDay)).contains("closed today for Independence Day").contains("on Monday");
         assertThat(WhatsAppBotService.openNowLine(christmas)).contains("Christmas").contains("tomorrow");
+        // Easter 2027: Thu 25 Mar evening -> Fri/Sat holidays, Sun closed, Mon Easter Monday -> Tuesday
+        assertThat(WhatsAppBotService.nextOpening(java.time.ZonedDateTime.of(2027, 3, 25, 18, 0, 0, 0, lusaka)))
+                .isEqualTo("on Tuesday");
         assertThat(WhatsAppBotService.kwacha(45_000)).isEqualTo("K450");
         assertThat(WhatsAppBotService.kwacha(99_900)).isEqualTo("K999");
     }
