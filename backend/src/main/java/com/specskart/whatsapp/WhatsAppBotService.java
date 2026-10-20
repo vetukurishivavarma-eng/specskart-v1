@@ -76,6 +76,8 @@ public class WhatsAppBotService {
     static final java.time.Duration REPEAT_WINDOW = java.time.Duration.ofHours(2);
     /** Every variant of the "a person will reply" note contains this -- it's how a repeat is spotted. */
     static final String HANDOFF_MARK = "from our team will reply";
+    static final java.time.Duration HANDOFF_WINDOW = java.time.Duration.ofMinutes(30);
+    static final java.time.Duration PHOTO_ACK_WINDOW = java.time.Duration.ofMinutes(5);
     static final java.util.regex.Pattern POWER =
             java.util.regex.Pattern.compile("(?<![\\w.])([+-]\\s?)?(\\d{1,2}(?:\\.\\d{1,2})?)(?![\\w%.])");
     static final java.util.regex.Pattern MULTIFOCAL_WORDS =
@@ -801,7 +803,11 @@ public class WhatsAppBotService {
     /** "A person will reply" -- once per window, then quiet until staff pick the chat up. */
     private void sendHandoff(Lead lead, boolean photo) {
         nudges.awaitingStaff(lead.getId()); // even when the note itself isn't repeated
-        if (recentOutbound(lead).stream().anyMatch(m -> m.getBody() != null && m.getBody().contains(HANDOFF_MARK))) return;
+        // A photo is always acknowledged (one per burst of photos); the plain note at most every 30 min.
+        // Silence after a photo reads as "nobody is there" (2026-10-20 device test).
+        java.time.Instant since = java.time.Instant.now().minus(photo ? PHOTO_ACK_WINDOW : HANDOFF_WINDOW);
+        if (recentOutbound(lead).stream().anyMatch(m -> m.getBody() != null && m.getBody().contains(HANDOFF_MARK)
+                && m.getCreatedAt().isAfter(since) && (!photo || m.getBody().startsWith("Got your photo")))) return;
         var now = lusakaNow();
         String text = (photo ? "Got your photo, thanks 📸 " : "Thanks! ")
                 + (isOpen(now) ? "Someone " + HANDOFF_MARK + " here shortly 🙏"
