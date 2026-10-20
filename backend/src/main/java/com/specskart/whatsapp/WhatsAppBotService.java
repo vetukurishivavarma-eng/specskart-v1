@@ -478,7 +478,13 @@ public class WhatsAppBotService {
     }
 
     private void sendBookingDays(Lead lead, java.time.LocalDate from, String body) {
-        var now = lusakaNow();
+        provider.sendButtons(waId(lead), body, bookingDayButtons(from, lusakaNow()));
+        logOutbound(lead.getId(), "interactive", "booking-days");
+        analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
+    }
+
+    /** The next three open days from {@code from}; today only while there's an hour left. */
+    static List<WhatsAppProvider.Button> bookingDayButtons(java.time.LocalDate from, java.time.ZonedDateTime now) {
         List<WhatsAppProvider.Button> days = new ArrayList<>();
         for (int i = 0; i < 14 && days.size() < 3; i++) {
             java.time.LocalDate day = from.plusDays(i);
@@ -489,9 +495,7 @@ public class WhatsAppBotService {
                     : java.time.format.DateTimeFormatter.ofPattern("EEE d MMM", java.util.Locale.ENGLISH).format(day);
             days.add(new WhatsAppProvider.Button(LeadNudges.ROW_BOOK_PREFIX + day, label));
         }
-        provider.sendButtons(waId(lead), body, days);
-        logOutbound(lead.getId(), "interactive", "booking-days");
-        analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
+        return days;
     }
 
     private void handleBook(Lead lead, String isoDay) {

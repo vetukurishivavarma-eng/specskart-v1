@@ -174,4 +174,59 @@ class LeadNudgesTest {
         assertThat(mine.get(0).buttons()).extracting(WhatsAppProvider.Button::id)
                 .first().isEqualTo(LeadNudges.ROW_BOOK_PREFIX + "2027-01-02");
     }
+
+    @Autowired AdminVisitController visits;
+
+    @Test
+    void aNoShowGetsOneSorryWeMissedYouUnlessStaffMarkedItDone() {
+        String missed = someNumber(), came = someNumber();
+        say(missed, "hi", null, "n0");
+        say(came, "hi", null, "c0");
+        for (String w : List.of(missed, came)) {
+            Lead l = lead(w);
+            l.setVisitOn(TUESDAY_10AM.toLocalDate().minusDays(1));
+            leads.save(l);
+        }
+        visits.done(lead(came).getId());
+
+        int mark = mark();
+        nudges.followUpNoShows(TUESDAY_10AM);
+        nudges.followUpNoShows(TUESDAY_10AM);
+
+        var mine = since(mark, missed);
+        assertThat(mine).hasSize(1);
+        assertThat(mine.get(0).text()).contains("Sorry we missed you");
+        assertThat(mine.get(0).buttons()).isNotEmpty().allMatch(b -> b.id().startsWith(LeadNudges.ROW_BOOK_PREFIX));
+        assertThat(since(mark, came)).isEmpty();
+    }
+
+    @Test
+    void bookedForTodayAndNotInYetGetsOneStillComingAtTwo() {
+        String waId = someNumber();
+        say(waId, "hi", null, "s0");
+        Lead l = lead(waId);
+        l.setVisitOn(TUESDAY_10AM.toLocalDate());
+        leads.save(l);
+
+        int mark = mark();
+        nudges.nudgeSameDay(TUESDAY_10AM.withHour(13));
+        nudges.nudgeSameDay(TUESDAY_10AM.withHour(14));
+        nudges.nudgeSameDay(TUESDAY_10AM.withHour(14));
+
+        var mine = since(mark, waId);
+        assertThat(mine).hasSize(1);
+        assertThat(mine.get(0).text()).contains("Still coming in today").contains("17:00");
+    }
+
+    @Test
+    void theBookingsPageGroupsByState() {
+        LocalDate today = LocalDate.now(LeadNudges.LUSAKA);
+        Lead l = new Lead();
+        l.setVisitOn(today.minusDays(1));
+        assertThat(AdminVisitController.view(l, today).state()).isEqualTo("MISSED");
+        l.setVisitOn(today);
+        assertThat(AdminVisitController.view(l, today).state()).isEqualTo("TODAY");
+        l.setVisitedOn(today);
+        assertThat(AdminVisitController.view(l, today).state()).isEqualTo("DONE");
+    }
 }

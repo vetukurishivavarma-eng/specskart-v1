@@ -40,6 +40,8 @@ public class LeadNudges {
     static final String BTN_BOOK = "BOOK_VISIT";
     /** A tapped day: {@code BOOK:2026-10-21}. */
     static final String ROW_BOOK_PREFIX = "BOOK:";
+    /** The POS app's Bookings page -- where every eye-test push lands. */
+    static final String BOOKINGS_PATH = "/bookings";
     static final ZoneId LUSAKA = ZoneId.of("Africa/Lusaka");
     static final Duration QUIET_AFTER = Duration.ofHours(20);
     static final Duration FOLLOW_UP_GAP = Duration.ofDays(7);
@@ -119,7 +121,7 @@ public class LeadNudges {
         lead.setVisitRemindedOn(day.equals(LocalDate.now(LUSAKA)) ? day : null);
         lead.setQuoteFollowUpDueAt(null);
         leads.save(lead);
-        push.notifyStaff("👁️ Eye test booked: " + who(lead), DAY.format(day), "/chat/" + waId(lead));
+        push.notifyStaff("👁️ Eye test booked: " + who(lead), DAY.format(day), BOOKINGS_PATH);
     }
 
     // ---- the job -----------------------------------------------------------------------------
@@ -130,8 +132,71 @@ public class LeadNudges {
         if (props.whatsapp().nurtureOn()) {
             remindVisits(now);
             followUpQuotes(now);
+            nudgeSameDay(now);
+            followUpNoShows(now);
         }
         nudgeStaff(now);
+        staffDigest(now);
+    }
+
+    // ponytail: in memory -- a restart between 8:00 and 9:00 sends the day's list twice; a column if that bites
+    private LocalDate digestSentOn;
+
+    /** 8:00-9:00: one push listing today's eye tests; tapping it opens the Bookings page. */
+    void staffDigest(ZonedDateTime now) {
+        LocalDate today = now.toLocalDate();
+        if (now.getHour() != 8 || today.equals(digestSentOn)) return;
+        digestSentOn = today;
+        List<Lead> booked = leads.findByVisitOnBetweenOrderByVisitOnAscCreatedAtAsc(today, today);
+        if (booked.isEmpty()) return;
+        String names = String.join(", ", booked.stream().map(LeadNudges::who).toList());
+        push.notifyStaff("👁️ " + booked.size() + " eye test" + (booked.size() == 1 ? "" : "s") + " booked today",
+                names.length() > 180 ? names.substring(0, 180) + "…" : names, BOOKINGS_PATH);
+    }
+
+    /** Booked for today and not in yet: one "still coming?" 3 hours before closing (14:00, Sat 11:00). */
+    void nudgeSameDay(ZonedDateTime now) {
+        LocalDate today = now.toLocalDate();
+        int close = WhatsAppBotService.closingHour(today);
+        if (close == 0 || now.getHour() != close - 3) return;
+        for (Lead lead : leads.findTop100ByVisitOnAndVisitedOnIsNullAndVisitNudgedOnIsNull(today)) {
+            each(lead, l -> {
+                l.setVisitNudgedOn(today);
+                leads.save(l);
+                if (!window.isOpen(waId(l)) || bookedWithin(l, Duration.ofHours(2))) return;
+                String body = "Still coming in today" + firstName(l) + "? 👋 We're open until " + close + ":00 "
+                        + "for your free eye check-up." + shops();
+                provider.sendButtons(waId(l), body, List.of(new WhatsAppProvider.Button(BTN_BOOK, "Another day")));
+                log(l, "interactive", body);
+            });
+        }
+    }
+
+    /** The morning after a missed booking (up to 3 days back): one "sorry we missed you" with new days. */
+    void followUpNoShows(ZonedDateTime now) {
+        if (now.getHour() < 8 || now.getHour() >= 12) return;
+        LocalDate today = now.toLocalDate();
+        for (Lead lead : leads.findTop100ByVisitOnBetweenAndVisitedOnIsNullAndVisitMissedOnIsNull(today.minusDays(3), today.minusDays(1))) {
+            each(lead, l -> {
+                l.setVisitMissedOn(today);
+                leads.save(l);
+                if (!window.isOpen(waId(l))) return; // a rebooking moves visit_on out of this range
+                String body = "Sorry we missed you" + firstName(l) + "! 👋 Would you like to pick another day "
+                        + "for your free eye check-up? 👁️";
+                provider.sendButtons(waId(l), body, WhatsAppBotService.bookingDayButtons(today, now));
+                log(l, "interactive", body);
+            });
+        }
+    }
+
+    /** Staff tapped "Check-up done" on the Bookings page; null undoes a mis-tap. */
+    public void markVisited(UUID leadId, LocalDate day) {
+        update(leadId, lead -> lead.setVisitedOn(day));
+    }
+
+    private boolean bookedWithin(Lead lead, Duration d) {
+        return messages.findByLeadIdAndDirectionAndCreatedAtAfter(lead.getId(), "OUTBOUND", Instant.now().minus(d)).stream()
+                .anyMatch(m -> m.getBody() != null && m.getBody().startsWith("✅ You're booked"));
     }
 
     /** 7:00-12:00 on the booked day, once. */

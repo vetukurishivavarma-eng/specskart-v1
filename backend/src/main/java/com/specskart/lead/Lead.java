@@ -112,6 +112,10 @@ public class Lead extends BaseEntity {
     /** The day they booked a free eye test from the chat, and the day we sent that morning's reminder. */
     private java.time.LocalDate visitOn;
     private java.time.LocalDate visitRemindedOn;
+    /** Staff tapped "Check-up done" (POS Bookings); the day the same-day nudge / no-show message went. */
+    private java.time.LocalDate visitedOn;
+    private java.time.LocalDate visitNudgedOn;
+    private java.time.LocalDate visitMissedOn;
 
     /** One "would you like to come in?" after a price went quiet; null = nothing pending. */
     private Instant quoteFollowUpDueAt;

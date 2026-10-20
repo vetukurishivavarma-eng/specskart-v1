@@ -109,6 +109,9 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
 
     // LeadNudges (chat -> shop visit)
     List<Lead> findTop100ByVisitOnAndVisitRemindedOnIsNull(java.time.LocalDate day);
+    List<Lead> findByVisitOnBetweenOrderByVisitOnAscCreatedAtAsc(java.time.LocalDate from, java.time.LocalDate to);
+    List<Lead> findTop100ByVisitOnAndVisitedOnIsNullAndVisitNudgedOnIsNull(java.time.LocalDate day);
+    List<Lead> findTop100ByVisitOnBetweenAndVisitedOnIsNullAndVisitMissedOnIsNull(java.time.LocalDate from, java.time.LocalDate to);
     List<Lead> findTop100ByQuoteFollowUpDueAtLessThanEqual(Instant due);
     List<Lead> findTop100ByAwaitingStaffSinceLessThanEqualAndStaffNudgesLessThan(Instant since, int nudges);
 }
