@@ -34,4 +34,30 @@ class BotClassifyTest {
         assertThat(WhatsAppBotService.classify("where is my order", null)).isEqualTo(BotIntent.TRACK_ORDER);
         assertThat(WhatsAppBotService.classify(null, "SUITS_YOU")).isEqualTo(BotIntent.SUITS_YOU);
     }
+
+    @Test
+    void aTypedPowerIsReadOnlyWhenItIsUnambiguous() {
+        assertThat(WhatsAppBotService.typedPower("how much for -2 lenses")).isEqualTo("-2");
+        assertThat(WhatsAppBotService.typedPower("how much is colourmatic 0.5")).isEqualTo("0.5");
+        assertThat(WhatsAppBotService.typedPower("right -2.00 left -2.75 price")).isEqualTo("-2.75");
+        assertThat(WhatsAppBotService.typedPower("2 pairs of lenses k450")).isNull();
+        assertThat(WhatsAppBotService.typedPower("-2.00 cyl -1.25 how much")).isNull();
+        assertThat(WhatsAppBotService.typedPower("bifocal -1 +2 price")).isNull();
+    }
+
+    @Test
+    void openingHoursAreAnsweredForRightNowInLusaka() {
+        var lusaka = java.time.ZoneId.of("Africa/Lusaka");
+        var tuesdayNoon = java.time.ZonedDateTime.of(2026, 10, 20, 12, 0, 0, 0, lusaka);
+        var fridayEvening = java.time.ZonedDateTime.of(2026, 10, 23, 18, 0, 0, 0, lusaka);
+        var saturdayAfternoon = java.time.ZonedDateTime.of(2026, 10, 24, 15, 0, 0, 0, lusaka);
+        var mondayEarly = java.time.ZonedDateTime.of(2026, 10, 26, 7, 0, 0, 0, lusaka);
+        assertThat(WhatsAppBotService.openNowLine(tuesdayNoon)).contains("open now, until 17:00");
+        assertThat(WhatsAppBotService.openNowLine(fridayEvening)).contains("closed").contains("tomorrow");
+        assertThat(WhatsAppBotService.openNowLine(saturdayAfternoon)).contains("on Monday");
+        assertThat(WhatsAppBotService.openNowLine(mondayEarly)).contains("today at 8:00");
+        assertThat(WhatsAppBotService.isOpen(mondayEarly.withHour(8).withMinute(30))).isTrue();
+        assertThat(WhatsAppBotService.kwacha(45_000)).isEqualTo("K450");
+        assertThat(WhatsAppBotService.kwacha(99_900)).isEqualTo("K999");
+    }
 }

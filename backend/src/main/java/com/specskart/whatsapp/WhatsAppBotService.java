@@ -71,8 +71,12 @@ public class WhatsAppBotService {
             java.util.regex.Pattern.compile("lens|colou?r ?matic|photo ?-?chrom|blue ?-?(block|light)|transition");
     /** How long the same answer, a menu, or the "someone will reply" note isn't sent again. */
     static final java.time.Duration REPEAT_WINDOW = java.time.Duration.ofHours(2);
-    static final String HANDOFF = "Thanks! Someone from our team will reply here shortly 🙏\n"
-            + "(Mon–Fri 9:00–17:00, Sat 9:00–14:00)";
+    /** Every variant of the "a person will reply" note contains this -- it's how a repeat is spotted. */
+    static final String HANDOFF_MARK = "from our team will reply";
+    static final java.util.regex.Pattern POWER =
+            java.util.regex.Pattern.compile("(?<![\\w.])([+-]\\s?)?(\\d{1,2}(?:\\.\\d{1,2})?)(?![\\w%.])");
+    static final java.util.regex.Pattern MULTIFOCAL_WORDS =
+            java.util.regex.Pattern.compile("\\bcyl|\\badd\\b|axis|bifocal|progressive|varifocal|reading|astigm");
 
     /**
      * Typed questions the FAQs already answer, matched to the FAQ by its title. First match wins,
@@ -205,9 +209,13 @@ public class WhatsAppBotService {
 
         if (buttonId == null) {
             // A photo is nearly always a prescription (or the frame they want): a person has to look.
-            if (mediaId != null) { sendHandoff(lead); return; }
+            if (mediaId != null) { sendHandoff(lead, true); return; }
             Optional<Faq> faq = faqFor(text);
-            if (faq.isPresent()) { sendText(lead, faq.get().getAnswer()); return; }
+            if (faq.isPresent()) {
+                boolean hours = faq.get().getTitle().equalsIgnoreCase("Opening hours");
+                sendText(lead, (hours ? openNowLine(lusakaNow()) + "\n\n" : "") + faq.get().getAnswer());
+                return;
+            }
         }
 
         BotIntent intent = classify(text, buttonId);
@@ -647,11 +655,18 @@ public class WhatsAppBotService {
         analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
     }
 
+    private void sendHandoff(Lead lead) { sendHandoff(lead, false); }
+
     /** "A person will reply" -- once per window, then quiet until staff pick the chat up. */
-    private void sendHandoff(Lead lead) {
-        if (sentRecently(lead, HANDOFF)) return;
-        provider.sendText(waId(lead), HANDOFF);
-        logOutbound(lead.getId(), "text", HANDOFF);
+    private void sendHandoff(Lead lead, boolean photo) {
+        if (recentOutbound(lead).stream().anyMatch(m -> m.getBody() != null && m.getBody().contains(HANDOFF_MARK))) return;
+        var now = lusakaNow();
+        String text = (photo ? "Got your photo, thanks 📸 " : "Thanks! ")
+                + (isOpen(now) ? "Someone " + HANDOFF_MARK + " here shortly 🙏"
+                        : "We're closed right now, so someone " + HANDOFF_MARK + " when we open "
+                        + nextOpening(now) + " at " + OPENS_AT + ":00 🙏");
+        provider.sendText(waId(lead), text);
+        logOutbound(lead.getId(), "text", text);
         analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
     }
 
@@ -699,12 +714,82 @@ public class WhatsAppBotService {
         boolean lens = LENS_WORDS.matcher(t).find() || RX_NUMBER.matcher(t).find();
         boolean frames = t.matches(".*\\b(frames?|spectacles?|specs|glasses|sunglasses)\\b.*");
         if (frames && !lens) { sendVisitStore(lead); return; }
+        String power = lens ? typedPower(t) : null;
+        if (power != null) {
+            Map<String, Long> prices = lensInquiries.chatPrices(Math.abs(Double.parseDouble(power.replace(" ", ""))));
+            if (!prices.isEmpty()) { sendLensQuote(lead, power, prices); return; }
+        }
         String lensLine = faqAnswer("Lens prices", "Lenses start from K200, depending on your prescription.");
         String shops = lensInquiries.shopLines();
         sendText(lead, (lens ? lensLine
                         : faqAnswer("Frame prices", "Frames start at K300 and go up to K3,000.") + "\n" + lensLine)
                 + "\n\n📸 Send a photo of your prescription here and we'll give you an exact price."
                 + (shops.isBlank() ? "" : "\n\n" + shops));
+    }
+
+    /**
+     * The one power in "how much for -2 lenses" / "colourmatic 0.5", or null when the question needs
+     * the whole prescription (cylinder, reading add, bifocal...) -- those still get the photo ask.
+     * Signed ("-2", "+1.25") or decimal ("0.5") only: a bare "2" is as likely "2 pairs".
+     */
+    static String typedPower(String t) {
+        if (MULTIFOCAL_WORDS.matcher(t).find()) return null;
+        var m = POWER.matcher(t);
+        String best = null;
+        double bestAbs = -1;
+        while (m.find()) {
+            if (m.group(1) == null && m.group(2).indexOf('.') < 0) continue;
+            double v = Double.parseDouble(m.group(2));
+            if (v > 20) continue;
+            if (v > bestAbs) { bestAbs = v; best = (m.group(1) == null ? "" : m.group(1).trim()) + m.group(2); }
+        }
+        return best;
+    }
+
+    private void sendLensQuote(Lead lead, String power, Map<String, Long> prices) {
+        StringBuilder sb = new StringBuilder("👓 Single-vision lenses for power " + power + " (price for a pair):\n");
+        prices.forEach((label, minor) -> sb.append("• ").append(label).append(": ").append(kwacha(minor)).append('\n'));
+        sb.append("\nFrames start from K300.\n")
+                .append("Have cylinder (CYL) or reading (ADD) numbers too? 📸 Send a photo of your prescription "
+                        + "and we'll confirm the exact price.");
+        String shops = lensInquiries.shopLines();
+        if (!shops.isBlank()) sb.append("\n\n").append(shops);
+        sendText(lead, sb.toString());
+    }
+
+    static String kwacha(long minor) {
+        return minor % 100 == 0 ? String.format("K%,d", minor / 100) : String.format("K%,.2f", minor / 100.0);
+    }
+
+    /**
+     * "Are you open?", answered for right now in Lusaka -- also tells a customer writing at night
+     * when the "someone will reply" promise will actually happen.
+     * ponytail: hours mirror the FAQ and ignore public holidays; read them from the shop if that matters.
+     */
+    static String openNowLine(java.time.ZonedDateTime now) {
+        return isOpen(now) ? "🟢 We're open now, until " + closingHour(now) + ":00 today."
+                : "🔴 We're closed right now. We open " + nextOpening(now) + " at " + OPENS_AT + ":00.";
+    }
+
+    /** Opening hour every open day (Google Maps listing: 8:00). */
+    static final int OPENS_AT = 8;
+
+    /** 17 weekdays, 14 Saturday, 0 = closed all day (Sunday). */
+    private static int closingHour(java.time.ZonedDateTime now) {
+        return switch (now.getDayOfWeek()) { case SUNDAY -> 0; case SATURDAY -> 14; default -> 17; };
+    }
+
+    static boolean isOpen(java.time.ZonedDateTime now) {
+        return now.getHour() >= OPENS_AT && now.getHour() < closingHour(now);
+    }
+
+    static String nextOpening(java.time.ZonedDateTime now) {
+        if (closingHour(now) > 0 && now.getHour() < OPENS_AT) return "today";
+        return switch (now.getDayOfWeek()) { case SATURDAY, SUNDAY -> "on Monday"; default -> "tomorrow"; };
+    }
+
+    private static java.time.ZonedDateTime lusakaNow() {
+        return java.time.ZonedDateTime.now(java.time.ZoneId.of("Africa/Lusaka"));
     }
 
     /**
@@ -721,7 +806,7 @@ public class WhatsAppBotService {
                 + "👓 Frames: K300 – K3,000\n"
                 + "🔍 Lenses: from K200, priced by your prescription\n"
                 + "🏥 Insurance: Prudential, Onelife, ZISC\n"
-                + "🕘 Mon–Fri 9:00–17:00, Sat 9:00–14:00\n"
+                + "🕘 Mon–Fri 8:00–17:00, Sat 8:00–14:00\n"
                 + (shops.isBlank() ? "" : "\n" + shops + "\n")
                 + "\n📸 Send a photo of your prescription for an exact price, or ask us anything.";
         provider.sendList(waId(lead), body.length() > 1024 ? body.substring(0, 1024) : body,

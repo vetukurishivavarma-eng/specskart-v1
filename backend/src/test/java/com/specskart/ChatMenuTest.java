@@ -62,7 +62,7 @@ class ChatMenuTest {
         inbound.process(new InboundMessage(waId, waId, "Lost", "anyone there", null, msgId(waId, "x3"), Map.of()));
         var mine = since(again).stream().filter(s -> waId.equals(s.toWaId())).toList();
         assertThat(mine).hasSize(1);
-        assertThat(mine.get(0).text()).contains("Someone from our team will reply");
+        assertThat(mine.get(0).text()).contains("from our team will reply");
     }
 
     /** What the Oct 2026 ad leads actually asked, answered in the chat instead of with a menu. */
@@ -98,6 +98,19 @@ class ChatMenuTest {
     }
 
     @Test
+    void aTypedPowerGetsTheRealPricesFromTheList() {
+        String waId = someNumber();
+        int mark = mark();
+        inbound.process(new InboundMessage(waId, waId, "Melody", "How much for -2 lenses", null, msgId(waId, "rx"), Map.of()));
+
+        var mine = since(mark).stream().filter(s -> waId.equals(s.toWaId())).toList();
+        assertThat(mine).hasSize(1);
+        // V51 defaults: clear K320, clear BB K360, Colormatic K450, Colormatic BB K630
+        assertThat(mine.get(0).text()).contains("-2").contains("Clear: K320").contains("K360")
+                .contains("Colourmatic (darkens in the sun): K450").contains("K630").contains("photo of your prescription");
+    }
+
+    @Test
     void aPhotoIsHandedToAPersonNotAnsweredWithTheMenu() {
         String waId = someNumber();
         int mark = mark();
@@ -106,7 +119,7 @@ class ChatMenuTest {
 
         var mine = since(mark).stream().filter(s -> waId.equals(s.toWaId())).toList();
         assertThat(mine).hasSize(1);
-        assertThat(mine.get(0).text()).contains("Someone from our team will reply");
+        assertThat(mine.get(0).text()).contains("from our team will reply");
     }
 
     @Test

@@ -76,6 +76,25 @@ class LensPricing {
         return cyl > 2 ? base + price("CYL_EXTRA") : base;
     }
 
+    /**
+     * A single-vision pair at one typed power, for the WhatsApp chat ("how much for -2 lenses?"):
+     * label -> price, in menu order. Options the price list can't cover at that power are left out.
+     */
+    Map<String, Long> singleVisionPrices(double sph) {
+        Map<String, Long> out = new java.util.LinkedHashMap<>();
+        String[][] options = {{"CLEAR", "f", "Clear"}, {"CLEAR", "t", "Clear + blue block"},
+                {"PHOTOCHROMATIC", "f", "Colourmatic (darkens in the sun)"},
+                {"PHOTOCHROMATIC", "t", "Colourmatic + blue block"}};
+        for (String[] o : options) {
+            LensInquiry q = new LensInquiry();
+            q.setLensType(o[0]);
+            q.setBlueBlock("t".equals(o[1]));
+            q.setSphRight(BigDecimal.valueOf(sph));
+            try { out.put(o[2], quoteBeforeDiscount(q)); } catch (ApiException outOfList) { /* not at this power */ }
+        }
+        return out;
+    }
+
     private long price(String code) {
         return options.findByCode(code).map(LensPricingOption::getPriceMinor).orElse(DEFAULTS.get(code));
     }

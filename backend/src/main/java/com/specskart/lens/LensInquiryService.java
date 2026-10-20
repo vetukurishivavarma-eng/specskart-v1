@@ -539,6 +539,11 @@ public class LensInquiryService {
 
     /** Every shop a customer can walk into, one collectionLine each — pinned shops first choice,
      *  since those are the ones with an exact map pin. */
+    /** Single-vision pair prices at one power, for the bot's in-chat quote. See LensPricing. */
+    public Map<String, Long> chatPrices(double sph) {
+        return pricing.singleVisionPrices(sph);
+    }
+
     public String shopLines() {
         List<Store> shops = stores.findByActiveTrueAndLatitudeIsNotNullAndLongitudeIsNotNull();
         if (shops.isEmpty()) shops = stores.findByActiveTrue();

@@ -15,6 +15,9 @@ Audited all 46 real Zambian leads since 10-01 (fresh backup). 0 real orders. Bot
   -> that note (staff are already pushed). Menu no longer sent after STOP.
 - 5-touch online-frames nurture OFF (`WHATSAPP_FRAMES_NURTURE_ENABLED`, default false). Checkup reminder, recall,
   post-purchase unaffected.
+- (3) Typed power ("how much for -2 lenses", "colourmatic 0.5") -> real pair prices from the lens price list
+  (single vision; CYL/ADD/bifocal -> photo ask). "Are you open?" / handoff note say open/closed NOW in Lusaka
+  time. Opening hour 8:00 (Google Maps listing) -- V63 fixes FAQ text. Public holidays not handled.
 - Not fixed by code (people): staff first-reply took 6-22h for a third of leads; 31 of 46 never got a human reply.
 
 ## RESUME HERE — 2026-10-20
