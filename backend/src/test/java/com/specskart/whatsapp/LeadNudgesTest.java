@@ -119,6 +119,15 @@ class LeadNudgesTest {
         nudges.nudgeStaff(TUESDAY_10AM); // too soon for the second push
         assertThat(lead(waId).getStaffNudges()).isEqualTo(1);
 
+        // every 5 minutes after that -- and it stops at the cap, never an endless loop
+        for (int i = 0; i < 20; i++) {
+            Lead w = lead(waId);
+            if (w.getStaffNudgedAt() != null) w.setStaffNudgedAt(w.getStaffNudgedAt().minusSeconds(5 * 60));
+            leads.save(w);
+            nudges.nudgeStaff(TUESDAY_10AM);
+        }
+        assertThat(lead(waId).getStaffNudges()).isEqualTo(LeadNudges.MAX_NUDGES);
+
         nudges.staffReplied(l.getId());
         assertThat(lead(waId).getAwaitingStaffSince()).isNull();
     }

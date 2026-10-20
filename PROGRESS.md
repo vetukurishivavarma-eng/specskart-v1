@@ -22,7 +22,7 @@ Audited all 46 real Zambian leads since 10-01 (fresh backup). 0 real orders. Bot
   next 3 open days -> booked (`leads.visit_on`), staff pushed, reminder 7-12h that morning; named days understood
   ("visit on jan 1 2027" -> closed + New Year's Day + next open days; "open saturday?"); ONE "would you like to come
   in?" + Book button ~20h after their last message when a price/staff answer went quiet (7-21h, 24h window only,
-  max 1/week); staff re-pushed "X is waiting" at 20 min then every 40 min (max 3, open hours) until a staff reply;
+  max 1/week); staff re-pushed "X waiting N min" every 5 min (max 6 = 30 min, open hours) until a staff reply;
   "see frames"/"pics" -> 5 frame photos + prices from the catalogue (needs WHATSAPP_ASSET_BASE_URL). Holidays
   2026+2027 hardcoded in WhatsAppBotService.HOLIDAYS.
 - Not fixed by code (people): staff first-reply took 6-22h for a third of leads; 31 of 46 never got a human reply.

@@ -43,9 +43,10 @@ public class LeadNudges {
     static final ZoneId LUSAKA = ZoneId.of("Africa/Lusaka");
     static final Duration QUIET_AFTER = Duration.ofHours(20);
     static final Duration FOLLOW_UP_GAP = Duration.ofDays(7);
-    static final Duration FIRST_NUDGE = Duration.ofMinutes(20);
-    static final Duration NEXT_NUDGE = Duration.ofMinutes(40);
-    static final int MAX_NUDGES = 3;
+    /** Staff reminders: every 5 min while nobody answers, then give up -- 6 pushes = half an hour. */
+    static final Duration FIRST_NUDGE = Duration.ofMinutes(5);
+    static final Duration NEXT_NUDGE = Duration.ofMinutes(5);
+    static final int MAX_NUDGES = 6;
     static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("EEEE d MMM", Locale.ENGLISH);
 
     private final LeadRepository leads;
@@ -123,7 +124,7 @@ public class LeadNudges {
 
     // ---- the job -----------------------------------------------------------------------------
 
-    @Scheduled(fixedDelayString = "PT5M", initialDelayString = "PT2M")
+    @Scheduled(fixedDelayString = "PT1M", initialDelayString = "PT2M")
     public void run() {
         ZonedDateTime now = ZonedDateTime.now(LUSAKA);
         if (props.whatsapp().nurtureOn()) {
@@ -170,13 +171,14 @@ public class LeadNudges {
         }
     }
 
-    /** While the shop is open: 20 min after the promise, then every 40 min, at most 3 pushes. */
+    /** While the shop is open: 5 min after the promise, then every 5 min, at most {@link #MAX_NUDGES} pushes. */
     void nudgeStaff(ZonedDateTime now) {
         if (!WhatsAppBotService.isOpen(now)) return;
         Instant at = now.toInstant();
         for (Lead lead : leads.findTop100ByAwaitingStaffSinceLessThanEqualAndStaffNudgesLessThan(at.minus(FIRST_NUDGE), MAX_NUDGES)) {
             each(lead, l -> {
-                if (l.getStaffNudgedAt() != null && l.getStaffNudgedAt().isAfter(at.minus(NEXT_NUDGE))) return;
+                // 30s slack: the job runs every minute, so "5 min since the last push" lands on the 5th run, not the 6th
+                if (l.getStaffNudgedAt() != null && l.getStaffNudgedAt().isAfter(at.minus(NEXT_NUDGE).plusSeconds(30))) return;
                 var last = messages.findFirstByLeadIdAndDirectionOrderByCreatedAtDesc(l.getId(), "INBOUND");
                 // their 24h window shut: staff can't free-text them any more, so stop buzzing
                 if (last.isEmpty() || last.get().getCreatedAt().isBefore(Instant.now().minus(Duration.ofHours(24)))) {
@@ -185,9 +187,13 @@ public class LeadNudges {
                     return;
                 }
                 String said = last.get().getBody() == null ? "(a photo or file)" : last.get().getBody();
-                push.notifyStaff("⏰ " + who(l) + " is waiting for a reply",
-                        "Since " + DateTimeFormatter.ofPattern("HH:mm").format(l.getAwaitingStaffSince().atZone(LUSAKA))
-                                + ": " + (said.length() > 150 ? said.substring(0, 150) + "…" : said),
+                long mins = Duration.between(l.getAwaitingStaffSince(), at).toMinutes();
+                // a message from last night: "since 22:14" reads better than "waiting 600 min"
+                String waited = mins < 120 ? mins + " min"
+                        : "since " + DateTimeFormatter.ofPattern("HH:mm").format(l.getAwaitingStaffSince().atZone(LUSAKA));
+                boolean lastOne = l.getStaffNudges() + 1 == MAX_NUDGES;
+                push.notifyStaff("⏰ " + who(l) + " waiting " + waited + " for a reply" + (lastOne ? " (last reminder)" : ""),
+                        (said.length() > 150 ? said.substring(0, 150) + "…" : said),
                         "/chat/" + waId(l));
                 l.setStaffNudges(l.getStaffNudges() + 1);
                 l.setStaffNudgedAt(at);
