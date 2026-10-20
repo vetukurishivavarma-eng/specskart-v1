@@ -25,6 +25,11 @@ Audited all 46 real Zambian leads since 10-01 (fresh backup). 0 real orders. Bot
   max 1/week); staff re-pushed "X waiting N min" every 5 min (max 6 = 30 min, open hours) until a staff reply;
   "see frames"/"pics" -> 5 frame photos + prices from the catalogue (needs WHATSAPP_ASSET_BASE_URL). Holidays
   2026+2027 hardcoded in WhatsAppBotService.HOLIDAYS.
+- (5) Bookings page: POS 1.28.0/vc33 (`specskart-pos@1530258`) More -> Eye test bookings (Today / Coming up /
+  Didn't come / Done, "Check-up done" + Undo, tap = chat); backend `53631b6` GET /api/admin/visits, POST
+  /{lead}/done|undo (V66). 8:00 push "N eye tests booked today" -> /bookings; "Still coming in today?" 3h before
+  closing; next-morning "Sorry we missed you" + new days -- both once, skipped when marked done. Photo always
+  acknowledged (`dcdec66`). Staff reminders every 5 min max 6 (`483d009`). APK needs publishing (release + row).
 - Not fixed by code (people): staff first-reply took 6-22h for a third of leads; 31 of 46 never got a human reply.
 
 ## RESUME HERE — 2026-10-20
