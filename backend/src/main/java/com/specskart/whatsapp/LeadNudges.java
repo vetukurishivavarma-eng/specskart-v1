@@ -119,6 +119,10 @@ public class LeadNudges {
         if (lead == null) return;
         lead.setVisitOn(day);
         lead.setVisitRemindedOn(day.equals(LocalDate.now(LUSAKA)) ? day : null);
+        // a rebooking (e.g. from "sorry we missed you") is a fresh booking: its nudges start again
+        lead.setVisitedOn(null);
+        lead.setVisitNudgedOn(null);
+        lead.setVisitMissedOn(null);
         lead.setQuoteFollowUpDueAt(null);
         leads.save(lead);
         push.notifyStaff("👁️ Eye test booked: " + who(lead), DAY.format(day), BOOKINGS_PATH);

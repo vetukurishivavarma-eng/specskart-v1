@@ -198,6 +198,13 @@ class LeadNudgesTest {
         assertThat(mine.get(0).text()).contains("Sorry we missed you");
         assertThat(mine.get(0).buttons()).isNotEmpty().allMatch(b -> b.id().startsWith(LeadNudges.ROW_BOOK_PREFIX));
         assertThat(since(mark, came)).isEmpty();
+        // tapping a day in that message rebooks them, and the new booking's nudges start fresh
+        var pick = mine.get(0).buttons().get(0);
+        say(missed, pick.title(), pick.id(), "n1");
+        Lead re = lead(missed);
+        assertThat(re.getVisitOn()).isEqualTo(LocalDate.parse(pick.id().substring(LeadNudges.ROW_BOOK_PREFIX.length())));
+        assertThat(re.getVisitMissedOn()).isNull();
+        assertThat(re.getVisitNudgedOn()).isNull();
     }
 
     @Test
