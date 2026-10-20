@@ -89,7 +89,7 @@ public class LeadFollowUpService {
         Lead lead = leads.findById(leadId).orElse(null);
         if (lead == null || lead.getFollowUpState() != null) return;
         if (lead.getCheckupNextAt() != null) return; // already on the checkup reminder -- one sequence at a time
-        if (!props.whatsapp().nurtureOn()) return;
+        if (!props.whatsapp().framesNurtureOn()) return;
         if (lead.getStatus() == LeadStatus.CONVERTED || lead.getStatus() == LeadStatus.LOST) return;
         if (waId(lead) == null) return;
         lead.setFollowUpState(FollowUpState.ACTIVE);
@@ -101,9 +101,10 @@ public class LeadFollowUpService {
 
     /** Any inbound message from the lead. STOP words opt them out; anything else defers the next touch. */
     @Transactional
-    public void onInbound(UUID leadId, String text) {
+    /** @return true when this message was the opt-out — it's answered here, so the bot stays quiet. */
+    public boolean onInbound(UUID leadId, String text) {
         Lead lead = leads.findById(leadId).orElse(null);
-        if (lead == null) return;
+        if (lead == null) return false;
         String t = text == null ? "" : text.toLowerCase().trim();
         // STOP works for every lead, not just ones mid-nurture — walk-in offer subscribers too.
         if (lead.getFollowUpState() != FollowUpState.OPTED_OUT
@@ -112,12 +113,13 @@ public class LeadFollowUpService {
             end(lead, FollowUpState.OPTED_OUT);
             safeSend(() -> whatsapp.sendText(waId(lead),
                     "Done — no more offers or follow-ups. Message us any time you'd like a hand picking frames."));
-            return;
+            return true;
         }
-        if (lead.getFollowUpState() != FollowUpState.ACTIVE) return;
+        if (lead.getFollowUpState() != FollowUpState.ACTIVE) return false;
         // they're engaging — hold off on the automated touches for a few days
         lead.setFollowUpNextAt(Instant.now().plus(Duration.ofDays(3)));
         leads.save(lead);
+        return false;
     }
 
     /** The lead bought something — stop with a success outcome. */

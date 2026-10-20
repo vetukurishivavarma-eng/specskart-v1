@@ -562,6 +562,7 @@ public class LensInquiryService {
      * and no billing — these are plain public URLs.
      */
     static String mapsLink(Store shop) {
+        if (!blank(shop.getMapUrl())) return shop.getMapUrl();
         if (shop.getLatitude() != null && shop.getLongitude() != null) {
             return "https://www.google.com/maps/search/?api=1&query="
                     + shop.getLatitude() + "," + shop.getLongitude();

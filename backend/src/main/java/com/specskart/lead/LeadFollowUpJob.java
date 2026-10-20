@@ -33,7 +33,7 @@ class LeadFollowUpJob {
 
     @Scheduled(fixedDelayString = "PT1H", initialDelayString = "PT4M")
     public void run() {
-        if (!props.whatsapp().nurtureOn()) return;
+        if (!props.whatsapp().framesNurtureOn()) return;
 
         List<Lead> fresh = leads.findTop100ByFollowUpStateIsNullAndArchivedAtIsNullAndStatusInAndCreatedAtAfter(
                 LeadFollowUpService.ENROLLABLE_STATUSES, Instant.now().minus(30, ChronoUnit.DAYS));

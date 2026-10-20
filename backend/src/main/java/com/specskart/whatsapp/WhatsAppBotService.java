@@ -65,6 +65,35 @@ public class WhatsAppBotService {
     static final String BTN_BUDGET_MED = "BUDGET_MED";
     static final String BTN_BUDGET_HIGH = "BUDGET_HIGH";
 
+    /** "-6.00", "+1.25", "-16": a prescription typed into the chat. */
+    static final java.util.regex.Pattern RX_NUMBER = java.util.regex.Pattern.compile("(^|\\s)[+-]\\s?\\d+(\\.\\d+)?\\b");
+    static final java.util.regex.Pattern LENS_WORDS =
+            java.util.regex.Pattern.compile("lens|colou?r ?matic|photo ?-?chrom|blue ?-?(block|light)|transition");
+    /** How long the same answer, a menu, or the "someone will reply" note isn't sent again. */
+    static final java.time.Duration REPEAT_WINDOW = java.time.Duration.ofHours(2);
+    static final String HANDOFF = "Thanks! Someone from our team will reply here shortly 🙏\n"
+            + "(Mon–Fri 9:00–17:00, Sat 9:00–14:00)";
+
+    /**
+     * Typed questions the FAQs already answer, matched to the FAQ by its title. First match wins,
+     * so the order matters ("do you offer insurance cover" is insurance, not the offer). Admins
+     * edit the answers in the POS app; renaming a title there just unhooks it from these words.
+     */
+    private static final List<Map.Entry<java.util.regex.Pattern, String>> FAQ_KEYWORDS = List.of(
+            faqKey("contact ?lens", "Contact lenses"),
+            faqKey("nhima", "NHIMA"),
+            faqKey("insur|prudential|one ?life|zisc|medical aid|\\bcover", "Insurance"),
+            faqKey("eye ?(test|exam|check)|check ?-?up|examination", "Eye check-up"),
+            faqKey("promo|discount|50 ?%|\\bsale\\b|\\boffers?\\b|slash", "Offers"),
+            faqKey("locat|where (are|r) (you|u)|were are you|where is (the|your) (shop|store|clinic|office)"
+                    + "|where the|address|direction|visit (the|your) (shop|store)|\\bmap\\b", "Where are you?"),
+            faqKey("\\bopen|opening|hours|saturday|sunday|weekend|closing", "Opening hours"),
+            faqKey("deliver", "Delivery"));
+
+    private static Map.Entry<java.util.regex.Pattern, String> faqKey(String regex, String title) {
+        return Map.entry(java.util.regex.Pattern.compile(regex), title);
+    }
+
     private static final java.util.regex.Pattern BUY_PATTERN =
             java.util.regex.Pattern.compile("(?i)^\\s*buy\\s*([1-3])\\s*$");
 
@@ -117,7 +146,8 @@ public class WhatsAppBotService {
     public void handleInbound(Lead lead, String text, String buttonId, String waMessageId, String mediaId, String mediaName) {
         // the filename is only logged for the chat -- never fed to the bot/opt-out matching below
         logInbound(lead.getId(), waMessageId, mediaName != null ? mediaName : text, buttonId, mediaId);
-        followUp.onInbound(lead.getId(), text); // opt-out keyword, or defer the automated touches
+        // opt-out keyword (answered there -- a menu after "STOP" reads as ignoring it), or defer the automated touches
+        if (followUp.onInbound(lead.getId(), text)) return;
 
         // Nobody is watching the chat screen all day: tell the staff phones someone wrote in, so they
         // can take over from the bot. A menu-button tap is the bot's own conversation -- not pushed,
@@ -173,6 +203,13 @@ public class WhatsAppBotService {
             return;
         }
 
+        if (buttonId == null) {
+            // A photo is nearly always a prescription (or the frame they want): a person has to look.
+            if (mediaId != null) { sendHandoff(lead); return; }
+            Optional<Faq> faq = faqFor(text);
+            if (faq.isPresent()) { sendText(lead, faq.get().getAnswer()); return; }
+        }
+
         BotIntent intent = classify(text, buttonId);
         log.info("bot intent {} for lead {}", intent, lead.getId());
         switch (intent) {
@@ -188,7 +225,7 @@ public class WhatsAppBotService {
             case SUITS_YOU -> sendFaceChart(lead);
             case EXPLORE_FRAMES -> sendText(lead, "Browse all our frames here — filter by shape and price:\n"
                     + props.frontendBaseUrl() + "/store");
-            case PRICE -> sendVisitStore(lead);
+            case PRICE -> sendPrice(lead, text);
             case VISIT_WEBSITE -> sendText(lead, "Here's our website: " + props.frontendBaseUrl());
             case EXPLORE_LENS -> sendLensLink(lead);
             case TRACK_ORDER -> sendOrderStatus(lead);
@@ -204,13 +241,11 @@ public class WhatsAppBotService {
                 sendText(lead, "No problem — your recommendations are saved. Message us anytime to pick up where you left off.");
             }
             case MENU -> sendMenu(lead);
-            case MORE_INFO -> {
-                sendLensLink(lead);
-                sendMenu(lead);
-            }
-            case GREETING -> sendWelcome(lead);
-            // Off-script: the full option list is a better dead-end than the welcome's one button.
-            case UNKNOWN -> sendMenu(lead);
+            case MORE_INFO -> sendIntro(lead);
+            // A second "hi" or an off-script message soon after a menu: another menu is what made
+            // people feel ignored -- tell them a person is coming instead (staff are pushed above).
+            case GREETING -> { if (menuSentRecently(lead)) sendHandoff(lead); else sendWelcome(lead); }
+            case UNKNOWN -> { if (menuSentRecently(lead)) sendHandoff(lead); else sendMenu(lead); }
         }
     }
 
@@ -238,6 +273,12 @@ public class WhatsAppBotService {
      * here for the same reason it is off the welcome message (see sendWelcome).
      */
     private void sendMenu(Lead lead) {
+        provider.sendList(waId(lead), "What can I help you with?", "Choose an option", menuRows());
+        logOutbound(lead.getId(), "interactive", "menu");
+        analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
+    }
+
+    private List<WhatsAppProvider.Row> menuRows() {
         List<WhatsAppProvider.Row> rows = new ArrayList<>(List.of(
                 new WhatsAppProvider.Row(BTN_EXPLORE_LENS, "Lenses",
                         "Clear or photochromatic, with or without blue-block"),
@@ -253,9 +294,7 @@ public class WhatsAppBotService {
         }
         rows.add(new WhatsAppProvider.Row(BTN_WEBSITE, "Our website",
                 "Browse " + props.storeName() + " online"));
-        provider.sendList(waId(lead), "What can I help you with?", "Choose an option", rows);
-        logOutbound(lead.getId(), "interactive", "menu");
-        analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
+        return rows;
     }
 
     /**
@@ -522,10 +561,14 @@ public class WhatsAppBotService {
         if (t.contains("faq") || t.contains("question")) return BotIntent.FAQ;
         if (MembershipService.ENABLED && (t.contains("care") || t.contains("member"))) return BotIntent.CARE;
         // Before the lens check on purpose — "where is my lens order" is a tracking question.
-        if (t.contains("track") || t.contains("where") || t.contains("my order")
+        // A bare "where" used to land here, so "where are you located?" got "I can't find an order".
+        if (t.contains("track") || t.contains("my order") || t.matches(".*where('?s| is) my.*")
                 || t.contains("order status")) return BotIntent.TRACK_ORDER;
-        if (t.contains("lens")) return BotIntent.EXPLORE_LENS;
-        if (t.matches(".*\\b(price|prices|pricing|cost|costs|how much|rate|rates|charges?)\\b.*")) return BotIntent.PRICE;
+        // Before the lens check: "how much are your lenses?" wants a price, not the configurator.
+        // A typed prescription ("-6.00") is a price question too.
+        if (t.matches(".*\\b(price|prices|pricing|cost|costs|how much|rate|rates|charges?|quot\\w*)\\b.*")
+                || RX_NUMBER.matcher(t).find()) return BotIntent.PRICE;
+        if (LENS_WORDS.matcher(t).find()) return BotIntent.EXPLORE_LENS;
         if (t.contains("help") || t.contains("choose") || t.contains("recommend") || t.contains("suggest")) return BotIntent.HELP_CHOOSE;
         if (t.matches(".*\\bfaces?\\b.*") || t.contains("suit") || t.contains("frame finder") || t.equals("1")) return BotIntent.FIND_FRAMES;
         if (t.contains("explore") || t.contains("latest") || t.contains("catalog") || t.equals("2")) return BotIntent.EXPLORE_FRAMES;
@@ -597,8 +640,93 @@ public class WhatsAppBotService {
     }
 
     private void sendText(Lead lead, String text) {
+        // The same link four times in a row is what a customer reads as "nobody is there".
+        if (sentRecently(lead, text)) { sendHandoff(lead); return; }
         provider.sendText(waId(lead), text);
         logOutbound(lead.getId(), "text", text);
+        analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
+    }
+
+    /** "A person will reply" -- once per window, then quiet until staff pick the chat up. */
+    private void sendHandoff(Lead lead) {
+        if (sentRecently(lead, HANDOFF)) return;
+        provider.sendText(waId(lead), HANDOFF);
+        logOutbound(lead.getId(), "text", HANDOFF);
+        analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
+    }
+
+    private boolean sentRecently(Lead lead, String body) {
+        String key = withoutQuery(body);
+        return recentOutbound(lead).stream().anyMatch(m -> key.equals(withoutQuery(m.getBody())));
+    }
+
+    private boolean menuSentRecently(Lead lead) {
+        return recentOutbound(lead).stream()
+                .anyMatch(m -> List.of("menu", "welcome", "intro").contains(m.getBody()));
+    }
+
+    private List<WhatsAppMessage> recentOutbound(Lead lead) {
+        return messages.findByLeadIdAndDirectionAndCreatedAtAfter(lead.getId(), "OUTBOUND",
+                java.time.Instant.now().minus(REPEAT_WINDOW));
+    }
+
+    /** Personal links differ only in their signed query string -- the same message to a person. */
+    static String withoutQuery(String s) {
+        return s == null ? "" : s.replaceAll("\\?\\S*", "");
+    }
+
+    private Optional<Faq> faqFor(String text) {
+        if (text == null || text.isBlank()) return Optional.empty();
+        String t = text.toLowerCase();
+        return FAQ_KEYWORDS.stream().filter(e -> e.getKey().matcher(t).find()).findFirst()
+                .flatMap(e -> faqs.findAllByOrderBySortOrderAscCreatedAtAsc().stream()
+                        .filter(f -> f.getTitle().equalsIgnoreCase(e.getValue())).findFirst());
+    }
+
+    private String faqAnswer(String title, String fallback) {
+        return faqs.findAllByOrderBySortOrderAscCreatedAtAsc().stream()
+                .filter(f -> f.getTitle().equalsIgnoreCase(title)).map(Faq::getAnswer)
+                .findFirst().orElse(fallback);
+    }
+
+    /**
+     * A price question, answered in the chat. Frames keep the client's "range + visit the shop";
+     * anything about lenses (or a typed prescription) gets the lens range and the ask that turns
+     * it into a real quote -- the configurator link it used to get converted nobody.
+     */
+    private void sendPrice(Lead lead, String text) {
+        String t = text == null ? "" : text.toLowerCase();
+        boolean lens = LENS_WORDS.matcher(t).find() || RX_NUMBER.matcher(t).find();
+        boolean frames = t.matches(".*\\b(frames?|spectacles?|specs|glasses|sunglasses)\\b.*");
+        if (frames && !lens) { sendVisitStore(lead); return; }
+        String lensLine = faqAnswer("Lens prices", "Lenses start from K200, depending on your prescription.");
+        String shops = lensInquiries.shopLines();
+        sendText(lead, (lens ? lensLine
+                        : faqAnswer("Frame prices", "Frames start at K300 and go up to K3,000.") + "\n" + lensLine)
+                + "\n\n📸 Send a photo of your prescription here and we'll give you an exact price."
+                + (shops.isBlank() ? "" : "\n\n" + shops));
+    }
+
+    /**
+     * The ad's prefilled "Can I get more info on this?" -- the first thing almost every ad lead
+     * sends. It used to get the lens configurator link, which answered none of what they asked
+     * next (location, promo, eye test, price). The facts, then the menu, in one message.
+     * ponytail: prices/hours here repeat the FAQs; build from the FAQ rows if the client edits them often.
+     */
+    private void sendIntro(Lead lead) {
+        String name = lead.getName() != null && !lead.getName().isBlank() ? " " + lead.getName().split(" ")[0] : "";
+        String shops = lensInquiries.shopLines();
+        String body = "Hi" + name + " 👋 Thanks for contacting " + props.storeName() + "!\n\n"
+                + "👁️ Eye check-up: FREE right now\n"
+                + "👓 Frames: K300 – K3,000\n"
+                + "🔍 Lenses: from K200, priced by your prescription\n"
+                + "🏥 Insurance: Prudential, Onelife, ZISC\n"
+                + "🕘 Mon–Fri 9:00–17:00, Sat 9:00–14:00\n"
+                + (shops.isBlank() ? "" : "\n" + shops + "\n")
+                + "\n📸 Send a photo of your prescription for an exact price, or ask us anything.";
+        provider.sendList(waId(lead), body.length() > 1024 ? body.substring(0, 1024) : body,
+                "Choose an option", menuRows());
+        logOutbound(lead.getId(), "interactive", "intro");
         analytics.record(LeadEventType.WHATSAPP_AUTOREPLY_SENT, lead.getId(), null);
     }
 

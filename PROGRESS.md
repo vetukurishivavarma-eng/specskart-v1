@@ -2,6 +2,21 @@
 
 _Last updated: 2026-10-20._
 
+## RESUME HERE — 2026-10-20 (2): lead audit + bot fixes
+Audited all 46 real Zambian leads since 10-01 (fresh backup). 0 real orders. Bot was the main leak:
+- Map pin sent to customers was the TEST shop "Shop1" at **Mumbai** coords. V62: `stores.map_url` (client link
+  https://maps.app.goo.gl/4Y1xnLdVeKX95Ezh9) + address on active shops, Shop1 -> "Specskart Opticians", FAQ
+  location/delivery answers rewritten, new FAQ "Offers" (50% frames sale -- **delete/edit in POS FAQs when it ends**).
+  Shop lat/lng still Mumbai (only used for distance/route maths) -- re-pin from the shop in POS.
+- Typed questions now answered from FAQs by keyword (location, promo, eye test, insurance, NHIMA, hours, contact
+  lenses, delivery); "where" no longer = track order; lens/Rx price questions get the price + "send a photo of your
+  prescription" instead of the configurator link; ad opener "more info" gets a facts intro + menu in one message.
+- No more repeats: same answer / menu within 2h -> one "someone from our team will reply" note, then quiet. Photos
+  -> that note (staff are already pushed). Menu no longer sent after STOP.
+- 5-touch online-frames nurture OFF (`WHATSAPP_FRAMES_NURTURE_ENABLED`, default false). Checkup reminder, recall,
+  post-purchase unaffected.
+- Not fixed by code (people): staff first-reply took 6-22h for a third of leads; 31 of 46 never got a human reply.
+
 ## RESUME HERE — 2026-10-20
 **DONE + LIVE:** backend `6e1bb87` (206 tests green) deployed on specskart-api-9b08 (user confirmed Live). POS 1.27.0 /
 build 32 (`29c8adf`) GitHub release v1.27.0 published + app_releases row added (min 31, not mandatory; verified via

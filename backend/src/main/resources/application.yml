@@ -107,6 +107,10 @@ specskart:
     # 24h window is open). Uses follow-up-template-lang.
     nurture-template: ${WHATSAPP_NURTURE_TEMPLATE:}
     nurture-enabled: ${WHATSAPP_NURTURE_ENABLED:true}
+    # The 5-touch online-frames nurture over ~18 days. OFF (2026-10-20): it chased leads whose
+    # questions the bot never answered, selling online frames with ~1 in stock. Checkup reminder,
+    # recall and post-purchase thanks are unaffected (they follow nurture-enabled only).
+    frames-nurture-enabled: ${WHATSAPP_FRAMES_NURTURE_ENABLED:false}
     # This API's own public origin, used to build absolute product-image URLs for WhatsApp
     # (Meta must be able to GET the image). e.g. https://specskart-api.onrender.com
     asset-base-url: ${WHATSAPP_ASSET_BASE_URL:}

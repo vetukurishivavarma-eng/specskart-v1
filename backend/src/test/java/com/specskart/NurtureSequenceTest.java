@@ -19,7 +19,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
+@SpringBootTest(properties = "specskart.whatsapp.frames-nurture-enabled=true")
 @ActiveProfiles("mock")
 class NurtureSequenceTest {
 

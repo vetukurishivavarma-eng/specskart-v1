@@ -119,7 +119,13 @@ public record AppProperties(
                             *  {{1}} = first name, {{2}} = shop link. Blank = the reminder sequence is off. */
                            String checkupTemplate,
                            /** Link in the checkup reminder. Blank = the website's /store page. */
-                           String checkupLink) {
+                           String checkupLink,
+                           /** The 5-touch online-frames nurture (LeadFollowUpJob). Off unless true. */
+                           Boolean framesNurtureEnabled) {
+
+        public boolean framesNurtureOn() {
+            return nurtureOn() && Boolean.TRUE.equals(framesNurtureEnabled);
+        }
 
         public List<String> staffNumbers() {
             return staffNumbers == null ? List.of() : staffNumbers;

@@ -34,4 +34,9 @@ public class Store extends BaseEntity {
     /** Map pin. Set on an active shop = its stock sells online and it ships web orders (nearest wins). */
     private Double latitude;
     private Double longitude;
+
+    /** The shop's own Google Maps link, sent to customers instead of a pin-built one. The pin
+     *  stays for distance maths; a place link shows the shop's name, photos and reviews. */
+    @Column(length = 500)
+    private String mapUrl;
 }
