@@ -255,6 +255,7 @@ public class AdminCatalogService {
         Product p = new Product();
         applyProduct(p, in, true);
         products.save(p);
+        setShelf(p, in.stockQty());
 
         replaceImages(p.getId(), in.images());
         return toAdmin(p);
@@ -266,6 +267,7 @@ public class AdminCatalogService {
                 .orElseThrow(() -> ApiException.notFound("PRODUCT_NOT_FOUND", "No such product."));
         applyProduct(p, in, false);
         products.save(p);
+        setShelf(p, in.stockQty());
         if (in.images() != null) replaceImages(id, in.images());
         return toAdmin(p);
     }
@@ -278,6 +280,24 @@ public class AdminCatalogService {
         products.findById(id).ifPresent(this::deleteTryOnBlob);
         images.deleteByProductId(id);
         products.deleteById(id);
+    }
+
+    /**
+     * Once shops have map pins the website's count is their shelves, so a changed "Stock quantity"
+     * on the product page becomes a stock adjustment on the shop's shelf (it used to be ignored
+     * silently). With several online shops there's no telling which shelf, so that's refused.
+     */
+    private void setShelf(Product p, Integer wanted) {
+        if (wanted == null || !inventory.stockComesFromShops()) return;
+        int delta = Math.max(0, wanted) - p.getStockQty();
+        if (delta == 0) return;
+        var shops = inventory.onlineShops();
+        if (shops.size() > 1) {
+            throw ApiException.conflict("STOCK_PER_SHOP",
+                    "You have " + shops.size() + " shops, so change stock in Stock for the right shop (stock adjustment).");
+        }
+        inventory.adjust(shops.get(0).getId(), p.getId(), delta, "ADJUSTMENT", "product-page", "Set on the product page", null);
+        p.setStockQty(p.getStockQty() + delta); // adjust() moved the row with an UPDATE; keep this copy in step
     }
 
     private void applyProduct(Product p, CatalogDtos.ProductUpsert in, boolean isNew) {
