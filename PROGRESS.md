@@ -2,6 +2,21 @@
 
 _Last updated: 2026-10-20._
 
+## 2026-10-21 (6) END OF DAY — RESUME HERE
+- POS **1.31.0 / vc36 RELEASED** (GitHub v1.31.0, link .../releases/download/v1.31.0/specskart-pos-1.31.0.apk); user adds
+  app_releases row (min 36, mandatory). 1.29.0 + 1.30.0 also released today.
+- FREE-FIRST rule (v1 `a64dbca`): open 24h chat -> plain text, closed -> paid template, for lens verify, lens + frames
+  post-purchase, eye-test recall, ready-message broadcast (freeText), New chat (opens chat if window open).
+- Meta: Visa added to WABA "specskart" (2285018372331628); no WhatsApp spend cap exists (offered in-app daily cap, not
+  built); business unverified = 250 new chats/day, verify later. Templates specskart_followup, spin_and_win,
+  eye_test_recall IN REVIEW; Render env set by user. eye_checkup_reminder deliberately NOT created.
+- App-update link with spaces now stripped server-side (`9929d6c`).
+- NOT live-tested yet: spin page redesign, OTP redeem on a device, broadcast sends (need approved templates),
+  bring-a-friend flow, follow-up template. Check staff_new_order has a Document header and lens_post_purchase a
+  Copy-code button, or those sends fail.
+- Amul project (separate repo): live site 404 since its `d37b5c2`; uncommitted fix in its server/src/app.ts; user
+  can't push there now.
+
 ## 2026-10-21 (5): POS 1.30.0/vc35 RELEASED by Claude (v1.30.0 GitHub release); user adds app_releases row
 - Broadcast in app (admin): Ready message (READY list in app/broadcast.tsx = approved templates; spin_and_win) or
   Type your own (free text, only leads with open 24h window, `/broadcast/text/*`). Never same template/text twice.
