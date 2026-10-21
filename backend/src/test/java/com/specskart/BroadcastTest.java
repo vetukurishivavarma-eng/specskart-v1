@@ -55,9 +55,24 @@ class BroadcastTest {
     }
 
     @Test
+    void sendingTheSameTemplateAgainNeverReachesTheSamePersonTwice() {
+        String waId = "26097" + (300000 + (int) (Math.random() * 600000));
+        lead(waId, FollowUpState.ACTIVE);
+        var all = new BroadcastService.Filter(null, false, false);
+        broadcast.send(all, "spin_and_win_t", "en", null, java.util.List.of(), 1000);
+        assertThat(broadcast.previewCount(all, "spin_and_win_t")).isZero();
+
+        int before = ((MockWhatsAppProvider) provider).outbox().size();
+        assertThat(broadcast.send(all, "spin_and_win_t", "en", null, java.util.List.of(), 1000).sent()).isZero();
+        assertThat(((MockWhatsAppProvider) provider).outbox()).hasSize(before);
+        // a different template still reaches them
+        assertThat(broadcast.previewCount(all, "other_t")).isGreaterThan(0);
+    }
+
+    @Test
     void previewCountsWithoutSendingAnything() {
         int before = ((MockWhatsAppProvider) provider).outbox().size();
-        int count = broadcast.previewCount(new BroadcastService.Filter(null, false, false));
+        int count = broadcast.previewCount(new BroadcastService.Filter(null, false, false), null);
         assertThat(count).isGreaterThanOrEqualTo(0);
         assertThat(((MockWhatsAppProvider) provider).outbox()).hasSize(before);
     }

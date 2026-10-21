@@ -29,7 +29,7 @@ public class AdminBroadcastController {
     /** Count how many leads a filter would reach — call this before send(). */
     @PostMapping("/preview")
     public PreviewResponse preview(@RequestBody Request req) {
-        return new PreviewResponse(broadcast.previewCount(filterOf(req)));
+        return new PreviewResponse(broadcast.previewCount(filterOf(req), req.templateName()));
     }
 
     @PostMapping("/send")

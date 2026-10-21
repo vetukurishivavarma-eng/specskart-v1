@@ -39,8 +39,12 @@ public class BroadcastService {
         this.messages = messages;
     }
 
-    private List<Lead> candidates(Filter f) {
+    /** Matching leads who haven't had this template yet: sending again reaches the rest, never the same person twice (each send is paid). */
+    private List<Lead> candidates(Filter f, String templateName) {
+        java.util.Set<UUID> had = templateName == null || templateName.isBlank()
+                ? java.util.Set.of() : messages.leadIdsWithBody("broadcast:" + templateName.trim());
         return leads.findTop1000ByArchivedAtIsNullOrderByLastContactAtDesc().stream()
+                .filter(l -> !had.contains(l.getId()))
                 .filter(l -> l.getFollowUpState() != FollowUpState.OPTED_OUT)
                 .filter(l -> waId(l) != null)
                 .filter(l -> f.faceShape() == null || f.faceShape().equalsIgnoreCase(l.getFaceShape()))
@@ -50,8 +54,8 @@ public class BroadcastService {
     }
 
     /** How many leads this filter would reach — call before send() to sanity-check the blast. */
-    public int previewCount(Filter f) {
-        return candidates(f).size();
+    public int previewCount(Filter f, String templateName) {
+        return candidates(f, templateName).size();
     }
 
     @Transactional
@@ -61,7 +65,8 @@ public class BroadcastService {
             throw ApiException.badRequest("TEMPLATE_REQUIRED",
                     "Name an approved WhatsApp template — that's the only thing Meta delivers to a cold lead at scale.");
         }
-        List<Lead> all = candidates(f);
+        templateName = templateName.trim();
+        List<Lead> all = candidates(f, templateName);
         int cap = Math.min(limit <= 0 ? 200 : limit, HARD_CAP);
         List<Lead> targets = all.stream().limit(cap).toList();
 

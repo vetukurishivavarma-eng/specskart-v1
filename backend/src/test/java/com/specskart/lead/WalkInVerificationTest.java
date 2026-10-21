@@ -35,7 +35,7 @@ class WalkInVerificationTest {
         assertThat(walkIns.status(started.id()).verified()).isFalse();
 
         String waId = "26097" + (1_000_000 + (int) (Math.random() * 8_000_000));
-        int optedInBefore = broadcast.previewCount(new BroadcastService.Filter(null, false, true));
+        int optedInBefore = broadcast.previewCount(new BroadcastService.Filter(null, false, true), null);
         inbound.process(msg(waId, "Hi Specskart! Please save my number for offers & updates. Code: " + started.code()));
 
         var status = walkIns.status(started.id());
@@ -47,7 +47,7 @@ class WalkInVerificationTest {
         assertThat(lead.getMarketingOptInAt()).isNotNull();
         assertThat(((MockWhatsAppProvider) whatsapp).outbox())
                 .anyMatch(s -> waId.equals(s.toWaId()) && s.text() != null && s.text().contains("Reply STOP"));
-        assertThat(broadcast.previewCount(new BroadcastService.Filter(null, false, true))).isEqualTo(optedInBefore + 1);
+        assertThat(broadcast.previewCount(new BroadcastService.Filter(null, false, true), null)).isEqualTo(optedInBefore + 1);
 
         // a used code can't be replayed from another phone
         String other = "26096" + (1_000_000 + (int) (Math.random() * 8_000_000));
@@ -58,7 +58,7 @@ class WalkInVerificationTest {
         lead = leads.findByWhatsappWaId(waId).orElseThrow();
         assertThat(lead.getMarketingOptInAt()).isNull();
         assertThat(lead.getFollowUpState()).isEqualTo(FollowUpState.OPTED_OUT);
-        assertThat(broadcast.previewCount(new BroadcastService.Filter(null, false, true))).isEqualTo(optedInBefore);
+        assertThat(broadcast.previewCount(new BroadcastService.Filter(null, false, true), null)).isEqualTo(optedInBefore);
     }
 
     @Test

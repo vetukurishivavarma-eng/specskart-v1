@@ -691,7 +691,7 @@ public class WhatsAppBotService {
     static BotIntent classify(String text, String buttonId) {
         if (buttonId != null) {
             try {
-                return switch (buttonId) {
+                BotIntent tapped = switch (buttonId) {
                     case BTN_FIND -> BotIntent.FIND_FRAMES;
                     case BTN_EXPLORE -> BotIntent.EXPLORE_FRAMES;
                     case BTN_WEBSITE -> BotIntent.VISIT_WEBSITE;
@@ -710,8 +710,11 @@ public class WhatsAppBotService {
                     case BTN_BUDGET_LOW -> BotIntent.BUDGET_LOW;
                     case BTN_BUDGET_MED -> BotIntent.BUDGET_MED;
                     case BTN_BUDGET_HIGH -> BotIntent.BUDGET_HIGH;
-                    default -> BotIntent.UNKNOWN;
+                    // not one of ours: a quick-reply button on an approved template (a broadcast's
+                    // "Spin") arrives with its own text as the id -- read it like typed text below
+                    default -> null;
                 };
+                if (tapped != null) return tapped;
             } catch (Exception ignored) { }
         }
         String t = text == null ? "" : text.toLowerCase().trim();

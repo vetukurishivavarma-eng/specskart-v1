@@ -70,4 +70,11 @@ class BotClassifyTest {
         assertThat(WhatsAppBotService.kwacha(45_000)).isEqualTo("K450");
         assertThat(WhatsAppBotService.kwacha(99_900)).isEqualTo("K999");
     }
+
+    /** A broadcast's quick-reply button ("Spin") comes back with its own text as the id. */
+    @Test
+    void aTemplateQuickReplyIsReadByItsText() {
+        assertThat(WhatsAppBotService.classify("Spin", "Spin")).isEqualTo(BotIntent.SPIN);
+        assertThat(WhatsAppBotService.classify("Book my visit", WhatsAppBotService.BTN_SPIN)).isEqualTo(BotIntent.SPIN); // our ids still win
+    }
 }
