@@ -21,6 +21,9 @@ const NEXT: Record<string, string[]> = {
   SHIPPED: ['DELIVERED', 'REFUNDED'],
   DELIVERED: ['REFUNDED'],
 }
+// Collected at the shop (every order since 2026-10-21): packed = ready, then straight to collected
+const NEXT_COLLECT: Record<string, string[]> = { ...NEXT, PACKED: ['DELIVERED', 'CANCELLED', 'REFUNDED'], SHIPPED: ['DELIVERED', 'REFUNDED'] }
+const COLLECT_LABEL: Record<string, string> = { PACKED: 'Ready to collect', SHIPPED: 'Ready to collect', DELIVERED: 'Collected' }
 
 export default function OrderDetail() {
   const { id } = useParams()
@@ -43,17 +46,19 @@ export default function OrderDetail() {
   })
 
   if (isLoading || !o) return <p className="text-ink/50">Loading…</p>
-  const nexts = NEXT[o.status] ?? []
+  const collect = o.deliveryMethod === 'STORE'
+  const nexts = (collect ? NEXT_COLLECT : NEXT)[o.status] ?? []
+  const name = (s: string) => (collect && COLLECT_LABEL[s]) || s
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2 space-y-6">
         <div>
           <h1 className="text-2xl">{o.orderNo}</h1>
-          <p className="text-ink/55">{o.status} · placed {new Date(o.createdAt).toLocaleString()}</p>
+          <p className="text-ink/55">{name(o.status)} · placed {new Date(o.createdAt).toLocaleString()}</p>
           {o.paymentMethod === 'COD' && (
             <p className="mt-1 text-sm">
-              💵 Cash on delivery — {o.cashDueMinor > 0
+              💵 {collect ? 'Pays at the shop' : 'Cash on delivery'} — {o.cashDueMinor > 0
                 ? <b>{money(o.cashDueMinor, o.currency)} to collect</b>
                 : <span className="text-moss">cash received</span>}
             </p>
@@ -65,7 +70,7 @@ export default function OrderDetail() {
             )}
             {nexts.map((s) => (
               <button key={s} disabled={move.isPending} onClick={() => move.mutate(s)}
-                className="btn-ghost !px-3 !py-1 text-xs">→ {s}</button>
+                className="btn-ghost !px-3 !py-1 text-xs">→ {name(s)}</button>
             ))}
           </div>
           {move.isError && <p className="mt-2 text-xs text-clay">{(move.error as Error).message}</p>}
@@ -93,7 +98,7 @@ export default function OrderDetail() {
           <dl className="mt-3 space-y-1 border-t border-ink/10 pt-3 text-sm">
             <div className="flex justify-between"><dt className="text-ink/55">Subtotal</dt><dd>{money(o.subtotalMinor, o.currency)}</dd></div>
             {o.discountMinor > 0 && <div className="flex justify-between"><dt className="text-ink/55">Discount {o.promoCode ? `(${o.promoCode})` : ''}</dt><dd>− {money(o.discountMinor, o.currency)}</dd></div>}
-            <div className="flex justify-between"><dt className="text-ink/55">Delivery</dt><dd>{money(o.shippingMinor, o.currency)}</dd></div>
+            {!collect && <div className="flex justify-between"><dt className="text-ink/55">Delivery</dt><dd>{money(o.shippingMinor, o.currency)}</dd></div>}
             <div className="flex justify-between font-medium"><dt>Total</dt><dd>{money(o.totalMinor, o.currency)}</dd></div>
           </dl>
         </section>
@@ -117,9 +122,10 @@ export default function OrderDetail() {
       <aside className="card h-fit p-4 text-sm">
         <div className="label">Customer</div>
         <p className="mt-2">{o.customerName}<br />{o.customerPhone}<br />{o.customerEmail ?? '—'}</p>
-        <div className="label mt-4">{o.deliveryMethod === 'PICKUP' ? 'Bus station pickup' : 'Deliver to'}</div>
+        <div className="label mt-4">{collect ? 'Collects at' : o.deliveryMethod === 'PICKUP' ? 'Bus station pickup' : 'Deliver to'}</div>
         <p className="mt-2">
-          {o.deliveryMethod === 'PICKUP' ? <><b>{o.pickupPoint}</b><br />{o.shipCity}</> : <>{o.shipAddress}<br />{o.shipCity}</>}
+          {collect ? <b>{o.shopName ?? 'the shop'}</b>
+            : o.deliveryMethod === 'PICKUP' ? <><b>{o.pickupPoint}</b><br />{o.shipCity}</> : <>{o.shipAddress}<br />{o.shipCity}</>}
         </p>
       </aside>
     </div>

@@ -22,7 +22,7 @@ public enum OrderStatus {
             CONFIRMED, Set.of(PAID, ACCEPTED, PACKED, CANCELLED),
             PAID, Set.of(ACCEPTED, PACKED, CANCELLED, REFUNDED),
             ACCEPTED, Set.of(PACKED, CANCELLED, REFUNDED),
-            PACKED, Set.of(SHIPPED, CANCELLED, REFUNDED),
+            PACKED, Set.of(SHIPPED, DELIVERED, CANCELLED, REFUNDED), // DELIVERED = collected at the shop
             SHIPPED, Set.of(DELIVERED, REFUNDED),
             DELIVERED, Set.of(REFUNDED),
             CANCELLED, Set.of(),
