@@ -2,6 +2,15 @@
 
 _Last updated: 2026-10-20._
 
+## 2026-10-21: website frame orders = collect at the shop (`d95fb5b`, `59fe7bd`, V67)
+- Checkout asks only name/phone/email; no address, location, door/bus options. New orders get
+  delivery_method STORE, ship_address "Collect at <shop>", shipping 0 (store_config fee ignored).
+- Customer WhatsApps: CONFIRMED/PAID say "pay/collect at the shop" + shop address + map; PACKED = "ready to
+  collect"; SHIPPED sends nothing for STORE; DELIVERED = "Collected". Staff slip: "Customer collects at".
+- Tracking page + web admin order page: Ready to collect -> Collected (PACKED -> DELIVERED now allowed).
+- V67: Delivery FAQ, payment_note, guarantee_note reworded (only if unedited). Old DOOR/PICKUP code kept for old orders.
+- Product page stock now sets the shop shelf (`5460b54`); POS product screens refresh after Stock edits (POS `3e5fa75`, next APK).
+
 ## 2026-10-20 (6): staff reply score, waiting-first leads, sale -> lead (backend only, no APK)
 - 8:00 push "📊 Yesterday: X of Y customers got no reply" + average/slowest reply (shop hours only,
   `LeadNudges.shopClock`) + last-7-days funnel chats -> booked -> came -> bought; tap opens Leads.
