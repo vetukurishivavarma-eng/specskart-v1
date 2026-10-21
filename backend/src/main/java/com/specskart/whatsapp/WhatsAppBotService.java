@@ -300,10 +300,9 @@ public class WhatsAppBotService {
         List<WhatsAppProvider.Button> buttons = new ArrayList<>();
         // The free eye test is what gets people through the door, so it leads (Meta allows 3 buttons).
         buttons.add(new WhatsAppProvider.Button(LeadNudges.BTN_BOOK, "Free eye test 👁️"));
-        // Only worth a button to someone who has actually ordered — a fresh lead has nothing to track.
-        buttons.add(latestOrderUpdate(lead).isPresent()
-                ? new WhatsAppProvider.Button(BTN_TRACK_ORDER, "Track my order 📦")
-                : new WhatsAppProvider.Button(BTN_EXPLORE_LENS, "Explore Lens 🔍"));
+        // Spin & Win took the Track-my-order / Explore-lens slot (client, 2026-10-21): "where is my
+        // order" typed is still answered (classify -> TRACK_ORDER), and lenses + tracking stay in the menu.
+        buttons.add(new WhatsAppProvider.Button(BTN_SPIN, "Spin & Win 🎁"));
         buttons.add(new WhatsAppProvider.Button(BTN_FAQ, "FAQs ❓"));
         provider.sendButtons(waId(lead),
                 "Hi" + name + " 👋\nWelcome to " + props.storeName() + ".", buttons);
