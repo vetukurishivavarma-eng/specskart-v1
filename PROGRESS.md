@@ -10,6 +10,9 @@ _Last updated: 2026-10-20._
 - Meta: Visa added to WABA "specskart" (2285018372331628); no WhatsApp spend cap exists (offered in-app daily cap, not
   built); business unverified = 250 new chats/day, verify later. Templates specskart_followup, spin_and_win,
   eye_test_recall IN REVIEW; Render env set by user. eye_checkup_reminder deliberately NOT created.
+- **TOMORROW (user asked):** broadcast "pick customers" — in app Message many customers, choose specific leads
+  (search/tick list) instead of everyone; also lets a 1-person test. App has no Max box now (fixed 200); web admin
+  Broadcast still has Max sends.
 - App-update link with spaces now stripped server-side (`9929d6c`).
 - NOT live-tested yet: spin page redesign, OTP redeem on a device, broadcast sends (need approved templates),
   bring-a-friend flow, follow-up template. Check staff_new_order has a Document header and lens_post_purchase a
