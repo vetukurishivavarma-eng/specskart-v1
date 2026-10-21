@@ -121,4 +121,19 @@ class AdminChatTest {
         var msgs = (java.util.List<java.util.Map<String, Object>>) chat.get(waId).get("messages");
         assertThat(msgs).anyMatch(m -> String.valueOf(m.get("body")).contains("WhatsApp doesn't show us: edit"));
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void aReactionShowsItsEmojiAndGetsNoReply() {
+        String waId = "26097" + (300000 + (int) (Math.random() * 600000));
+        String payload = """
+            {"entry":[{"changes":[{"value":{"contacts":[{"profile":{"name":"BTS"},"wa_id":"%s"}],
+              "messages":[{"from":"%s","id":"wamid.%s","type":"reaction",
+                "reaction":{"message_id":"wamid.ours","emoji":"👍"}}]}}]}]}
+            """.formatted(waId, waId, UUID.randomUUID());
+        webhook.receive(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8), null);
+        var msgs = (java.util.List<java.util.Map<String, Object>>) chat.get(waId).get("messages");
+        assertThat(msgs).anyMatch(m -> "Reacted 👍".equals(m.get("body")));
+        assertThat(sentTo(waId)).isZero(); // no menu fired back at a thumbs-up
+    }
 }

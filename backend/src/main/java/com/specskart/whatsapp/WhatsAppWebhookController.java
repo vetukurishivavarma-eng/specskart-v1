@@ -137,6 +137,11 @@ public class WhatsAppWebhookController {
                         + (why.isBlank() ? "" : ": " + why) + (ad.isBlank() ? "" : " | from ad: " + ad)
                         + ". Check the WhatsApp app or ask them to type it again.)";
             }
+            // an emoji on one of our messages: shown in the chat, never answered (see WhatsAppBotService)
+            case "reaction" -> {
+                String emoji = msg.path("reaction").path("emoji").asText("");
+                text = WhatsAppBotService.REACTION + (emoji.isBlank() ? "(took back their reaction)" : emoji);
+            }
             default -> text = "[" + type + "]"; // image/document/...: media id picked up below
         }
         Map<String, Object> referral = null;

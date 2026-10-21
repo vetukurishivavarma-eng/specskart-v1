@@ -151,6 +151,9 @@ public class WhatsAppBotService {
         this.reviewCapture = reviewCapture;
     }
 
+    /** How a customer's emoji reaction reads in the chat: "Reacted 👍". */
+    static final String REACTION = "Reacted ";
+
     @Transactional
     public void handleInbound(Lead lead, String text, String buttonId, String waMessageId) {
         handleInbound(lead, text, buttonId, waMessageId, null, null);
@@ -160,6 +163,8 @@ public class WhatsAppBotService {
     public void handleInbound(Lead lead, String text, String buttonId, String waMessageId, String mediaId, String mediaName) {
         // the filename is only logged for the chat -- never fed to the bot/opt-out matching below
         logInbound(lead.getId(), waMessageId, mediaName != null ? mediaName : text, buttonId, mediaId);
+        // a 👍 on our message is not a question: keep it in the chat, but no reply and no staff buzz
+        if (buttonId == null && mediaId == null && text != null && text.startsWith(REACTION)) return;
         // opt-out keyword (answered there -- a menu after "STOP" reads as ignoring it), or defer the automated touches
         if (followUp.onInbound(lead.getId(), text)) return;
         nudges.customerWrote(lead.getId());
