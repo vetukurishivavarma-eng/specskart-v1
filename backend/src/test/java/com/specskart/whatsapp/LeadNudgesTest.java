@@ -226,6 +226,15 @@ class LeadNudgesTest {
     }
 
     @Test
+    void theMorningPushesGoOnceADayEvenIfTheServerRestarts() {
+        LocalDate day = LocalDate.of(2031, 3, 4);
+        assertThat(nudges.onceToday("score", day)).isTrue();
+        assertThat(nudges.onceToday("score", day)).isFalse(); // a restart at 8:15 asks again: no
+        assertThat(nudges.onceToday("digest", day)).isTrue();
+        assertThat(nudges.onceToday("score", day.plusDays(1))).isTrue();
+    }
+
+    @Test
     void replyTimesOnlyCountShopHours() {
         // Friday 22:00 -> Saturday 8:00; Saturday 15:00 (after the 14:00 close) -> Monday 8:00
         Instant fri10pm = ZonedDateTime.of(2030, 1, 11, 22, 0, 0, 0, LeadNudges.LUSAKA).toInstant();

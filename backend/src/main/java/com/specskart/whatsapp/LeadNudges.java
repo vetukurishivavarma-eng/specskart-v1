@@ -65,10 +65,12 @@ public class LeadNudges {
     private final AppProperties props;
     private final AnalyticsService analytics;
     private final LeadEventRepository events;
+    private final WebhookDedupe dedupe;
 
     public LeadNudges(LeadRepository leads, WhatsAppMessageRepository messages, WhatsAppProvider provider,
                       ServiceWindow window, PushService push, LensInquiryService lensInquiries, AppProperties props,
-                      AnalyticsService analytics, LeadEventRepository events) {
+                      AnalyticsService analytics, LeadEventRepository events, WebhookDedupe dedupe) {
+        this.dedupe = dedupe;
         this.analytics = analytics;
         this.events = events;
         this.leads = leads;
@@ -177,13 +179,22 @@ public class LeadNudges {
         staffScore(now);
     }
 
-    private LocalDate scoreSentOn; // ponytail: in memory, same as digestSentOn
+    /**
+     * True the first time it's asked for this push today, across restarts and overlapping deploys
+     * (a deploy at 8:15 used to send the 8:00 pushes a second time: the "sent" flag was in memory).
+     */
+    boolean onceToday(String push, LocalDate day) {
+        try {
+            return dedupe.claim("staff-push:" + push + ":" + day, "staff_push");
+        } catch (Exception raceLost) { // the other instance claimed it a moment earlier
+            return false;
+        }
+    }
 
     /** 8:00-9:00: how yesterday's customers were answered, and last week's chat -> sale funnel. */
     void staffScore(ZonedDateTime now) {
         LocalDate today = now.toLocalDate();
-        if (now.getHour() != 8 || today.equals(scoreSentOn)) return;
-        scoreSentOn = today;
+        if (now.getHour() != 8 || !onceToday("score", today)) return;
         Score s = score(today);
         if (s.needed() == 0 && s.chats() == 0) return;
         push.notifyStaff(s.title(), s.body(), "/leads");
@@ -243,14 +254,10 @@ public class LeadNudges {
         return m < 60 ? m + " min" : m / 60 + "h " + m % 60 + "m";
     }
 
-    // ponytail: in memory -- a restart between 8:00 and 9:00 sends the day's list twice; a column if that bites
-    private LocalDate digestSentOn;
-
     /** 8:00-9:00: one push listing today's eye tests; tapping it opens the Bookings page. */
     void staffDigest(ZonedDateTime now) {
         LocalDate today = now.toLocalDate();
-        if (now.getHour() != 8 || today.equals(digestSentOn)) return;
-        digestSentOn = today;
+        if (now.getHour() != 8 || !onceToday("digest", today)) return;
         List<Lead> booked = leads.findByVisitOnBetweenOrderByVisitOnAscCreatedAtAsc(today, today);
         if (booked.isEmpty()) return;
         String names = String.join(", ", booked.stream().map(LeadNudges::who).toList());
