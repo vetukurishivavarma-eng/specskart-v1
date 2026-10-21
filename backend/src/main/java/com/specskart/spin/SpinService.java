@@ -33,12 +33,12 @@ import java.util.stream.Stream;
 import java.util.UUID;
 
 /**
- * Spin & Win (2026-10-21): every spin wins a prize that is collected at the shop within a week.
+ * Spin & Win (2026-10-21): every spin wins a prize that is collected at the shop within 2 weeks.
  *
  * One prize at a time (client, 2026-10-21): the spin page is only reachable from a signed link the
  * WhatsApp bot sends (so each spin belongs to a real WhatsApp number), a repeat spin while their prize
  * (or a friend code they joined with) is still in its week returns / refuses, and the lead row is
- * locked while spinning so two taps can't both spin. Once the week is over they can spin again. The server picks the
+ * locked while spinning so two taps can't both spin. Once those 2 weeks are over they can spin again. The server picks the
  * prize -- the browser only animates the wheel to it -- and each slice's size on the wheel is its
  * real chance.
  */
@@ -46,7 +46,7 @@ import java.util.UUID;
 public class SpinService {
 
     private static final Logger log = LoggerFactory.getLogger(SpinService.class);
-    static final Duration VALID_FOR = Duration.ofDays(7); // client: "code valid for 1 week"
+    static final Duration VALID_FOR = Duration.ofDays(14); // client: 1 week, then 2 weeks (2026-10-21)
     static final Duration LINK_TTL = Duration.ofDays(14);
     private static final String ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no I,L,O,0,1
     private static final SecureRandom RNG = new SecureRandom();
@@ -149,7 +149,7 @@ public class SpinService {
     }
 
     /**
-     * One spin per week-long prize. A second call (double tap, reload, second phone) while the prize
+     * One spin per prize (valid 2 weeks). A second call (double tap, reload, second phone) while the prize
      * is still in its week returns that prize; a friend's code they hold blocks spinning until it ends.
      */
     @Transactional
@@ -187,7 +187,7 @@ public class SpinService {
         String body = isFriendPrize(s.getPrizeLabel())
                 ? "🎉 You won: *" + s.getPrizeLabel() + "*!\n\n" + friendSteps(s)
                 : "🎉 You won: *" + s.getPrizeLabel() + "*!\n\nYour code: *" + s.getCode() + "*\n"
-                + "Show it at the shop by *" + UNTIL.format(s.getExpiresAt()) + "* (valid for 1 week).\n\n" + lens.shopLines();
+                + "Show it at the shop by *" + UNTIL.format(s.getExpiresAt()) + "* (valid for 2 weeks).\n\n" + lens.shopLines();
         try {
             whatsapp.sendButtons(waId, body, List.of(new WhatsAppProvider.Button(LeadNudges.BTN_BOOK, "Book my visit")));
             chatLog.sent(waId, body);
