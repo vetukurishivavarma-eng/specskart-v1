@@ -171,7 +171,7 @@ export default function ProductDetail() {
         {(add.isError || buyNow.isError) && (
           <p className="mt-2 text-sm text-clay">{((add.error ?? buyNow.error) as Error).message}</p>
         )}
-        <p className="mt-3 text-xs text-ink/45">Fitted with your lenses and delivered across Zambia. Pay by card or mobile money.</p>
+        <p className="mt-3 text-xs text-ink/45">Fitted with your lenses — collect at our Lusaka shop and pay when you pick up.</p>
       </div>
 
       {tryOn && (

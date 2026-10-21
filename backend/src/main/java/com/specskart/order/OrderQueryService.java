@@ -20,9 +20,11 @@ public class OrderQueryService {
     private final OrderEventRepository events;
     private final LeadRepository leads;
     private final AppProperties props;
+    private final com.specskart.pos.StoreRepository stores;
 
     public OrderQueryService(OrderRepository orders, OrderItemRepository items, OrderEventRepository events,
-                             LeadRepository leads, AppProperties props) {
+                             LeadRepository leads, AppProperties props, com.specskart.pos.StoreRepository stores) {
+        this.stores = stores;
         this.orders = orders;
         this.items = items;
         this.events = events;
@@ -96,6 +98,7 @@ public class OrderQueryService {
         Lead lead = o.getLeadId() == null ? null : leads.findById(o.getLeadId()).orElse(null);
         int balance = lead == null ? 0 : lead.getPoints();
         String referralCode = lead == null ? null : lead.getReferralCode();
+        var shop = o.getFulfilStoreId() == null ? null : stores.findById(o.getFulfilStoreId()).orElse(null);
         return new OrderDtos.OrderView(o.getOrderNo(), o.getStatus().name(), o.getCustomerName(), o.getCustomerPhone(),
                 o.getCustomerEmail(), o.getShipAddress(), o.getShipCity(),
                 o.getSubtotalMinor(), o.getDiscountMinor(), o.getShippingMinor(), o.getTotalMinor(),
@@ -103,6 +106,8 @@ public class OrderQueryService {
                 o.getPointsEarned(), o.getPointsRedeemed(), balance, referralCode,
                 o.getLensType(), o.getLensAddMinor(), o.getRxJson(), o.getPrescriptionFileId() != null,
                 o.isCod() ? "COD" : "ONLINE", o.cashStillDue() ? o.getTotalMinor() : 0,
-                o.getDeliveryMethod(), o.getPickupPoint());
+                o.getDeliveryMethod(), o.getPickupPoint(),
+                shop == null ? null : shop.getName(), shop == null ? null : shop.getAddress(),
+                shop == null ? null : com.specskart.lens.LensInquiryService.mapsLink(shop));
     }
 }

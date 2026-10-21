@@ -64,6 +64,8 @@ public class OrderNotificationService {
     public void onStatus(Order order, OrderStatus status) {
         String line = statusLine(status);
         if (line == null) return; // status with no customer-facing message
+        // "Shipped" has nothing to say for a shop collection: "ready to collect" went at PACKED
+        if (status == OrderStatus.SHIPPED && !isDelivery(order)) return;
         if (order.getLeadId() == null) return;
         Lead lead = leads.findById(order.getLeadId()).orElse(null);
         if (lead == null) return;
@@ -133,7 +135,8 @@ public class OrderNotificationService {
         out.add("# 🛍️ New order " + order.getOrderNo() + " — " + total);
         out.add("Placed: " + STAFF_TIME.format(order.getCreatedAt()));
         out.add(order.isCod()
-                ? "💵 CASH ON DELIVERY — collect " + total + " on hand-over"
+                ? (isDelivery(order) ? "💵 CASH ON DELIVERY — collect " + total + " on hand-over"
+                                     : "💵 PAYS AT THE SHOP — take " + total + " when they collect")
                 : "Payment: " + (order.getPaidAt() != null ? "PAID online" : "not paid yet")
                         + (order.getPaymentProvider() == null ? "" : " (" + order.getPaymentProvider() + ")"));
         out.add("");
@@ -141,13 +144,16 @@ public class OrderNotificationService {
         out.add("Name: " + orDash(order.getCustomerName()));
         out.add("Phone: " + orDash(order.getCustomerPhone()));
         if (order.getCustomerEmail() != null && !order.getCustomerEmail().isBlank()) out.add("Email: " + order.getCustomerEmail());
-        out.add("PICKUP".equals(order.getDeliveryMethod())
-                ? "Pickup at: " + orDash(order.getPickupPoint())
-                : "Deliver to: " + orDash(order.getShipAddress()) + ", " + orDash(order.getShipCity()));
-        com.specskart.pos.Store from = order.getFulfilStoreId() == null ? null
-                : stores.findById(order.getFulfilStoreId()).orElse(null);
-        if (from != null) out.add("🏬 Ships from: " + from.getName());
-        if (order.getDeliveryLat() != null && order.getDeliveryLng() != null) {
+        com.specskart.pos.Store from = shopOf(order);
+        if (!isDelivery(order)) {
+            out.add("🏬 Customer collects at: " + (from == null ? "the shop" : from.getName()));
+        } else {
+            out.add("PICKUP".equals(order.getDeliveryMethod())
+                    ? "Pickup at: " + orDash(order.getPickupPoint())
+                    : "Deliver to: " + orDash(order.getShipAddress()) + ", " + orDash(order.getShipCity()));
+            if (from != null) out.add("🏬 Ships from: " + from.getName());
+        }
+        if (isDelivery(order) && order.getDeliveryLat() != null && order.getDeliveryLng() != null) {
             String to = order.getDeliveryLat() + "," + order.getDeliveryLng();
             out.add("📍 Customer's pin: https://www.google.com/maps/search/?api=1&query=" + to);
             // Google Maps URLs are free (no API key): tapping shows the real road route and distance
@@ -182,8 +188,23 @@ public class OrderNotificationService {
                     : "⚠ NO prescription on file — WhatsApp the customer before cutting lenses.");
         }
         out.add("");
-        out.add("Pack & dispatch: " + adminLink(order));
+        out.add((isDelivery(order) ? "Pack & dispatch: " : "Get it ready for collection: ") + adminLink(order));
         return out;
+    }
+
+    /** Orders from before 2026-10-21 went by courier or bus; everything since is collected at the shop. */
+    static boolean isDelivery(Order order) {
+        return "DOOR".equals(order.getDeliveryMethod()) || "PICKUP".equals(order.getDeliveryMethod());
+    }
+
+    private com.specskart.pos.Store shopOf(Order order) {
+        return order.getFulfilStoreId() == null ? null : stores.findById(order.getFulfilStoreId()).orElse(null);
+    }
+
+    /** "Specskart Opticians, Radian Retail Park ...\n📍 map link" for the customer messages. */
+    private String collectAt(Order order) {
+        com.specskart.pos.Store shop = shopOf(order);
+        return shop == null ? "our shop" : com.specskart.lens.LensInquiryService.collectionLine(shop);
     }
 
     private String shopName(java.util.UUID storeId) {
@@ -206,12 +227,11 @@ public class OrderNotificationService {
     /** Short, single-line status headline — fills {{2}} of the order-update template. Null = no customer message. */
     public static String statusLine(OrderStatus status) {
         return switch (status) {
-            case CONFIRMED -> "Order confirmed — pay cash when it arrives";
+            case CONFIRMED -> "Order confirmed — pay at the shop when you collect";
             case PAID -> "Payment received — we're preparing your frames";
             case ACCEPTED -> "Your shop has your order — we're getting your frames ready";
-            case PACKED -> "Packed and ready for dispatch";
-            case SHIPPED -> "Out for delivery — on its way to you";
-            case DELIVERED -> "Delivered — enjoy your new frames!";
+            case PACKED, SHIPPED -> "Ready to collect at the shop";
+            case DELIVERED -> "Collected — enjoy your new frames!";
             case CANCELLED -> "Your order has been cancelled";
             case REFUNDED -> "Your refund has been processed";
             default -> null;
@@ -230,14 +250,19 @@ public class OrderNotificationService {
         return switch (status) {
             case CONFIRMED -> "Order confirmed" + hi + " ✅\n\nOrder " + order.getOrderNo() + "\n" + items
                     + "\n\nPay *" + money(order.getTotalMinor(), order.getCurrency())
-                    + "* in cash to the courier on delivery. We're getting your frames ready — track any time:\n" + track;
+                    + "* when you collect at the shop. We'll message you here as soon as your frames are ready.\n\n"
+                    + collectAt(order) + "\n\nTrack any time:\n" + track;
             case PAID -> "Thanks" + hi + "! Payment received ✅\n\nOrder " + order.getOrderNo() + "\n" + items
                     + "\nTotal " + money(order.getTotalMinor(), order.getCurrency()) + rewards
-                    + "\n\nWe're preparing your frames. Track your order any time:\n" + track;
-            case PACKED -> "Good news" + hi + " — order " + order.getOrderNo() + " is packed and ready for dispatch 📦\n" + track;
+                    + "\n\nWe're preparing your frames and will message you here when they're ready to collect.\n\n"
+                    + collectAt(order) + "\n\nTrack your order any time:\n" + track;
+            case PACKED -> "Good news" + hi + " — order " + order.getOrderNo() + " is ready to collect 🎉\n\n"
+                    + collectAt(order) + (order.cashStillDue()
+                            ? "\n\nPay *" + money(order.getTotalMinor(), order.getCurrency()) + "* when you collect." : "")
+                    + "\n\n" + track;
             case SHIPPED -> "On its way 🛵\nOrder " + order.getOrderNo() + " has been handed to the courier — "
                     + "expected within a few working days.\n" + track;
-            case DELIVERED -> "Delivered 🎉 Enjoy your new frames" + hi + "!\nAnything not right with the fit? Just reply here.";
+            case DELIVERED -> "Collected 🎉 Enjoy your new frames" + hi + "!\nAnything not right with the fit? Just reply here.";
             case CANCELLED -> "Order " + order.getOrderNo() + " has been cancelled. If this wasn't you, reply here.";
             case REFUNDED -> "A refund for order " + order.getOrderNo() + " has been processed.";
             default -> null;

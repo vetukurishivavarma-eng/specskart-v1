@@ -609,7 +609,7 @@ public class WhatsAppBotService {
         carts.addItem(token, product.get().getId(), 1);
         String link = props.frontendBaseUrl() + "/store?c=" + token;
         sendText(lead, "Added *" + product.get().getName() + "* to your bag ✅\n\n"
-                + "Checkout here — pay online or cash on delivery:\n" + link);
+                + "Checkout here — you collect and pay at our shop:\n" + link);
         analytics.record(LeadEventType.PRODUCTS_SHOWN, lead.getId(), null);
     }
 

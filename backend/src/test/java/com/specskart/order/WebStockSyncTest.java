@@ -121,8 +121,8 @@ class WebStockSyncTest {
         assertThat(order.getFulfilStoreId()).isEqualTo(kitwe.getId());
         assertThat(order.getDeliveryLat()).isEqualTo(KIT_LAT + 0.02);
         assertThat(notifications.staffLines(order))
-                .anyMatch(l -> l.equals("🏬 Ships from: Kitwe test"))
-                .anyMatch(l -> l.contains("google.com/maps/dir/?api=1&origin=" + KIT_LAT + "," + KIT_LNG + "&destination="));
+                .anyMatch(l -> l.equals("🏬 Customer collects at: Kitwe test"))
+                .noneMatch(l -> l.contains("google.com/maps/dir")); // nothing to drive to: they come to us
         assertThat(shelf(kitwe, frame)).isEqualTo(1);
         assertThat(shelf(lusaka, frame)).isEqualTo(2);
         assertThat(online(frame)).isEqualTo(3);

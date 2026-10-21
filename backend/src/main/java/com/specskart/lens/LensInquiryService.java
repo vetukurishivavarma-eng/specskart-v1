@@ -551,7 +551,7 @@ public class LensInquiryService {
     }
 
     /** Where to collect, as a line a customer can act on: name, street, and a tappable map. */
-    static String collectionLine(Store shop) {
+    public static String collectionLine(Store shop) {
         if (shop == null) return "our shop";
         StringBuilder sb = new StringBuilder(shop.getName());
         if (!blank(shop.getAddress())) sb.append(", ").append(shop.getAddress());
@@ -566,7 +566,7 @@ public class LensInquiryService {
      * handed over as a search, which is still better than a name nobody can find. No API key
      * and no billing — these are plain public URLs.
      */
-    static String mapsLink(Store shop) {
+    public static String mapsLink(Store shop) {
         if (!blank(shop.getMapUrl())) return shop.getMapUrl();
         if (shop.getLatitude() != null && shop.getLongitude() != null) {
             return "https://www.google.com/maps/search/?api=1&query="

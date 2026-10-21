@@ -38,10 +38,10 @@ public class StoreConfig {
     private boolean firstOrderFreeShipping = false;
 
     @Column(nullable = false, length = 300)
-    private String paymentNote = "Pay by card, MTN / Airtel Money, or cash on delivery.";
+    private String paymentNote = "Pay at the shop when you collect -- cash or mobile money.";
 
     @Column(nullable = false, length = 300)
-    private String guaranteeNote = "Delivered across Zambia · 30-day fit guarantee · free frame adjustments.";
+    private String guaranteeNote = "Collect at our Lusaka shop · 30-day fit guarantee · free frame adjustments.";
 
     public long shippingFor(long subtotalMinor) {
         if (freeShippingOverMinor != null && subtotalMinor >= freeShippingOverMinor) return 0;

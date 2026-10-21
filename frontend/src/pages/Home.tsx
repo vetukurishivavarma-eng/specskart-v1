@@ -129,7 +129,7 @@ export default function Home() {
             {[
               ['01', 'Choose your frame', 'Browse the store or let Frame Finder match one to your face shape.'],
               ['02', 'Add your lenses', 'Clear or photochromatic, blue-light block optional — priced from your prescription.'],
-              ['03', 'Confirm on WhatsApp', 'We verify your order, then you collect in store or we deliver.'],
+              ['03', 'Confirm on WhatsApp', 'We verify your order and message you when it’s ready to collect at our shop.'],
             ].map(([n, t, d]) => (
               <div key={n} className="rounded-2xl bg-bone p-7">
                 <div className="font-display text-5xl font-extrabold text-clay">{n}</div>

@@ -112,7 +112,8 @@ export type OrderView = {
   pointsEarned: number; pointsRedeemed: number; pointsBalance: number; referralCode: string | null
   lensType: string | null; lensAddMinor: number; rxJson: string | null; hasPrescription: boolean
   paymentMethod: 'ONLINE' | 'COD'; cashDueMinor: number
-  deliveryMethod: 'DOOR' | 'PICKUP'; pickupPoint: string | null
+  deliveryMethod: 'DOOR' | 'PICKUP' | 'STORE'; pickupPoint: string | null
+  shopName: string | null; shopAddress: string | null; shopMapsUrl: string | null
 }
 
 export type StoreConfig = {
@@ -157,7 +158,8 @@ export const shop = {
     const q = new URLSearchParams()
     if (pin) { q.set('lat', String(pin.lat)); q.set('lng', String(pin.lng)) }
     if (city) q.set('city', city)
-    return api<{ shopName: string | null; city: string | null; distanceKm: number | null; split: boolean }>(
+    return api<{ shopName: string | null; city: string | null; distanceKm: number | null; split: boolean
+      address: string | null; mapsUrl: string | null }>(
       `/public/cart/ships-from?${q.toString()}`, { headers: headers() })
   },
   checkout: (body: Record<string, string | number | boolean | undefined>) =>

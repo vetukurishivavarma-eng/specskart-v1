@@ -74,8 +74,6 @@ public class CheckoutService {
     public OrderDtos.CheckoutResult start(String cartToken, OrderDtos.CheckoutRequest req) {
         require(req.customerName(), "a name");
         require(req.customerPhone(), "a phone number");
-        require(req.shipAddress(), "a delivery address");
-        require(req.shipCity(), "a city / town");
 
         Cart cart = carts.findByToken(cartToken)
                 .orElseThrow(() -> ApiException.badRequest("CART_EMPTY", "Your bag is empty."));
@@ -127,12 +125,9 @@ public class CheckoutService {
         order.setCustomerName(req.customerName().trim());
         order.setCustomerPhone(req.customerPhone().trim());
         order.setCustomerEmail(req.customerEmail() == null ? null : req.customerEmail().trim());
-        order.setShipAddress(req.shipAddress().trim());
-        order.setShipCity(req.shipCity().trim());
-        if ("PICKUP".equals(req.deliveryMethod()) && req.pickupPoint() != null && !req.pickupPoint().isBlank()) {
-            order.setDeliveryMethod("PICKUP");
-            order.setPickupPoint(req.pickupPoint().trim());
-        }
+        // No delivery any more: every frames order is collected at the shop (DOOR / PICKUP are
+        // only on orders placed before 2026-10-21). The address columns name the shop instead.
+        order.setDeliveryMethod("STORE");
         order.setSubtotalMinor(subtotal);
         order.setDiscountMinor(discountMinor);
         order.setShippingMinor(view.shippingMinor());
@@ -153,8 +148,12 @@ public class CheckoutService {
         }
         // ship from the nearest shop that has it: the browser pin, else the city typed
         var allocation = inventory.allocate(quantities(lines), order.getDeliveryLat(), order.getDeliveryLng(),
-                order.getShipCity());
+                req.shipCity());
         if (allocation != null) order.setFulfilStoreId(allocation.primary().getId());
+        var shop = allocation != null ? allocation.primary()
+                : inventory.onlineShops().stream().findFirst().orElse(null);
+        order.setShipAddress(shop == null ? "Collect at our shop" : "Collect at " + shop.getName());
+        order.setShipCity(shop == null || shop.getCity() == null ? "" : shop.getCity());
         orders.save(order);
 
         for (CartItem ci : lines) {
@@ -314,9 +313,10 @@ public class CheckoutService {
         Cart cart = cartToken == null ? null : carts.findByToken(cartToken).orElse(null);
         var a = cart == null ? null
                 : inventory.allocate(quantities(cartItems.findByCartId(cart.getId())), coord(lat, 90), coord(lng, 180), city);
-        if (a == null) return new OrderDtos.ShipsFrom(null, null, null, false);
+        if (a == null) return new OrderDtos.ShipsFrom(null, null, null, false, null, null);
         Double km = a.primaryDistanceKm() == null ? null : Math.round(a.primaryDistanceKm() * 10) / 10.0;
-        return new OrderDtos.ShipsFrom(a.primary().getName(), a.primary().getCity(), km, a.split());
+        return new OrderDtos.ShipsFrom(a.primary().getName(), a.primary().getCity(), km, a.split(),
+                a.primary().getAddress(), com.specskart.lens.LensInquiryService.mapsLink(a.primary()));
     }
 
     private static java.util.Map<UUID, Integer> quantities(List<CartItem> lines) {

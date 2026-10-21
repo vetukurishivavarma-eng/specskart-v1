@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { shop, money } from '../lib/shop'
@@ -8,40 +8,23 @@ export default function Checkout() {
   const navigate = useNavigate()
   const { data: cart, isLoading } = useQuery({ queryKey: ['cart'], queryFn: shop.cart })
   const { data: cfg } = useQuery({ queryKey: ['storeConfig'], queryFn: shop.storeConfig })
-  const [f, setF] = useState({ customerName: '', customerPhone: '', customerEmail: '', shipAddress: '', shipCity: '' })
+  const [f, setF] = useState({ customerName: '', customerPhone: '', customerEmail: '' })
   const on = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value })
   const [cc, setCc] = useState(DEFAULT_COUNTRY_CODE)
   const [usePoints, setUsePoints] = useState(false)
   const [referral, setReferral] = useState('')
   const [method, setMethod] = useState<'ONLINE' | 'COD'>('COD')
-  const [delivery, setDelivery] = useState<'DOOR' | 'PICKUP'>('DOOR')
-  const [pickupPoint, setPickupPoint] = useState('')
 
-  // Nearest-shop fulfilment: ask the browser once. The pin picks the shop the frames ship from
-  // and goes on the staff alert so the courier finds the door. Denied = we fall back to the city.
-  const [pin, setPin] = useState<{ lat: number; lng: number } | null>(null)
-  const [locState, setLocState] = useState<'asking' | 'ok' | 'denied' | 'unsupported'>('asking')
-  const askLocation = () => {
-    if (!navigator.geolocation) { setLocState('unsupported'); return }
-    setLocState('asking')
-    navigator.geolocation.getCurrentPosition(
-      (p) => { setPin({ lat: p.coords.latitude, lng: p.coords.longitude }); setLocState('ok') },
-      () => setLocState('denied'),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 300000 })
-  }
-  useEffect(askLocation, [])
-  const cityForShop = pin ? '' : f.shipCity.trim()
-  const { data: shipsFrom } = useQuery({
-    queryKey: ['shipsFrom', pin?.lat, pin?.lng, cityForShop],
-    queryFn: () => shop.shipsFrom(pin, cityForShop),
-    enabled: !!cart?.lines.length && locState !== 'asking',
+  // No delivery: every order is collected at the shop holding the frames.
+  const { data: collectAt } = useQuery({
+    queryKey: ['shipsFrom'],
+    queryFn: () => shop.shipsFrom(null, ''),
+    enabled: !!cart?.lines.length,
   })
 
   const points = cart?.pointsAvailable ?? 0
   const pointsDiscount = usePoints ? points * (cart?.pointValueMinor ?? 0) : 0
   const cod = method === 'COD'
-  const outOfLusaka = f.shipCity.trim() !== '' && !f.shipCity.trim().toLowerCase().includes('lusaka')
-  const pickup = outOfLusaka && delivery === 'PICKUP'
 
   const pay = useMutation({
     mutationFn: () => shop.checkout({
@@ -50,10 +33,6 @@ export default function Checkout() {
       redeemPoints: usePoints ? points : undefined,
       referralCode: referral.trim() || undefined,
       payOnDelivery: cod,
-      deliveryMethod: pickup ? 'PICKUP' : 'DOOR',
-      pickupPoint: pickup ? pickupPoint.trim() : undefined,
-      latitude: pin?.lat,
-      longitude: pin?.lng,
     }),
     onSuccess: (r) => { r.checkoutUrl ? (window.location.href = r.checkoutUrl) : navigate(`/order/${r.orderNo}`) },
   })
@@ -66,8 +45,7 @@ export default function Checkout() {
     </div>
   )
 
-  const valid = f.customerName.trim() && f.customerPhone.trim() && f.shipAddress.trim() && f.shipCity.trim()
-    && (!pickup || pickupPoint.trim())
+  const valid = f.customerName.trim() && f.customerPhone.trim()
 
   return (
     <div className="container-x grid gap-10 py-12 lg:grid-cols-2">
@@ -87,46 +65,18 @@ export default function Checkout() {
             </div>
           </label>
           <Field label="Email (optional)" value={f.customerEmail} onChange={on('customerEmail')} type="email" />
-          <Field label="Delivery address" value={f.shipAddress} onChange={on('shipAddress')} />
-          <Field label="City / town" value={f.shipCity} onChange={on('shipCity')} />
 
-          <div className="rounded-lg bg-ink/5 px-3 py-2 text-sm">
-            {locState === 'asking' ? 'Finding the Specskart shop nearest you…'
-              : shipsFrom?.shopName ? (
-                <span>
-                  📦 Ships from our <b>{shipsFrom.shopName}</b> shop
-                  {shipsFrom.distanceKm != null && <> · {shipsFrom.distanceKm} km from you</>}
-                  {shipsFrom.split && ' (some items from another shop)'}
-                </span>
-              )
-              : locState === 'ok' ? '📍 Location saved to help the courier find you.'
-              : null}
-            {(locState === 'denied' || locState === 'unsupported') && (
-              <p className="mt-1 text-ink/60">
-                Allow location so we send your order from the nearest shop and the courier finds you faster.{' '}
-                {locState === 'denied' && <button type="button" onClick={askLocation} className="underline">Try again</button>}
-              </p>
+          <div className="rounded-lg bg-ink/5 px-3 py-3 text-sm">
+            <span className="text-xs font-medium uppercase tracking-widest text-ink/50">Collect at the shop</span>
+            <p className="mt-1">
+              🏬 <b>{collectAt?.shopName ?? 'Specskart'}</b>
+              {collectAt?.address && <><br /><span className="text-ink/70">{collectAt.address}</span></>}
+            </p>
+            {collectAt?.mapsUrl && (
+              <a href={collectAt.mapsUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block underline">Open in Google Maps</a>
             )}
+            <p className="mt-1 text-ink/60">We don’t deliver. We’ll message you on WhatsApp as soon as your frames are ready to collect.</p>
           </div>
-
-          {outOfLusaka && (
-            <fieldset className="space-y-2">
-              <span className="text-xs font-medium uppercase tracking-widest text-ink/50">How should it reach you?</span>
-              <label className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${!pickup ? 'border-ink bg-ink/5' : 'border-ink/20'}`}>
-                <input type="radio" name="delivery" checked={delivery === 'DOOR'} onChange={() => setDelivery('DOOR')} className="mt-0.5" />
-                <span><b>Door delivery</b> — courier to the address above.</span>
-              </label>
-              <label className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${pickup ? 'border-ink bg-ink/5' : 'border-ink/20'}`}>
-                <input type="radio" name="delivery" checked={delivery === 'PICKUP'} onChange={() => setDelivery('PICKUP')} className="mt-0.5" />
-                <span><b>Bus station pickup</b> — often cheaper &amp; faster outside Lusaka. Collect it yourself when it arrives.</span>
-              </label>
-              {pickup && (
-                <input value={pickupPoint} onChange={(e) => setPickupPoint(e.target.value)}
-                  placeholder="Which bus company / terminal? e.g. Power Tools, Kitwe"
-                  className="w-full rounded-lg border border-ink/20 px-3 py-2 text-sm" />
-              )}
-            </fieldset>
-          )}
 
           {!cart.promoCode && (
             <label className="block">
@@ -153,20 +103,20 @@ export default function Checkout() {
             {cfg?.codEnabled !== false && (
               <label className={`flex items-start gap-3 rounded-lg border p-3 text-sm ${cod ? 'border-ink bg-ink/5' : 'border-ink/20'}`}>
                 <input type="radio" name="pay" checked={cod} onChange={() => setMethod('COD')} className="mt-0.5" />
-                <span><b>Pay on delivery</b> — cash to the courier when your frames arrive.</span>
+                <span><b>Pay at the shop</b> — cash or mobile money when you collect.</span>
               </label>
             )}
           </fieldset>
 
           <button className="btn-primary mt-4 w-full disabled:bg-ink/30" disabled={!valid || pay.isPending}>
             {pay.isPending ? 'Placing your order…'
-              : cod ? `Place order · pay ${money(cart.totalMinor, cart.currency)} on delivery`
+              : cod ? `Place order · pay ${money(cart.totalMinor, cart.currency)} when you collect`
               : (usePoints || referral.trim()) ? 'Continue to payment'
               : `Pay ${money(cart.totalMinor, cart.currency)}`}
           </button>
           {pay.isError && <p className="text-sm text-clay">{(pay.error as Error).message}</p>}
           <p className="text-xs text-ink/45">
-            {cod ? 'We’ll get your frames ready and the courier collects the cash on hand-over.'
+            {cod ? 'We’ll get your frames ready and you pay when you pick them up at the shop.'
                  : 'You’ll be taken to a secure page to pay by card or mobile money (MTN / Airtel).'}
           </p>
           {cfg?.guaranteeNote && <p className="text-xs text-ink/45">✓ {cfg.guaranteeNote}</p>}
@@ -186,7 +136,7 @@ export default function Checkout() {
         <dl className="mt-4 space-y-1 border-t border-ink/10 pt-3 text-sm">
           <div className="flex justify-between"><dt className="text-ink/55">Subtotal</dt><dd>{money(cart.subtotalMinor, cart.currency)}</dd></div>
           {cart.discountMinor > 0 && <div className="flex justify-between text-moss"><dt>Discount</dt><dd>− {money(cart.discountMinor, cart.currency)}</dd></div>}
-          <div className="flex justify-between"><dt className="text-ink/55">Delivery</dt><dd>{cart.shippingMinor === 0 ? 'Free' : money(cart.shippingMinor, cart.currency)}</dd></div>
+          <div className="flex justify-between"><dt className="text-ink/55">Collection</dt><dd>At the shop</dd></div>
           <div className="flex justify-between pt-1 text-base font-medium"><dt>Total</dt><dd>{money(cart.totalMinor, cart.currency)}</dd></div>
         </dl>
       </aside>

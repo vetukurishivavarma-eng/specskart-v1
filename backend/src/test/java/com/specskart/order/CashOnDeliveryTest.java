@@ -77,7 +77,7 @@ class CashOnDeliveryTest {
     }
 
     @Test
-    void firstOrderFreeShippingWaivesDelivery() {
+    void aDeliveryFeeNoLongerApplies() { // every order is collected at the shop
         StoreConfig sc = storeConfig.current();
         long origFee = sc.getShippingFeeMinor();
         boolean origFlag = sc.isFirstOrderFreeShipping();
@@ -85,13 +85,10 @@ class CashOnDeliveryTest {
             sc.setShippingFeeMinor(3_000);
             sc.setFirstOrderFreeShipping(true);
             storeConfig.save(sc);
-            var cart = carts.addItem(null, frame().getId(), 1);
-            assertThat(carts.view(cart.token()).shippingMinor()).isZero();
-
             sc.setFirstOrderFreeShipping(false);
             storeConfig.save(sc);
-            var cart2 = carts.addItem(null, frame().getId(), 1);
-            assertThat(carts.view(cart2.token()).shippingMinor()).isEqualTo(3_000);
+            var cart = carts.addItem(null, frame().getId(), 1);
+            assertThat(carts.view(cart.token()).shippingMinor()).isZero();
         } finally {
             sc.setShippingFeeMinor(origFee);
             sc.setFirstOrderFreeShipping(origFlag);

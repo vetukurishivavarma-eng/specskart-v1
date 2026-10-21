@@ -11,6 +11,10 @@ const LABEL: Record<string, string> = {
   PENDING_PAYMENT: 'Awaiting payment', CONFIRMED: 'Order confirmed', PAID: 'Payment received', PACKED: 'Packed',
   SHIPPED: 'Out for delivery', DELIVERED: 'Delivered', CANCELLED: 'Cancelled', REFUNDED: 'Refunded',
 }
+// Collected at the shop (every order since 2026-10-21): "shipped" means the same as ready
+const COLLECT_LABEL: Record<string, string> = {
+  ...LABEL, CONFIRMED: 'Order confirmed', PACKED: 'Ready to collect', SHIPPED: 'Ready to collect', DELIVERED: 'Collected',
+}
 
 export default function OrderTracking() {
   const { orderNo } = useParams()
@@ -34,14 +38,16 @@ export default function OrderTracking() {
     </div>
   )
 
-  const steps = order.paymentMethod === 'COD' ? STEPS_COD : STEPS
-  const stepIdx = steps.indexOf(order.status)
+  const collect = order.deliveryMethod === 'STORE'
+  const label = collect ? COLLECT_LABEL : LABEL
+  const steps = (order.paymentMethod === 'COD' ? STEPS_COD : STEPS).filter((s) => !collect || s !== 'SHIPPED')
+  const stepIdx = steps.indexOf(collect && order.status === 'SHIPPED' ? 'PACKED' : order.status)
   const terminal = order.status === 'CANCELLED' || order.status === 'REFUNDED'
 
   return (
     <div className="container-x max-w-2xl py-12">
       <p className="label">Order {order.orderNo}</p>
-      <h1 className="mt-2 text-3xl">{LABEL[order.status] ?? order.status}</h1>
+      <h1 className="mt-2 text-3xl">{label[order.status] ?? order.status}</h1>
 
       {order.status === 'PENDING_PAYMENT' && (
         <p className="mt-3 text-ink/60">We’re waiting for your payment to confirm. This page updates automatically.</p>
@@ -49,7 +55,7 @@ export default function OrderTracking() {
 
       {order.cashDueMinor > 0 && (
         <div className="mt-4 rounded-xl border border-ink/15 bg-bone px-4 py-3 text-sm">
-          💵 Pay <b>{money(order.cashDueMinor, order.currency)}</b> in cash to the courier when your frames arrive.
+          💵 Pay <b>{money(order.cashDueMinor, order.currency)}</b> {collect ? 'at the shop when you collect.' : 'in cash to the courier when your frames arrive.'}
         </div>
       )}
 
@@ -58,7 +64,7 @@ export default function OrderTracking() {
           {steps.map((s, i) => (
             <li key={s} className="flex flex-1 flex-col items-center text-center">
               <span className={`h-3 w-3 rounded-full ${i <= stepIdx ? 'bg-ink' : 'bg-ink/20'}`} />
-              <span className={`mt-2 text-xs ${i <= stepIdx ? 'text-ink' : 'text-ink/40'}`}>{LABEL[s]}</span>
+              <span className={`mt-2 text-xs ${i <= stepIdx ? 'text-ink' : 'text-ink/40'}`}>{label[s]}</span>
             </li>
           ))}
         </ol>
@@ -75,7 +81,9 @@ export default function OrderTracking() {
           <div className="flex justify-between"><dt className="text-ink/55">Subtotal</dt><dd>{money(order.subtotalMinor, order.currency)}</dd></div>
           {order.lensAddMinor > 0 && <div className="flex justify-between"><dt className="text-ink/55">Prescription lenses{order.lensType ? ` (${order.lensType.replace('_', ' ').toLowerCase()})` : ''}</dt><dd>+ {money(order.lensAddMinor, order.currency)}</dd></div>}
           {order.discountMinor > 0 && <div className="flex justify-between text-moss"><dt>Discount</dt><dd>− {money(order.discountMinor, order.currency)}</dd></div>}
-          <div className="flex justify-between"><dt className="text-ink/55">Delivery</dt><dd>{order.shippingMinor === 0 ? 'Free' : money(order.shippingMinor, order.currency)}</dd></div>
+          {collect
+            ? <div className="flex justify-between"><dt className="text-ink/55">Collection</dt><dd>At the shop</dd></div>
+            : <div className="flex justify-between"><dt className="text-ink/55">Delivery</dt><dd>{order.shippingMinor === 0 ? 'Free' : money(order.shippingMinor, order.currency)}</dd></div>}
           <div className="flex justify-between pt-1 font-medium"><dt>Total</dt><dd>{money(order.totalMinor, order.currency)}</dd></div>
         </dl>
         {order.lensType && order.lensType !== 'NON_PRESCRIPTION' && !order.rxJson && (
@@ -84,8 +92,14 @@ export default function OrderTracking() {
       </div>
 
       <div className="card mt-4 p-5 text-sm">
-        <h2 className="text-lg">{order.deliveryMethod === 'PICKUP' ? 'Pickup' : 'Delivery'}</h2>
-        {order.deliveryMethod === 'PICKUP' ? (
+        <h2 className="text-lg">{collect ? (order.status === 'DELIVERED' ? 'Collected from' : 'Collect from') : order.deliveryMethod === 'PICKUP' ? 'Pickup' : 'Delivery'}</h2>
+        {collect ? (
+          <>
+            <p className="mt-2 text-ink/70"><b>{order.shopName ?? 'Our shop'}</b>{order.shopAddress ? <><br />{order.shopAddress}</> : null}</p>
+            {order.shopMapsUrl && <a href={order.shopMapsUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block underline">Open in Google Maps</a>}
+            <p className="mt-2 text-ink/50">We’ll message you on WhatsApp when it’s ready to collect.</p>
+          </>
+        ) : order.deliveryMethod === 'PICKUP' ? (
           <p className="mt-2 text-ink/70">{order.customerName}<br />Collect at: {order.pickupPoint}<br />{order.shipCity}<br />{order.customerPhone}</p>
         ) : (
           <p className="mt-2 text-ink/70">{order.customerName}<br />{order.shipAddress}, {order.shipCity}<br />{order.customerPhone}</p>
@@ -117,7 +131,7 @@ export default function OrderTracking() {
         {order.timeline.map((e, i) => (
           <li key={i} className="flex gap-3">
             <span className="text-ink/40">{new Date(e.at).toLocaleString()}</span>
-            <span>{LABEL[e.status] ?? e.status}{e.note ? ` — ${e.note}` : ''}</span>
+            <span>{label[e.status] ?? e.status}{e.note ? ` — ${e.note}` : ''}</span>
           </li>
         ))}
       </ol>

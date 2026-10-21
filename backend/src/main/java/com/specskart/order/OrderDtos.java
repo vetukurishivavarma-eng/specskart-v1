@@ -58,7 +58,8 @@ public final class OrderDtos {
     }
 
     /** Checkout's "ships from" line. shopName null = no shop sells online yet. */
-    public record ShipsFrom(String shopName, String city, Double distanceKm, boolean split) {}
+    public record ShipsFrom(String shopName, String city, Double distanceKm, boolean split,
+                            String address, String mapsUrl) {}
 
     /** checkoutUrl is null for a cash-on-delivery order (nothing to pay online). */
     public record CheckoutResult(String orderNo, String checkoutUrl, long totalMinor, String currency) {}
@@ -74,7 +75,9 @@ public final class OrderDtos {
                             int pointsEarned, int pointsRedeemed, int pointsBalance, String referralCode,
                             String lensType, long lensAddMinor, String rxJson, boolean hasPrescription,
                             String paymentMethod, long cashDueMinor,
-                            String deliveryMethod, String pickupPoint) {}
+                            String deliveryMethod, String pickupPoint,
+                            /** where a STORE order is collected */
+                            String shopName, String shopAddress, String shopMapsUrl) {}
 
     public record StatusEvent(String status, String note, Instant at) {}
 

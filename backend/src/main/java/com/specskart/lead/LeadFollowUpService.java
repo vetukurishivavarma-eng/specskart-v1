@@ -270,7 +270,7 @@ public class LeadFollowUpService {
         }
         if (s.kind() == Kind.LENS_VALUE) {
             body.append("\n\nEvery pair comes fitted with your prescription lenses — anti-glare and "
-                    + "scratch-resistant — and delivered across Zambia.");
+                    + "scratch-resistant — ready to collect at our Lusaka shop.");
         }
         body.append("\n\n🎁 ").append(offer);
         body.append("\n\nShop & check out here:\n").append(shopLink);

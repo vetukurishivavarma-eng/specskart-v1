@@ -50,6 +50,6 @@ class StaffOrderAlertTest {
         assertThat(alerts).hasSize(2);
         assertThat(alerts).extracting(MockWhatsAppProvider.Sent::toWaId)
                 .containsExactlyInAnyOrder("+260999000111", "+260888000222");
-        assertThat(alerts.get(0).text()).contains("Grace Banda").contains("Pack & dispatch");
+        assertThat(alerts.get(0).text()).contains("Grace Banda").contains("Get it ready for collection");
     }
 }

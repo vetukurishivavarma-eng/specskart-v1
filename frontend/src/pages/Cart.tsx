@@ -161,7 +161,7 @@ export default function Cart() {
           <Row k="Subtotal" v={money(cart.subtotalMinor, cart.currency)} />
           {cart.lensAddMinor > 0 && <Row k="Prescription lenses" v={`+ ${money(cart.lensAddMinor, cart.currency)}`} />}
           {cart.discountMinor > 0 && <Row k={cart.promoCode ? `Discount (${cart.promoCode})` : 'Discount'} v={`− ${money(cart.discountMinor, cart.currency)}`} accent />}
-          <Row k="Delivery" v={cart.shippingMinor === 0 ? 'Free' : money(cart.shippingMinor, cart.currency)} />
+          <Row k="Collection" v="At the shop" />
           <div className="flex justify-between border-t border-ink/10 pt-2 text-base font-medium">
             <span>Total</span><span>{money(cart.totalMinor, cart.currency)}</span>
           </div>
@@ -179,7 +179,7 @@ export default function Cart() {
         {applyPromo.isError && <p className="mt-1 text-xs text-clay">{(applyPromo.error as Error).message}</p>}
 
         <button className="btn-primary mt-5 w-full" onClick={() => nav('/checkout')}>Checkout</button>
-        <p className="mt-2 text-center text-xs text-ink/45">Delivery in {cart.deliveryEta}</p>
+        <p className="mt-2 text-center text-xs text-ink/45">Collect at our Lusaka shop — we’ll WhatsApp you when it’s ready.</p>
       </aside>
     </div>
   )

@@ -278,10 +278,7 @@ public class CartService {
         }
         StoreConfig sc = storeConfig.current();
         long goods = subtotal + lensAdd;
-        long shipping = out.isEmpty() ? 0 : sc.shippingFor(goods - discount);
-        if (shipping > 0 && sc.isFirstOrderFreeShipping() && isFirstOrder(cart.getLeadId())) {
-            shipping = 0;
-        }
+        long shipping = 0; // collected at the shop: store_config's delivery fee no longer applies
         long total = Math.max(0, goods - discount) + shipping;
         int points = cart.getLeadId() == null ? 0
                 : leads.findById(cart.getLeadId()).map(com.specskart.lead.Lead::getPoints).orElse(0);

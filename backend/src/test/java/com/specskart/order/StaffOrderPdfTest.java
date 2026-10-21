@@ -63,7 +63,7 @@ class StaffOrderPdfTest {
         assertThat(doc.text())
                 .contains("New order " + result.orderNo())
                 .contains("Aviator Gold ×1")
-                .contains("5 Great East Rd")
+                .contains("Customer collects at:")
                 .contains("Lenses: Single vision")
                 .contains("NO prescription on file");
         String prefix = "https://api.example.test";
