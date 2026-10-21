@@ -1,0 +1,281 @@
+package com.specskart.spin;
+
+import com.specskart.config.AppProperties;
+import com.specskart.lead.Lead;
+import com.specskart.lead.LeadRepository;
+import com.specskart.lens.LensInquiryService;
+import com.specskart.push.PushService;
+import com.specskart.shared.ApiException;
+import com.specskart.shared.SignedLinks;
+import com.specskart.whatsapp.ChatLog;
+import com.specskart.whatsapp.LeadNudges;
+import com.specskart.whatsapp.WhatsAppProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Locale;
+import java.util.UUID;
+
+/**
+ * Spin & Win (2026-10-21): every spin wins a prize that is collected at the shop within a week.
+ *
+ * One spin per customer, enforced three ways: the spin page is only reachable from a signed link
+ * the WhatsApp bot sends (so each spin belongs to a real WhatsApp number), a repeat spin returns
+ * the prize they already won, and spins.lead_id is UNIQUE in the database. The server picks the
+ * prize -- the browser only animates the wheel to it -- and each slice's size on the wheel is its
+ * real chance.
+ */
+@Service
+public class SpinService {
+
+    private static final Logger log = LoggerFactory.getLogger(SpinService.class);
+    static final Duration VALID_FOR = Duration.ofDays(7); // client: "code valid for 1 week"
+    static final Duration LINK_TTL = Duration.ofDays(14);
+    private static final String ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no I,L,O,0,1
+    private static final SecureRandom RNG = new SecureRandom();
+    private static final DateTimeFormatter UNTIL = DateTimeFormatter.ofPattern("EEEE d MMM", Locale.ENGLISH)
+            .withZone(ZoneId.of("Africa/Lusaka"));
+
+    /** The client's three prizes (2026-10-21); chances are a starting point, editable in the web admin. */
+    static final List<Object[]> DEFAULT_PRIZES = List.of(
+            new Object[]{"Free eye check for your family", 50},
+            new Object[]{"K100 off photochromatic + blue block lenses", 35},
+            new Object[]{"Free sunglasses with your first pair", 15});
+
+    public record Slice(String label, int weight) {}
+    public record Result(String prize, String code, Instant expiresAt, boolean redeemed, int sliceIndex) {}
+    public record Page(String firstName, List<Slice> slices, Result result) {}
+
+    private final SpinRepository spins;
+    private final SpinPrizeRepository prizes;
+    private final LeadRepository leads;
+    private final SignedLinks links;
+    private final AppProperties props;
+    private final WhatsAppProvider whatsapp;
+    private final ChatLog chatLog;
+    private final PushService push;
+    private final LensInquiryService lens;
+
+    public SpinService(SpinRepository spins, SpinPrizeRepository prizes, LeadRepository leads, SignedLinks links,
+                       AppProperties props, WhatsAppProvider whatsapp, ChatLog chatLog, PushService push,
+                       LensInquiryService lens) {
+        this.spins = spins;
+        this.prizes = prizes;
+        this.leads = leads;
+        this.links = links;
+        this.props = props;
+        this.whatsapp = whatsapp;
+        this.chatLog = chatLog;
+        this.push = push;
+        this.lens = lens;
+    }
+
+    // ---- the bot's side -----------------------------------------------------------------------
+
+    /** The personal link to this customer's one spin. */
+    public String link(Lead lead) {
+        String resource = "spin/" + lead.getId();
+        return props.frontendBaseUrl() + "/spin/" + lead.getId() + links.query(resource, LINK_TTL);
+    }
+
+    /** What the bot says to "spin": the link, or the prize they already won. */
+    public String offer(Lead lead) {
+        var done = spins.findByLeadId(lead.getId());
+        if (done.isPresent()) {
+            Spin s = done.get();
+            if (s.getRedeemedAt() != null) return "You've already had your spin 🎁 — and used your prize (" + s.getPrizeLabel() + "). Thank you!";
+            if (s.getExpiresAt().isBefore(Instant.now())) {
+                return "You've already had your spin 🎁 Your prize (" + s.getPrizeLabel() + ") expired on "
+                        + UNTIL.format(s.getExpiresAt()) + ". It's one spin per customer, sorry!";
+            }
+            return "You've already had your spin 🎁\nYou won: *" + s.getPrizeLabel() + "*\nCode: *" + s.getCode()
+                    + "* — show it at the shop by " + UNTIL.format(s.getExpiresAt()) + ".\n\n" + lens.shopLines();
+        }
+        return "🎁 *Spin & Win!* Every spin wins a prize.\n\nTap to spin (one spin per customer):\n" + link(lead);
+    }
+
+    // ---- the spin page ------------------------------------------------------------------------
+
+    @Transactional
+    public Page page(UUID leadId, long exp, String sig) {
+        Lead lead = authorised(leadId, exp, sig);
+        List<SpinPrize> wheel = wheel();
+        Result result = spins.findByLeadId(leadId).map(s -> result(s, wheel)).orElse(null);
+        String first = lead.getName() == null || lead.getName().isBlank() ? null : lead.getName().trim().split("\\s+")[0];
+        return new Page(first, wheel.stream().map(p -> new Slice(p.getLabel(), p.getWeight())).toList(), result);
+    }
+
+    /** Spins once. A second call (double tap, reload, second phone) returns the first result. */
+    @Transactional
+    public Result spin(UUID leadId, long exp, String sig) {
+        Lead lead = authorised(leadId, exp, sig);
+        List<SpinPrize> wheel = wheel();
+        var existing = spins.findByLeadId(leadId);
+        if (existing.isPresent()) return result(existing.get(), wheel);
+
+        SpinPrize won = pick(wheel, RNG.nextInt(wheel.stream().mapToInt(SpinPrize::getWeight).sum()));
+        Spin s = new Spin();
+        s.setLeadId(leadId);
+        s.setPrizeLabel(won.getLabel());
+        s.setCode(freshCode());
+        s.setExpiresAt(Instant.now().plus(VALID_FOR));
+        try {
+            spins.saveAndFlush(s);
+        } catch (DataIntegrityViolationException raced) { // two taps at once: the unique lead_id lets one through
+            throw ApiException.conflict("ALREADY_SPUN", "You've already had your spin — reload to see your prize.");
+        }
+        tell(lead, s);
+        return result(s, wheel);
+    }
+
+    /** Weighted pick: {@code roll} in [0, total weight). */
+    static SpinPrize pick(List<SpinPrize> wheel, int roll) {
+        for (SpinPrize p : wheel) {
+            if (roll < p.getWeight()) return p;
+            roll -= p.getWeight();
+        }
+        return wheel.get(wheel.size() - 1);
+    }
+
+    private void tell(Lead lead, Spin s) {
+        String waId = lead.getWhatsappWaId() != null ? lead.getWhatsappWaId() : lead.getWhatsappNumber();
+        String body = "🎉 You won: *" + s.getPrizeLabel() + "*!\n\nYour code: *" + s.getCode() + "*\n"
+                + "Show it at the shop by *" + UNTIL.format(s.getExpiresAt()) + "* (valid for 1 week).\n\n" + lens.shopLines();
+        try {
+            whatsapp.sendButtons(waId, body, List.of(new WhatsAppProvider.Button(LeadNudges.BTN_BOOK, "Book my visit")));
+            chatLog.sent(waId, body);
+        } catch (Exception e) { // the page shows the code too, so a failed send loses nothing
+            log.warn("spin prize message to lead {} failed: {}", lead.getId(), e.getMessage());
+        }
+        String who = lead.getName() != null && !lead.getName().isBlank() ? lead.getName() : "+" + waId;
+        push.notifyStaff("🎁 " + who + " won " + s.getPrizeLabel(), "Code " + s.getCode() + " · valid until "
+                + UNTIL.format(s.getExpiresAt()), "/chat/" + waId);
+    }
+
+    // ---- staff --------------------------------------------------------------------------------
+
+    public record SpinView(String code, String prize, String customer, String phone, Instant spunAt,
+                           Instant expiresAt, Instant redeemedAt, String redeemedBy, String state) {}
+
+    @Transactional(readOnly = true)
+    public List<SpinView> recent() {
+        return spins.findTop100ByOrderByCreatedAtDesc().stream().map(this::view).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public SpinView lookup(String code) {
+        return view(byCode(code));
+    }
+
+    /** At the till: the code is used, once. */
+    @Transactional
+    public SpinView redeem(String code, String staff) {
+        Spin s = byCode(code);
+        if (s.getRedeemedAt() != null) {
+            throw ApiException.conflict("ALREADY_USED", "This code was already used on " + UNTIL.format(s.getRedeemedAt()) + ".");
+        }
+        if (s.getExpiresAt().isBefore(Instant.now())) {
+            throw ApiException.conflict("EXPIRED", "This code expired on " + UNTIL.format(s.getExpiresAt()) + ".");
+        }
+        s.setRedeemedAt(Instant.now());
+        s.setRedeemedBy(staff);
+        return view(spins.save(s));
+    }
+
+    @Transactional
+    public List<SpinPrize> prizes() {
+        wheel(); // seeds the defaults the first time
+        return prizes.findAllByOrderBySortOrderAsc();
+    }
+
+    public record PrizeInput(String label, int weight, boolean active) {}
+
+    /** Replace the wheel. Spins already won keep their prize text. */
+    @Transactional
+    public List<SpinPrize> savePrizes(List<PrizeInput> in) {
+        if (in == null || in.stream().noneMatch(p -> p.active() && p.weight() > 0)) {
+            throw ApiException.badRequest("NO_PRIZES", "Keep at least one prize switched on with a chance above 0.");
+        }
+        for (PrizeInput p : in) {
+            if (p.label() == null || p.label().isBlank() || p.label().length() > 80) {
+                throw ApiException.badRequest("BAD_PRIZE", "Each prize needs a name of up to 80 characters.");
+            }
+            if (p.weight() < 0) throw ApiException.badRequest("BAD_PRIZE", "A chance can't be negative.");
+        }
+        prizes.deleteAll();
+        prizes.flush();
+        int order = 0;
+        for (PrizeInput p : in) {
+            SpinPrize sp = new SpinPrize();
+            sp.setLabel(p.label().trim());
+            sp.setWeight(p.weight());
+            sp.setActive(p.active());
+            sp.setSortOrder(order++);
+            prizes.save(sp);
+        }
+        return prizes.findAllByOrderBySortOrderAsc();
+    }
+
+    // ---- helpers ------------------------------------------------------------------------------
+
+    private Lead authorised(UUID leadId, long exp, String sig) {
+        if (!links.valid("spin/" + leadId, exp, sig)) {
+            throw ApiException.forbidden("BAD_LINK", "This spin link has expired. Message us on WhatsApp \"spin\" for a new one.");
+        }
+        return leads.findById(leadId).orElseThrow(() -> ApiException.notFound("NO_LEAD", "We couldn't find you — message us on WhatsApp."));
+    }
+
+    /** The live wheel: active prizes with a chance above 0. Seeds the client's prizes if there are none. */
+    private List<SpinPrize> wheel() {
+        if (prizes.count() == 0) {
+            int order = 0;
+            for (Object[] d : DEFAULT_PRIZES) {
+                SpinPrize p = new SpinPrize();
+                p.setLabel((String) d[0]);
+                p.setWeight((Integer) d[1]);
+                p.setSortOrder(order++);
+                prizes.save(p);
+            }
+        }
+        return prizes.findByActiveTrueOrderBySortOrderAsc().stream().filter(p -> p.getWeight() > 0).toList();
+    }
+
+    private Result result(Spin s, List<SpinPrize> wheel) {
+        int idx = 0;
+        for (int i = 0; i < wheel.size(); i++) if (wheel.get(i).getLabel().equals(s.getPrizeLabel())) idx = i;
+        return new Result(s.getPrizeLabel(), s.getCode(), s.getExpiresAt(), s.getRedeemedAt() != null, idx);
+    }
+
+    private Spin byCode(String code) {
+        String c = code == null ? "" : code.trim().toUpperCase(Locale.ROOT);
+        if (!c.startsWith("SPIN-")) c = "SPIN-" + c;
+        return spins.findByCodeIgnoreCase(c).orElseThrow(() -> ApiException.notFound("NO_CODE", "No prize with that code."));
+    }
+
+    private SpinView view(Spin s) {
+        Lead l = leads.findById(s.getLeadId()).orElse(null);
+        String state = s.getRedeemedAt() != null ? "USED" : s.getExpiresAt().isBefore(Instant.now()) ? "EXPIRED" : "VALID";
+        return new SpinView(s.getCode(), s.getPrizeLabel(), l == null ? null : l.getName(),
+                l == null ? null : (l.getWhatsappWaId() != null ? l.getWhatsappWaId() : l.getWhatsappNumber()),
+                s.getCreatedAt(), s.getExpiresAt(), s.getRedeemedAt(), s.getRedeemedBy(), state);
+    }
+
+    private String freshCode() {
+        String code;
+        do {
+            StringBuilder sb = new StringBuilder("SPIN-");
+            for (int i = 0; i < 5; i++) sb.append(ALPHABET.charAt(RNG.nextInt(ALPHABET.length())));
+            code = sb.toString();
+        } while (spins.existsByCode(code));
+        return code;
+    }
+}

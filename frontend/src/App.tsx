@@ -14,6 +14,8 @@ import Terms from './pages/Terms'
 import FrameFinder from './pages/FrameFinder'
 import LensConfigurator from './pages/LensConfigurator'
 import LensVerify from './pages/LensVerify'
+import Spin from './pages/Spin'
+import SpinCodes from './admin/SpinCodes'
 import AdminLayout from './admin/AdminLayout'
 import Login from './admin/Login'
 import Dashboard from './admin/Dashboard'
@@ -51,6 +53,7 @@ export default function App() {
         <Route path="/lens/track/:id" element={<LensTracking />} />
       </Route>
       <Route path="/lens/verify/:token" element={<LensVerify />} />
+      <Route path="/spin/:leadId" element={<Spin />} />
       {/* Frame Finder runs full-screen, outside the site chrome. */}
       <Route path="/frame-finder" element={<FrameFinder />} />
 
@@ -68,6 +71,7 @@ export default function App() {
         <Route path="promos" element={<Promos />} />
         <Route path="store" element={<StoreSettings />} />
         <Route path="broadcast" element={<Broadcast />} />
+        <Route path="spins" element={<SpinCodes />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

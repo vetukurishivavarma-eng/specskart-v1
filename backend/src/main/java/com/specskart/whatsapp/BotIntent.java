@@ -20,5 +20,7 @@ public enum BotIntent {
     SUITS_YOU,
     // Chat -> shop visit (2026-10-20): book the free eye test; frame photos in the chat
     BOOK_VISIT, FRAME_PHOTOS,
+    // Spin & Win (2026-10-21): one prize spin per customer
+    SPIN,
     GREETING, UNKNOWN
 }

@@ -18,6 +18,7 @@ export default function AdminLayout() {
             <NavLink to="/admin/broadcast" className={link}>Broadcast</NavLink>
             <div className="pt-3 text-[10px] uppercase tracking-widest text-ink/30">Shop</div>
             <NavLink to="/admin/orders" className={link}>Orders</NavLink>
+            <NavLink to="/admin/spins" className={link}>Spin &amp; Win</NavLink>
             <NavLink to="/admin/products" className={link}>Products</NavLink>
             <NavLink to="/admin/promos" className={link}>Promo codes</NavLink>
             <NavLink to="/admin/store" className={link}>Storefront</NavLink>

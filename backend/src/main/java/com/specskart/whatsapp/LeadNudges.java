@@ -42,7 +42,7 @@ public class LeadNudges {
 
     private static final Logger log = LoggerFactory.getLogger(LeadNudges.class);
 
-    static final String BTN_BOOK = "BOOK_VISIT";
+    public static final String BTN_BOOK = "BOOK_VISIT";
     /** A tapped day: {@code BOOK:2026-10-21}. */
     static final String ROW_BOOK_PREFIX = "BOOK:";
     /** The POS app's Bookings page -- where every eye-test push lands. */

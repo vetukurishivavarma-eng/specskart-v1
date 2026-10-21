@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { shop, money, assetUrl, adoptCartFromUrl, rememberedFace, type ProductCard } from '../lib/shop'
 import SocialProof from '../components/SocialProof'
+import { WA } from '../lib/wa'
 
 const CATEGORIES = [
   ['', 'All frames'], ['WAYFARER', 'Wayfarer'], ['AVIATOR', 'Aviator'], ['ROUND_FRAME', 'Round'],
@@ -57,6 +58,7 @@ export default function Store() {
       <p className="mt-3 max-w-xl text-ink/65">{cfg?.heroSubtitle}</p>
 
       <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink/60">
+        <a href={`${WA}?text=Spin`} className="font-semibold text-clay underline">🎁 Spin &amp; win a prize on WhatsApp</a>
         {cfg?.paymentNote && <span>💳 {cfg.paymentNote}</span>}
         {cfg?.guaranteeNote && <span>✓ {cfg.guaranteeNote}</span>}
       </div>

@@ -55,6 +55,7 @@ public class WhatsAppBotService {
     static final String BTN_FAQ = "FAQ";
     static final String BTN_SUITS = "SUITS_YOU";
     static final String BTN_FRAME_PHOTOS = "FRAME_PHOTOS";
+    static final String BTN_SPIN = "SPIN";
     /** How many frame photos one "show me frames" sends -- enough to browse, not a flood. */
     static final int FRAME_PHOTOS = 5;
     /** A tapped FAQ row: {@code FAQ:<uuid>}, or {@code FAQ_MORE:<offset>} for the next page. */
@@ -121,6 +122,7 @@ public class WhatsAppBotService {
     private final MembershipService memberships;
     private final FaqRepository faqs;
     private final com.specskart.push.PushService push;
+    private final com.specskart.spin.SpinService spins;
     private final LeadNudges nudges;
     private final com.specskart.catalog.ProductImageRepository productImages;
 
@@ -131,7 +133,9 @@ public class WhatsAppBotService {
                               ReviewCaptureService reviewCapture, OrderQueryService orderQuery,
                               LensInquiryService lensInquiries, MembershipService memberships,
                               FaqRepository faqs, com.specskart.push.PushService push,
-                              LeadNudges nudges, com.specskart.catalog.ProductImageRepository productImages) {
+                              LeadNudges nudges, com.specskart.catalog.ProductImageRepository productImages,
+                              com.specskart.spin.SpinService spins) {
+        this.spins = spins;
         this.nudges = nudges;
         this.productImages = productImages;
         this.faqs = faqs;
@@ -252,6 +256,7 @@ public class WhatsAppBotService {
             // price filters. A price question gets the range and the shop's address.
             case FRAMES, HELP_CHOOSE -> sendSuitsPrompt(lead);
             case FRAME_PHOTOS -> sendFramePhotos(lead);
+            case SPIN -> sendText(lead, spins.offer(lead));
             case BOOK_VISIT -> sendBookingDays(lead);
             // budget buttons still sitting in older chats keep working
             case BUDGET_LOW -> sendBudgetPicks(lead, "low");
@@ -316,6 +321,8 @@ public class WhatsAppBotService {
 
     private List<WhatsAppProvider.Row> menuRows() {
         List<WhatsAppProvider.Row> rows = new ArrayList<>(List.of(
+                new WhatsAppProvider.Row(BTN_SPIN, "Spin & win a prize",
+                        "Every spin wins. One spin per customer"),
                 new WhatsAppProvider.Row(LeadNudges.BTN_BOOK, "Book a free eye test",
                         "Pick a day and we'll expect you"),
                 new WhatsAppProvider.Row(BTN_FRAME_PHOTOS, "See our frames",
@@ -696,6 +703,7 @@ public class WhatsAppBotService {
                     case BTN_FAQ -> BotIntent.FAQ;
                     case LeadNudges.BTN_BOOK -> BotIntent.BOOK_VISIT;
                     case BTN_FRAME_PHOTOS -> BotIntent.FRAME_PHOTOS;
+                    case BTN_SPIN -> BotIntent.SPIN;
                     case BTN_SUITS -> BotIntent.SUITS_YOU;
                     case BTN_BUDGET_LOW -> BotIntent.BUDGET_LOW;
                     case BTN_BUDGET_MED -> BotIntent.BUDGET_MED;
@@ -706,6 +714,7 @@ public class WhatsAppBotService {
         }
         String t = text == null ? "" : text.toLowerCase().trim();
         if (t.isBlank()) return BotIntent.GREETING;
+        if (t.matches(".*\\b(spin|prize)\\b.*")) return BotIntent.SPIN;
         if (t.matches(".*(hi|hello|hey|start|namaste).*") && t.length() < 15) return BotIntent.GREETING;
         // "can you send pics of your specs" -- before MORE_INFO, the ad prefill often rides along with it
         if ((t.matches(".*\\b(pics?|pictures?|photos?|images?|catalog(ue)?|share)\\b.*")

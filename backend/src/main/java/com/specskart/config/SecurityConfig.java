@@ -56,6 +56,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/admin/users", "/api/admin/users/**").hasRole("ADMIN")
                 // A broadcast messages every customer at once, and Meta bills each one.
                 .requestMatchers("/api/admin/whatsapp/broadcast/**").hasRole("ADMIN")
+                // What the Spin & Win wheel gives away, and how often, is the owner's call.
+                .requestMatchers(HttpMethod.PUT, "/api/admin/spins/prizes").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/admin/**").hasAnyRole("ADMIN", "AGENT")
                 // Staff add frames (photo, code, brand, price, shape) from the POS app; only an
                 // admin removes one.
