@@ -126,14 +126,24 @@ class AdminChatTest {
     @SuppressWarnings("unchecked")
     void aReactionShowsItsEmojiAndGetsNoReply() {
         String waId = "26097" + (300000 + (int) (Math.random() * 600000));
+        String ours = provider.sendText(waId, "Back in stock 👓\n*Rayban* — K450");
+        long before = sentTo(waId);
         String payload = """
             {"entry":[{"changes":[{"value":{"contacts":[{"profile":{"name":"BTS"},"wa_id":"%s"}],
               "messages":[{"from":"%s","id":"wamid.%s","type":"reaction",
-                "reaction":{"message_id":"wamid.ours","emoji":"👍"}}]}}]}]}
-            """.formatted(waId, waId, UUID.randomUUID());
+                "reaction":{"message_id":"%s","emoji":"👍"}}]}}]}]}
+            """.formatted(waId, waId, UUID.randomUUID(), ours);
         webhook.receive(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8), null);
         var msgs = (java.util.List<java.util.Map<String, Object>>) chat.get(waId).get("messages");
-        assertThat(msgs).anyMatch(m -> "Reacted 👍".equals(m.get("body")));
-        assertThat(sentTo(waId)).isZero(); // no menu fired back at a thumbs-up
+        assertThat(msgs).anyMatch(m -> "Reacted 👍 to: \"Back in stock 👓 *Rayban* — K450\"".equals(m.get("body")));
+        assertThat(sentTo(waId)).isEqualTo(before); // no menu fired back at a thumbs-up
+    }
+
+    @Test
+    void theSentMessageIndexKeepsWhatTheCustomerSaw() {
+        assertThat(com.specskart.whatsapp.MetaWhatsAppProvider.summary(java.util.Map.of("type", "interactive",
+                "interactive", java.util.Map.of("body", java.util.Map.of("text", "Pick a day"))))).isEqualTo("Pick a day");
+        assertThat(com.specskart.whatsapp.MetaWhatsAppProvider.summary(java.util.Map.of("type", "template",
+                "template", java.util.Map.of("name", "order_update")))).isEqualTo("(template order_update)");
     }
 }

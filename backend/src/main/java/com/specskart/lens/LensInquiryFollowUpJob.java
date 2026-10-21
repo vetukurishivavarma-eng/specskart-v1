@@ -35,7 +35,11 @@ class LensInquiryFollowUpJob {
     private final WhatsAppProvider whatsapp;
     private final AppProperties props;
 
-    LensInquiryFollowUpJob(LensInquiryRepository inquiries, WhatsAppProvider whatsapp, AppProperties props) {
+    private final com.specskart.whatsapp.ChatLog chatLog;
+
+    LensInquiryFollowUpJob(LensInquiryRepository inquiries, WhatsAppProvider whatsapp, AppProperties props,
+            com.specskart.whatsapp.ChatLog chatLog) {
+        this.chatLog = chatLog;
         this.inquiries = inquiries;
         this.whatsapp = whatsapp;
         this.props = props;
@@ -53,6 +57,7 @@ class LensInquiryFollowUpJob {
                 inquiries.save(q);
                 try {
                     whatsapp.sendText(q.getWaId(), message(q));
+                    chatLog.sent(q.getWaId(), message(q));
                     sent++;
                 } catch (Exception e) {
                     log.warn("lens follow-up failed for inquiry {}: {}", q.getId(), e.getMessage());

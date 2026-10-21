@@ -48,9 +48,13 @@ class LensPostPurchaseJob {
     private final AppProperties props;
     private final ReviewCaptureService reviewCapture;
 
+    private final com.specskart.whatsapp.ChatLog chatLog;
+
     LensPostPurchaseJob(LensInquiryRepository inquiries, LeadRepository leads, LeadService leadService,
                         PromoIssuer promoIssuer, WhatsAppProvider whatsapp, AnalyticsService analytics,
-                        AppProperties props, ReviewCaptureService reviewCapture) {
+                        AppProperties props, ReviewCaptureService reviewCapture,
+            com.specskart.whatsapp.ChatLog chatLog) {
+        this.chatLog = chatLog;
         this.reviewCapture = reviewCapture;
         this.inquiries = inquiries;
         this.leads = leads;
@@ -104,8 +108,11 @@ class LensPostPurchaseJob {
             whatsapp.sendCouponTemplate(waId, props.whatsapp().postPurchaseTemplate(),
                     props.whatsapp().followUpTemplateLang(), List.of(firstName(lead, q), promo.getCode(), referral),
                     promo.getCode());
+            chatLog.sent(waId, "Thank-you message with offer code " + promo.getCode());
         } else {
-            whatsapp.sendText(waId, message(firstName(lead, q), promo, referral));
+            String text = message(firstName(lead, q), promo, referral);
+            whatsapp.sendText(waId, text);
+            chatLog.sent(waId, text);
         }
         analytics.record(LeadEventType.WHATSAPP_FOLLOW_UP_SENT, lead.getId(), null);
         return true;

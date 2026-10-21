@@ -30,6 +30,11 @@ public class MockWhatsAppProvider implements WhatsAppProvider {
     }
 
     private final List<Sent> outbox = new ArrayList<>();
+    private final SentMessageRepository sent;
+
+    public MockWhatsAppProvider(SentMessageRepository sent) {
+        this.sent = sent;
+    }
 
     @Override
     public String mode() {
@@ -41,7 +46,12 @@ public class MockWhatsAppProvider implements WhatsAppProvider {
         failIfAsked();
         outbox.add(new Sent(toWaId, text, List.of()));
         log.info("[MOCK-WA] -> {} : {}", toWaId, text);
-        return "wamid.mock-" + outbox.size();
+        SentMessage m = new SentMessage(); // as the real provider does, so reactions can be tested
+        m.setWaMessageId("wamid.mock-" + java.util.UUID.randomUUID());
+        m.setToWaId(toWaId);
+        m.setBody(text);
+        sent.save(m);
+        return m.getWaMessageId();
     }
 
     @Override

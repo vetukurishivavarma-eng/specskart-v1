@@ -23,8 +23,11 @@ class StockAlertJob {
     private final ProductRepository products;
     private final WhatsAppProvider whatsapp;
     private final AppProperties props;
+    private final com.specskart.whatsapp.ChatLog chatLog;
 
-    StockAlertJob(StockAlertRepository alerts, ProductRepository products, WhatsAppProvider whatsapp, AppProperties props) {
+    StockAlertJob(StockAlertRepository alerts, ProductRepository products, WhatsAppProvider whatsapp, AppProperties props,
+                  com.specskart.whatsapp.ChatLog chatLog) {
+        this.chatLog = chatLog;
         this.alerts = alerts;
         this.products = products;
         this.whatsapp = whatsapp;
@@ -46,6 +49,7 @@ class StockAlertJob {
                 // ponytail: plain text — only delivers inside the 24h window. Swap to an approved
                 // template (like the follow-up one) if alerts routinely land outside it.
                 whatsapp.sendText(alert.getWaId(), msg);
+                chatLog.sent(alert.getWaId(), msg);
                 alert.setNotifiedAt(Instant.now());
                 alerts.save(alert);
                 log.info("back-in-stock alert sent for {}", p.getSlug());

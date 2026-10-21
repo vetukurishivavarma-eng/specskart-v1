@@ -83,10 +83,12 @@ public class OrderNotificationService {
                 whatsapp.sendTemplate(waId, props.whatsapp().orderUpdateTemplate(),
                         props.whatsapp().followUpTemplateLang(),
                         List.of(hi.isBlank() ? "there" : hi.trim(), line, order.getOrderNo(), track));
+                logOutbound(order.getLeadId(), "Order " + order.getOrderNo() + ": " + line + "\n" + track, "sent");
             } else {
-                whatsapp.sendText(waId, plainMessage(order, status, lead, hi, track));
+                String text = plainMessage(order, status, lead, hi, track);
+                whatsapp.sendText(waId, text);
+                logOutbound(order.getLeadId(), text, "sent");
             }
-            logOutbound(order.getLeadId(), logKey, "sent");
         } catch (Exception e) {
             log.warn("{} WhatsApp send failed for order {}: {}", logKey, order.getOrderNo(), e.getMessage());
             logOutbound(order.getLeadId(), logKey, "failed");

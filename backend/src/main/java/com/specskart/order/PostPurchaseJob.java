@@ -49,10 +49,14 @@ class PostPurchaseJob {
     private final ReviewCaptureService reviewCapture;
     private final LeadService leadService;
 
+    private final com.specskart.whatsapp.ChatLog chatLog;
+
     PostPurchaseJob(OrderRepository orders, OrderEventRepository orderEvents, LeadRepository leads,
                     PromoCodeRepository promos, CartService carts, WhatsAppProvider whatsapp,
                     OrderNotificationService notifications, AnalyticsService analytics, AppProperties props,
-                    ReviewCaptureService reviewCapture, LeadService leadService) {
+                    ReviewCaptureService reviewCapture, LeadService leadService,
+            com.specskart.whatsapp.ChatLog chatLog) {
+        this.chatLog = chatLog;
         this.leadService = leadService;
         this.orders = orders;
         this.orderEvents = orderEvents;
@@ -93,10 +97,12 @@ class PostPurchaseJob {
                             // Shared with the lens post-purchase: {{1}} name, {{2}} promo, {{3}} referral.
                             List.of(name.isBlank() ? "there" : name, code,
                                     leadService.ensureReferralCode(lead.getId())), code);
+                    chatLog.sent(waId, "Thank-you message with offer code " + code);
                 } else {
-                    whatsapp.sendText(waId, plainMessage(lead, order, code));
+                    String text = plainMessage(lead, order, code);
+                    whatsapp.sendText(waId, text);
+                    chatLog.sent(waId, text);
                 }
-                notifications.logSent(order.getLeadId(), "order-post-purchase");
                 analytics.record(LeadEventType.REVIEW_REQUESTED, order.getLeadId(), null);
                 reviewCapture.markPending(order.getLeadId(), order.getId());
                 log.info("post-purchase message sent for order {}", order.getOrderNo());

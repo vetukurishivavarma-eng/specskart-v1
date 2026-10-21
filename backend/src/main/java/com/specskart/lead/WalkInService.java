@@ -44,8 +44,12 @@ public class WalkInService {
     private final AppProperties props;
     private final LeadService leadService;
 
+    private final com.specskart.whatsapp.ChatLog chatLog;
+
     public WalkInService(WalkInVerificationRepository verifications, LeadRepository leads,
-                         WhatsAppProvider whatsapp, AppProperties props, LeadService leadService) {
+                         WhatsAppProvider whatsapp, AppProperties props, LeadService leadService,
+            com.specskart.whatsapp.ChatLog chatLog) {
+        this.chatLog = chatLog;
         this.leadService = leadService;
         this.verifications = verifications;
         this.leads = leads;
@@ -131,8 +135,10 @@ public class WalkInService {
 
         String hi = lead.getName() == null || lead.getName().isBlank() ? "" : " " + lead.getName().trim().split("\\s+")[0];
         try {
-            whatsapp.sendText(lead.getWhatsappWaId(), "Thanks" + hi + "! ✅ Your number is saved with " + props.storeName()
-                    + ". We'll send you new arrivals, offers and your order updates right here.\nReply STOP any time to opt out.");
+            String welcome = "Thanks" + hi + "! ✅ Your number is saved with " + props.storeName()
+                    + ". We'll send you new arrivals, offers and your order updates right here.\nReply STOP any time to opt out.";
+            whatsapp.sendText(lead.getWhatsappWaId(), welcome);
+            chatLog.sent(lead.getWhatsappWaId(), welcome);
         } catch (Exception e) {
             log.warn("walk-in welcome to lead {} failed: {}", lead.getId(), e.getMessage());
         }

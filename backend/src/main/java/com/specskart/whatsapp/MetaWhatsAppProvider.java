@@ -21,10 +21,12 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
 
     private final RestClient http;
     private final AppProperties props;
+    private final SentMessageRepository sent;
 
-    public MetaWhatsAppProvider(RestClient http, AppProperties props) {
+    public MetaWhatsAppProvider(RestClient http, AppProperties props, SentMessageRepository sent) {
         this.http = http;
         this.props = props;
+        this.sent = sent;
         if (props.whatsapp().accessToken() == null || props.whatsapp().phoneNumberId() == null) {
             throw new IllegalStateException("WhatsApp provider=meta requires WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID");
         }
@@ -279,10 +281,42 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
                     .body(payload)
                     .retrieve()
                     .body(JsonNode.class);
-            return body == null ? null : body.path("messages").path(0).path("id").asText(null);
+            String id = body == null ? null : body.path("messages").path(0).path("id").asText(null);
+            remember(id, String.valueOf(payload.get("to")), summary(payload));
+            return id;
         } catch (Exception e) {
             log.error("WhatsApp send failed: {}", e.getMessage());
             throw e;
         }
+    }
+
+    private void remember(String id, String to, String text) {
+        if (id == null) return;
+        try {
+            SentMessage m = new SentMessage();
+            m.setWaMessageId(id);
+            m.setToWaId(to);
+            m.setBody(text);
+            sent.save(m);
+        } catch (Exception e) { // only for reactions -- never fail a send over it
+            log.warn("could not record sent message {}: {}", id, e.getMessage());
+        }
+    }
+
+    /** The words the customer saw: text, a button/list message's body, a caption, or the template's name. */
+    @SuppressWarnings("unchecked")
+    public static String summary(Map<String, Object> payload) {
+        String type = String.valueOf(payload.get("type"));
+        Object part = payload.get(type);
+        if (!(part instanceof Map<?, ?> p)) return type;
+        Map<String, Object> m = (Map<String, Object>) p;
+        Object text = switch (type) {
+            case "text" -> m.get("body");
+            case "interactive" -> m.get("body") instanceof Map<?, ?> b ? b.get("text") : null;
+            case "image", "document" -> m.get("caption") != null ? m.get("caption") : m.get("filename");
+            case "template" -> "(template " + m.get("name") + ")";
+            default -> null;
+        };
+        return text == null ? "(" + type + ")" : text.toString();
     }
 }

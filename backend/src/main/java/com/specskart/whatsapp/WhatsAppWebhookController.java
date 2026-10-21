@@ -27,10 +27,12 @@ public class WhatsAppWebhookController {
     private final WhatsAppInboundService inbound;
     private final ObjectMapper mapper;
     private final StaffAlerts staffAlerts;
+    private final SentMessageRepository sent;
 
     public WhatsAppWebhookController(AppProperties props, WhatsAppInboundService inbound, ObjectMapper mapper,
-                                     StaffAlerts staffAlerts) {
+                                     StaffAlerts staffAlerts, SentMessageRepository sent) {
         this.staffAlerts = staffAlerts;
+        this.sent = sent;
         this.props = props;
         this.inbound = inbound;
         this.mapper = mapper;
@@ -140,7 +142,11 @@ public class WhatsAppWebhookController {
             // an emoji on one of our messages: shown in the chat, never answered (see WhatsAppBotService)
             case "reaction" -> {
                 String emoji = msg.path("reaction").path("emoji").asText("");
-                text = WhatsAppBotService.REACTION + (emoji.isBlank() ? "(took back their reaction)" : emoji);
+                String on = sent.findById(msg.path("reaction").path("message_id").asText(""))
+                        .map(SentMessage::getBody).filter(b -> b != null && !b.isBlank())
+                        .map(b -> " to: \"" + (b.length() > 80 ? b.substring(0, 80).trim() + "…" : b).replace('\n', ' ') + "\"")
+                        .orElse(""); // a message from before we kept these
+                text = WhatsAppBotService.REACTION + (emoji.isBlank() ? "(took back their reaction)" : emoji) + on;
             }
             default -> text = "[" + type + "]"; // image/document/...: media id picked up below
         }

@@ -78,13 +78,17 @@ public class LensInquiryService {
     /** How long a personal /lens link keeps working after the bot sends it. */
     private static final Duration LINK_TTL = Duration.ofDays(30);
 
+    private final com.specskart.whatsapp.ChatLog chatLog;
+
     public LensInquiryService(LensInquiryRepository inquiries, LeadService leadService,
                               WhatsAppProvider whatsapp, TokenGenerator tokens, AppProperties props,
                               LensPricing pricing, StaffAlerts staffAlerts, SignedLinks links,
                               PaymentProvider payments, MembershipService memberships,
                               InventoryService inventory, ProductRepository products, StoreRepository stores,
                               AdEventService adEvents, AnalyticsService analytics, LeadRepository leads,
-                              com.specskart.whatsapp.ServiceWindow window) {
+                              com.specskart.whatsapp.ServiceWindow window,
+            com.specskart.whatsapp.ChatLog chatLog) {
+        this.chatLog = chatLog;
         this.window = window;
         this.adEvents = adEvents;
         this.analytics = analytics;
@@ -179,6 +183,7 @@ public class LensInquiryService {
         }
         try {
             whatsapp.sendText(waId, text);
+            chatLog.sent(waId, text);
         } catch (Exception e) {
             log.warn("lens verification send failed for inquiry {}: {}", q.getId(), e.getMessage());
         }
@@ -688,6 +693,8 @@ public class LensInquiryService {
                 whatsapp.sendText(q.getWaId(), "Hi " + who + " — " + line + " (" + ref(q) + ").\n\nTrack your order: "
                         + props.frontendBaseUrl() + "/lens/track/" + q.getId());
             }
+            chatLog.sent(q.getWaId(), "Hi " + who + " — " + line + " (" + ref(q) + ").\n\nTrack your order: "
+                    + props.frontendBaseUrl() + "/lens/track/" + q.getId());
         } catch (Exception e) {
             log.warn("lens {} customer notification failed: {}", ref(q), e.getMessage());
         }

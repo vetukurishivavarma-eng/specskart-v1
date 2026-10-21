@@ -34,8 +34,12 @@ public class EyeTestRecallService {
     private final AnalyticsService analytics;
     private final AppProperties props;
 
+    private final com.specskart.whatsapp.ChatLog chatLog;
+
     public EyeTestRecallService(LeadRepository leads, PromoIssuer promoIssuer, WhatsAppProvider whatsapp,
-                                AnalyticsService analytics, AppProperties props) {
+                                AnalyticsService analytics, AppProperties props,
+            com.specskart.whatsapp.ChatLog chatLog) {
+        this.chatLog = chatLog;
         this.leads = leads;
         this.promoIssuer = promoIssuer;
         this.whatsapp = whatsapp;
@@ -73,6 +77,7 @@ public class EyeTestRecallService {
             } else {
                 whatsapp.sendText(waId, plainMessage(hi, months, offer, shop));
             }
+            chatLog.sent(waId, plainMessage(hi, months, offer, shop));
             analytics.record(LeadEventType.EYE_TEST_RECALL_SENT, lead.getId(), null);
             log.info("eye-test recall sent to lead {}", lead.getId());
         } catch (Exception e) {
