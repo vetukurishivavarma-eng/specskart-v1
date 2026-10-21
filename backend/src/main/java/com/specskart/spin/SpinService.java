@@ -10,6 +10,7 @@ import com.specskart.shared.PhoneNumbers;
 import com.specskart.shared.SignedLinks;
 import com.specskart.whatsapp.ChatLog;
 import com.specskart.whatsapp.LeadNudges;
+import com.specskart.whatsapp.ServiceWindow;
 import com.specskart.whatsapp.WhatsAppProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,10 +75,12 @@ public class SpinService {
     private final ChatLog chatLog;
     private final PushService push;
     private final LensInquiryService lens;
+    private final ServiceWindow window;
 
     public SpinService(SpinRepository spins, SpinPrizeRepository prizes, LeadRepository leads, SignedLinks links,
                        AppProperties props, WhatsAppProvider whatsapp, ChatLog chatLog, PushService push,
-                       LensInquiryService lens) {
+                       LensInquiryService lens, ServiceWindow window) {
+        this.window = window;
         this.spins = spins;
         this.prizes = prizes;
         this.leads = leads;
@@ -305,6 +308,11 @@ public class SpinService {
         return l == null || l.getName() == null || l.getName().isBlank() ? fallback : l.getName().trim().split("\\s+")[0];
     }
 
+    /** "+260 ••• 9599": staff see only the last 4 digits, so at the till the customer has to say their number. */
+    static String masked(String waId) {
+        return waId == null || waId.length() < 7 ? waId : "+" + waId.substring(0, 3) + " ••• " + waId.substring(waId.length() - 4);
+    }
+
     private static String waId(Lead l) {
         return l.getWhatsappWaId() != null ? l.getWhatsappWaId() : l.getWhatsappNumber();
     }
@@ -329,37 +337,111 @@ public class SpinService {
                 .orElseThrow(() -> ApiException.notFound("NO_CODE", "No prize with that code."));
     }
 
-    /** At the till: the code is used, once. */
-    @Transactional
-    public SpinView redeem(String code, String staff) {
+    static final Duration OTP_TTL = Duration.ofMinutes(10);
+    static final int OTP_TRIES = 5;
+
+    /** A prize code at the till: the winner's code or a friend's code on the same spin. */
+    private record Holder(Spin spin, boolean friend, String code) {
+        UUID leadId() { return friend ? spin.getFriendLeadId() : spin.getLeadId(); }
+        Instant redeemedAt() { return friend ? spin.getFriendRedeemedAt() : spin.getRedeemedAt(); }
+    }
+
+    private Holder holder(String code) {
         String c = normalise(code);
         var asFriend = spins.findByFriendCodeIgnoreCase(c);
-        if (asFriend.isPresent()) {
-            Spin f = asFriend.get();
-            if (f.getFriendRedeemedAt() != null) {
-                throw ApiException.conflict("ALREADY_USED", "This code was already used on " + UNTIL.format(f.getFriendRedeemedAt()) + ".");
-            }
-            if (f.getExpiresAt().isBefore(Instant.now())) {
-                throw ApiException.conflict("EXPIRED", "This code expired on " + UNTIL.format(f.getExpiresAt()) + ".");
-            }
-            f.setFriendRedeemedAt(Instant.now());
-            f.setFriendRedeemedBy(staff);
-            return friendView(spins.save(f));
-        }
-        Spin s = byCode(c);
-        if (waitingForFriend(s)) {
+        if (asFriend.isPresent()) return new Holder(asFriend.get(), true, c);
+        return new Holder(byCode(c), false, c);
+    }
+
+    /**
+     * Still good to give, and the number staff typed is the customer's own WhatsApp. Returns their waId.
+     * A wrong number says so without naming the right one.
+     */
+    private String checkAtTill(Holder h, String phone) {
+        Spin s = h.spin();
+        if (!h.friend() && waitingForFriend(s)) {
             throw ApiException.conflict("WAITING_FRIEND",
                     "Not unlocked yet: no new friend has messaged us with this code. It works once one does.");
         }
-        if (s.getRedeemedAt() != null) {
-            throw ApiException.conflict("ALREADY_USED", "This code was already used on " + UNTIL.format(s.getRedeemedAt()) + ".");
+        if (h.redeemedAt() != null) {
+            throw ApiException.conflict("ALREADY_USED", "This code was already used on " + UNTIL.format(h.redeemedAt()) + ".");
         }
         if (s.getExpiresAt().isBefore(Instant.now())) {
             throw ApiException.conflict("EXPIRED", "This code expired on " + UNTIL.format(s.getExpiresAt()) + ".");
         }
+        Lead lead = leads.findById(h.leadId()).orElseThrow(() -> ApiException.notFound("NO_LEAD", "The customer for this code is gone."));
+        String typed = PhoneNumbers.normalize(phone, props.whatsapp().defaultCountryCode());
+        String theirs = PhoneNumbers.normalize(waId(lead), props.whatsapp().defaultCountryCode());
+        if (typed == null || !typed.equals(theirs)) {
+            throw ApiException.badRequest("WRONG_NUMBER", "This code was won on a different WhatsApp number. Check the number with the customer.");
+        }
+        return waId(lead);
+    }
+
+    /**
+     * At the till, step 1: staff type the customer's WhatsApp number + prize code, and we WhatsApp the
+     * customer a 6-digit verification code (valid 10 minutes). Free-form text, so only inside WhatsApp's
+     * 24h window -- otherwise the customer sends us any message first.
+     */
+    @Transactional
+    public String sendRedeemCode(String code, String phone) {
+        Holder h = holder(code);
+        String waId = checkAtTill(h, phone);
+        if (!window.isOpen(waId)) {
+            throw ApiException.conflict("WINDOW_CLOSED", "Ask the customer to send any message (like \"hi\") to our WhatsApp, "
+                    + "then tap Send code again. WhatsApp only lets us message them within 24 hours of their last message.");
+        }
+        String otp = String.format("%06d", RNG.nextInt(1_000_000));
+        Spin s = h.spin();
+        s.setOtpCode(h.code());
+        s.setOtpHash(otpHash(s, otp));
+        s.setOtpExpiresAt(Instant.now().plus(OTP_TTL));
+        s.setOtpTries(0);
+        spins.save(s);
+        whatsapp.sendText(waId, "🔐 Your verification code is *" + otp + "*\n\nGive it to our staff to collect your prize: "
+                + s.getPrizeLabel() + ". It works for 10 minutes.\nNot at " + props.storeName() + " right now? Ignore this message.");
+        // the chat shows that a code went out, never the code itself: staff can read the chat
+        chatLog.sent(waId, "🔐 Sent a prize verification code for " + h.code());
+        return masked(waId);
+    }
+
+    /** At the till, step 2: the code the customer got on WhatsApp. The prize code is then used, once. */
+    @Transactional(noRollbackFor = ApiException.class) // a wrong try is counted even though it throws
+    public SpinView redeem(String code, String phone, String otp, String staff) {
+        Holder h = holder(code);
+        checkAtTill(h, phone);
+        Spin s = h.spin();
+        if (s.getOtpHash() == null || !h.code().equals(s.getOtpCode()) || s.getOtpExpiresAt().isBefore(Instant.now())) {
+            throw ApiException.badRequest("SEND_CODE", "Tap Send code to WhatsApp the customer a new verification code.");
+        }
+        if (s.getOtpTries() >= OTP_TRIES) {
+            throw ApiException.badRequest("TOO_MANY_TRIES", "Too many wrong tries. Tap Send code for a new verification code.");
+        }
+        if (otp == null || !otpHash(s, otp.trim()).equals(s.getOtpHash())) {
+            s.setOtpTries(s.getOtpTries() + 1);
+            spins.save(s);
+            throw ApiException.badRequest("WRONG_CODE", "That verification code is wrong. Check the WhatsApp message with the customer.");
+        }
+        s.setOtpHash(null);
+        s.setOtpCode(null);
+        s.setOtpExpiresAt(null);
+        if (h.friend()) {
+            s.setFriendRedeemedAt(Instant.now());
+            s.setFriendRedeemedBy(staff);
+            return friendView(spins.save(s));
+        }
         s.setRedeemedAt(Instant.now());
         s.setRedeemedBy(staff);
         return view(spins.save(s));
+    }
+
+    private static String otpHash(Spin s, String otp) {
+        try {
+            byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest((s.getId() + ":" + otp).getBytes(StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(d);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @Transactional
@@ -440,7 +522,7 @@ public class SpinService {
         Lead l = leads.findById(s.getLeadId()).orElse(null);
         String state = s.getRedeemedAt() != null ? "USED" : s.getExpiresAt().isBefore(Instant.now()) ? "EXPIRED"
                 : waitingForFriend(s) ? "WAITING_FRIEND" : "VALID";
-        return new SpinView(s.getCode(), s.getPrizeLabel(), l == null ? null : l.getName(), l == null ? null : waId(l),
+        return new SpinView(s.getCode(), s.getPrizeLabel(), l == null ? null : l.getName(), l == null ? null : masked(waId(l)),
                 s.getCreatedAt(), s.getExpiresAt(), s.getRedeemedAt(), s.getRedeemedBy(), state);
     }
 
@@ -450,7 +532,7 @@ public class SpinService {
         Lead w = leads.findById(s.getLeadId()).orElse(null);
         String state = s.getFriendRedeemedAt() != null ? "USED" : s.getExpiresAt().isBefore(Instant.now()) ? "EXPIRED" : "VALID";
         return new SpinView(s.getFriendCode(), s.getPrizeLabel() + " (friend of " + firstName(w, "a winner") + ")",
-                f == null ? null : f.getName(), f == null ? null : waId(f),
+                f == null ? null : f.getName(), f == null ? null : masked(waId(f)),
                 s.getUpdatedAt(), s.getExpiresAt(), s.getFriendRedeemedAt(), s.getFriendRedeemedBy(), state);
     }
 

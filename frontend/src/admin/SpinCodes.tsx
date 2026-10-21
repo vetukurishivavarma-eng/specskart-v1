@@ -19,16 +19,26 @@ export default function SpinCodes() {
   const [code, setCode] = useState('')
   const [found, setFound] = useState<SpinView | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
+  const [phone, setPhone] = useState('')
+  const [otp, setOtp] = useState('')
+  const [sentTo, setSentTo] = useState<string | null>(null)
   const { data: recent } = useQuery({ queryKey: ['admin-spins'], queryFn: () => api<SpinView[]>('/admin/spins', { auth: true }) })
 
   const look = useMutation({
     mutationFn: () => api<SpinView>(`/admin/spins/code/${encodeURIComponent(code.trim())}`, { auth: true }),
-    onSuccess: (v) => { setFound(v); setMsg(null) },
+    onSuccess: (v) => { setFound(v); setMsg(null); setSentTo(null); setOtp('') },
     onError: (e) => { setFound(null); setMsg((e as Error).message) },
   })
+  const send = useMutation({
+    mutationFn: (c: string) => api<{ sentTo: string }>(`/admin/spins/code/${encodeURIComponent(c)}/send-otp`,
+      { method: 'POST', auth: true, body: JSON.stringify({ phone }) }),
+    onSuccess: (r) => { setSentTo(r.sentTo); setMsg(null) },
+    onError: (e) => setMsg((e as Error).message),
+  })
   const use = useMutation({
-    mutationFn: (c: string) => api<SpinView>(`/admin/spins/code/${encodeURIComponent(c)}/redeem`, { method: 'POST', auth: true }),
-    onSuccess: (v) => { setFound(v); setMsg('✅ Marked as used.'); qc.invalidateQueries({ queryKey: ['admin-spins'] }) },
+    mutationFn: (c: string) => api<SpinView>(`/admin/spins/code/${encodeURIComponent(c)}/redeem`,
+      { method: 'POST', auth: true, body: JSON.stringify({ phone, otp }) }),
+    onSuccess: (v) => { setFound(v); setSentTo(null); setOtp(''); setPhone(''); setMsg('✅ Marked as used.'); qc.invalidateQueries({ queryKey: ['admin-spins'] }) },
     onError: (e) => setMsg((e as Error).message),
   })
 
@@ -48,9 +58,21 @@ export default function SpinCodes() {
         {found && (
           <div className="mt-4 rounded-lg bg-bone p-3 text-sm">
             <p><b>{found.prize}</b> · <span className={TONE[found.state]}>{found.state === 'WAITING_FRIEND' ? 'locked: no new friend has messaged us with this code yet' : found.state === 'VALID' ? `valid until ${day(found.expiresAt)}` : found.state === 'USED' ? `used ${day(found.redeemedAt!)}${found.redeemedBy ? ` by ${found.redeemedBy}` : ''}` : `expired ${day(found.expiresAt)}`}</span></p>
-            <p className="text-ink/60">{found.customer ?? 'Customer'} · +{found.phone}</p>
+            <p className="text-ink/60">{found.customer ?? 'Customer'}</p>
             {found.state === 'VALID' && (
-              <button className="btn-primary mt-3 !px-4 !py-2 text-xs" disabled={use.isPending} onClick={() => use.mutate(found.code)}>Give the prize & mark used</button>
+              <div className="mt-3 space-y-2">
+                <p className="text-xs text-ink/60">1. Ask for the WhatsApp number they won with. 2. Send them a verification code. 3. Type the code they got.</p>
+                <div className="flex flex-wrap gap-2">
+                  <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Their WhatsApp number" inputMode="tel" className="fld !mt-0 max-w-xs" />
+                  <button className="btn-ghost !px-4 !py-2 text-xs" disabled={!phone.trim() || send.isPending} onClick={() => send.mutate(found.code)}>{sentTo ? 'Send again' : 'Send code'}</button>
+                </div>
+                {sentTo && (
+                  <div className="flex flex-wrap gap-2">
+                    <input value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder={`6-digit code sent to ${sentTo}`} inputMode="numeric" className="fld !mt-0 max-w-xs" />
+                    <button className="btn-primary !px-4 !py-2 text-xs" disabled={otp.length !== 6 || use.isPending} onClick={() => use.mutate(found.code)}>Give the prize & mark used</button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -67,7 +89,7 @@ export default function SpinCodes() {
             {(recent ?? []).map((s) => (
               <tr key={s.code} className="border-t border-ink/5">
                 <td className="py-1 font-mono">{s.code}</td><td>{s.prize}</td>
-                <td>{s.customer ?? `+${s.phone}`}</td><td>{day(s.spunAt)}</td>
+                <td>{s.customer ?? s.phone}</td><td>{day(s.spunAt)}</td>
                 <td className={TONE[s.state]}>{STATE[s.state]}</td>
               </tr>
             ))}

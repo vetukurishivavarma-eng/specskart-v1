@@ -77,11 +77,50 @@ class SpinTest {
 
     @Test
     void aCodeIsUsedOnceAtTheShop() {
-        String code = won(customer(), "Free sunglasses with your first pair", "H").getCode(); // not a friend prize
+        Lead l = customer();
+        String waId = l.getWhatsappWaId();
+        String code = won(l, "Free sunglasses with your first pair", "H").getCode(); // not a friend prize
 
         assertThat(spins.lookup(code.substring(5).toLowerCase()).state()).isEqualTo("VALID"); // typed without SPIN-
-        assertThat(spins.redeem(code, "Staff").state()).isEqualTo("USED");
-        assertThatThrownBy(() -> spins.redeem(code, "Staff")).hasMessageContaining("already used");
+        // the number must be the customer's own WhatsApp, and a verification code must have been sent
+        assertThatThrownBy(() -> spins.sendRedeemCode(code, "260971111111")).hasMessageContaining("different WhatsApp number");
+        assertThatThrownBy(() -> spins.redeem(code, waId, "123456", "Staff")).hasMessageContaining("Send code");
+
+        assertThat(spins.sendRedeemCode(code, "+" + waId)).endsWith(waId.substring(waId.length() - 4));
+        String otp = lastOtp(waId);
+        String wrong = otp.equals("000000") ? "111111" : "000000";
+        assertThatThrownBy(() -> spins.redeem(code, waId, wrong, "Staff")).hasMessageContaining("wrong");
+        assertThat(spinRows.findByCodeIgnoreCase(code).orElseThrow().getOtpTries()).isEqualTo(1); // counted despite the throw
+        assertThat(spins.redeem(code, waId, otp, "Staff").state()).isEqualTo("USED");
+        assertThatThrownBy(() -> spins.sendRedeemCode(code, waId)).hasMessageContaining("already used");
+    }
+
+    @Test
+    void fiveWrongVerificationCodesNeedANewOne() {
+        Lead l = customer();
+        String code = won(l, "Free sunglasses with your first pair", "M").getCode();
+        spins.sendRedeemCode(code, l.getWhatsappWaId());
+        String otp = lastOtp(l.getWhatsappWaId());
+        String wrong = otp.equals("000000") ? "111111" : "000000";
+        for (int i = 0; i < SpinService.OTP_TRIES; i++) {
+            assertThatThrownBy(() -> spins.redeem(code, l.getWhatsappWaId(), wrong, "Staff")).hasMessageContaining("wrong");
+        }
+        assertThatThrownBy(() -> spins.redeem(code, l.getWhatsappWaId(), otp, "Staff")).hasMessageContaining("Too many");
+    }
+
+    /** The verification code in the last WhatsApp sent to this number. */
+    private String lastOtp(String waId) {
+        var m = ((MockWhatsAppProvider) provider).outbox().stream()
+                .filter(s -> waId.equals(s.toWaId()) && s.text() != null && s.text().contains("verification code is"))
+                .reduce((a, b) -> b).orElseThrow().text();
+        var match = java.util.regex.Pattern.compile("\\*(\\d{6})\\*").matcher(m);
+        assertThat(match.find()).isTrue();
+        return match.group(1);
+    }
+
+    private SpinService.SpinView redeemWithOtp(String code, String waId) {
+        spins.sendRedeemCode(code, waId);
+        return spins.redeem(code, waId, lastOtp(waId), "Staff");
     }
 
     @Test
@@ -90,7 +129,7 @@ class SpinTest {
         Spin s = won(winner, FRIEND, "F");
 
         assertThat(spins.lookup(s.getCode()).state()).isEqualTo("WAITING_FRIEND");
-        assertThatThrownBy(() -> spins.redeem(s.getCode(), "Staff")).hasMessageContaining("Not unlocked");
+        assertThatThrownBy(() -> spins.sendRedeemCode(s.getCode(), winner.getWhatsappWaId())).hasMessageContaining("Not unlocked");
         assertThat(spins.claimFriend(winner, s.getCode())).contains("your own code");
 
         // the friend messages us with the code (the forwarded link's prefilled text)
@@ -102,9 +141,11 @@ class SpinTest {
                 .filter(m -> waId.equals(m.toWaId()) && m.text() != null))
                 .anyMatch(m -> m.text().contains(after.getFriendCode()));
 
-        assertThat(spins.redeem(s.getCode(), "Staff").state()).isEqualTo("USED");
-        assertThat(spins.redeem(after.getFriendCode(), "Staff").state()).isEqualTo("USED");
-        assertThatThrownBy(() -> spins.redeem(after.getFriendCode(), "Staff")).hasMessageContaining("already used");
+        // each code only with its own holder's number
+        assertThatThrownBy(() -> spins.sendRedeemCode(after.getFriendCode(), winner.getWhatsappWaId())).hasMessageContaining("different WhatsApp number");
+        assertThat(redeemWithOtp(s.getCode(), winner.getWhatsappWaId()).state()).isEqualTo("USED");
+        assertThat(redeemWithOtp(after.getFriendCode(), waId).state()).isEqualTo("USED");
+        assertThatThrownBy(() -> spins.sendRedeemCode(after.getFriendCode(), waId)).hasMessageContaining("already used");
 
         // a second friend can't use it
         Lead late = customer();

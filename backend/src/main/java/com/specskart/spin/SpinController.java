@@ -39,9 +39,19 @@ public class SpinController {
         return spins.lookup(code);
     }
 
+    public record SendCode(String phone) {}
+    public record Redeem(String phone, String otp) {}
+
+    /** Step 1 at the till: WhatsApp the customer a verification code. Returns the masked number it went to. */
+    @PostMapping("/api/admin/spins/code/{code}/send-otp")
+    public java.util.Map<String, String> sendCode(@PathVariable String code, @RequestBody SendCode req) {
+        return java.util.Map.of("sentTo", spins.sendRedeemCode(code, req.phone()));
+    }
+
+    /** Step 2: the verification code the customer got; the prize code is then used, once. */
     @PostMapping("/api/admin/spins/code/{code}/redeem")
-    public SpinService.SpinView redeem(@PathVariable String code, Authentication auth) {
-        return spins.redeem(code, currentUser.nameOf(auth));
+    public SpinService.SpinView redeem(@PathVariable String code, @RequestBody Redeem req, Authentication auth) {
+        return spins.redeem(code, req.phone(), req.otp(), currentUser.nameOf(auth));
     }
 
     @GetMapping("/api/admin/spins/prizes")

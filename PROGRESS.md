@@ -2,6 +2,16 @@
 
 _Last updated: 2026-10-20._
 
+## 2026-10-21 (4): Spin redeem = WhatsApp number + prize code + WhatsApp'd verification code (V74, 238 tests)
+- Till flow (web admin Spin & Win + POS 1.29.0/vc34 More -> Spin & Win codes): staff check code, type the customer's
+  WhatsApp number (must match the holder's), "Send code" WhatsApps a 6-digit code (hashed, 10 min, 5 tries; free text so
+  only inside 24h window -> else "ask them to send hi"); chat log shows "sent a code", never the code. Phones masked
+  (+260 ••• 1234) in spin views. POS also carries 3e5fa75. POS 1.29.0 pushed; APK to build + publish.
+- Welcome buttons now Free eye test / Spin & Win / FAQs (`a985b8a`); V72 wheel = 5 prizes; QR poster in Downloads.
+- Templates still to create (see chat 10-21): specskart_followup, eye_checkup_reminder, eye_test_recall (+ optional
+  spin_and_win broadcast). Existing: order_update, lens_verify, staff_new_order (needs Document header),
+  lens_post_purchase (needs Copy-code button). All English (en).
+
 ## 2026-10-21 (3): Spin bring-a-friend unlock (V71, 236 tests)
 - Any prize whose name contains "friend" (`SpinService.isFriendPrize`) is LOCKED (state WAITING_FRIEND, redeem 409) until a
   customer NEW since the spin messages the bot with the SPIN-code (forwarded wa.me link prefills it; bot catches any

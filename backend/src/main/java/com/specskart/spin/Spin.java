@@ -40,4 +40,13 @@ public class Spin extends BaseEntity {
 
     private Instant friendRedeemedAt;
     private String friendRedeemedBy;
+
+    /** Redeeming at the till: a WhatsApp'd verification code (hashed) for one of this spin's prize codes. */
+    @Column(length = 20)
+    private String otpCode;
+    @Column(length = 64)
+    private String otpHash;
+    private Instant otpExpiresAt;
+    @Column(nullable = false)
+    private int otpTries;
 }
