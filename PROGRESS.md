@@ -2,6 +2,15 @@
 
 _Last updated: 2026-10-20._
 
+## 2026-10-21 (5): POS 1.30.0/vc35 RELEASED by Claude (v1.30.0 GitHub release); user adds app_releases row
+- Broadcast in app (admin): Ready message (READY list in app/broadcast.tsx = approved templates; spin_and_win) or
+  Type your own (free text, only leads with open 24h window, `/broadcast/text/*`). Never same template/text twice.
+  Template quick-reply taps read by text (classify fallback). OTP: 1/min, 5 per prize (V75). Prizes 2 weeks.
+  App update link spaces stripped (AppRelease getter/setter) after a pasted link with spaces locked tills.
+- Meta: billing being added; business UNVERIFIED (250 new chats/day) -> verify later with client's PACRA docs; fix
+  portfolio name/time zone (Asia/Kolkata -> Africa/Lusaka) before. Templates in review: specskart_followup,
+  spin_and_win, eye_test_recall; Render env set by user. Checkup reminder deliberately OFF.
+
 ## 2026-10-21 (4): Spin redeem = WhatsApp number + prize code + WhatsApp'd verification code (V74, 238 tests)
 - Till flow (web admin Spin & Win + POS 1.29.0/vc34 More -> Spin & Win codes): staff check code, type the customer's
   WhatsApp number (must match the holder's), "Send code" WhatsApps a 6-digit code (hashed, 10 min, 5 tries; free text so
