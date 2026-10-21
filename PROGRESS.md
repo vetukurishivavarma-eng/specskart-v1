@@ -8,7 +8,10 @@ _Last updated: 2026-10-20._
   SPIN-XXXXX in text -> `claimFriend`). Friend gets own code (spins.friend_code, same expiry); winner WhatsApp'd "unlocked";
   staff push. One friend per code, a lead can be friend once, existing customers refused. Both codes redeemed in web admin.
 - Client said only #2 (second pair) + #8 (bring a friend) of the 8 extra prize ideas; suggested second pair = 20% off
-  cheaper frame on sale price. Prizes NOT added to the live wheel by Claude (owner adds in web admin -> Spin & Win).
+  cheaper frame on sale price. V72 adds both to the live wheel (35/25/15/15/10); owner edits in web admin -> Spin & Win.
+- Client rule then: ONE PRIZE AT A TIME, not one spin ever (V73 drops unique lead_id/friend_lead_id; lead row locked
+  while spinning). Can't spin while own prize OR a friend code you joined with is in its week (used or not); after
+  expiry both winner and friend can spin again. Someone holding an active code can't take a friend's code.
 
 ## 2026-10-21 (2): Spin & Win (`8bae327`, V70) + reactions/system msgs in chat (`99707f8`, V69) + 8:00 push once/day (`d1c1f60`)
 - Customer types "spin" / menu row -> signed 14-day link /spin/<leadId>; server picks prize (weights), spins.lead_id UNIQUE,

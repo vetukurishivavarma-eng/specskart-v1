@@ -325,7 +325,7 @@ public class WhatsAppBotService {
     private List<WhatsAppProvider.Row> menuRows() {
         List<WhatsAppProvider.Row> rows = new ArrayList<>(List.of(
                 new WhatsAppProvider.Row(BTN_SPIN, "Spin & win a prize",
-                        "Every spin wins. One spin per customer"),
+                        "Every spin wins a prize"),
                 new WhatsAppProvider.Row(LeadNudges.BTN_BOOK, "Book a free eye test",
                         "Pick a day and we'll expect you"),
                 new WhatsAppProvider.Row(BTN_FRAME_PHOTOS, "See our frames",

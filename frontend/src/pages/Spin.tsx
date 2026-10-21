@@ -71,7 +71,7 @@ export default function Spin() {
       <div className="mx-auto max-w-md text-center">
         <p className="label !text-signal">Specskart Opticians</p>
         <h1 className="mt-2 text-3xl">{page.firstName ? `${page.firstName}, spin & win!` : 'Spin & win!'}</h1>
-        <p className="mt-2 text-sm text-white/60">Every spin wins a prize. One spin per customer.</p>
+        <p className="mt-2 text-sm text-white/60">Every spin wins a prize.</p>
 
         <div className="relative mx-auto mt-8 aspect-square w-full max-w-[320px]">
           {/* the pointer, at the top */}
@@ -138,7 +138,7 @@ export default function Spin() {
             </li>
           ))}
         </ul>
-        <p className="mt-6 text-xs text-white/40">Prizes are collected at our shop within a week. One spin per WhatsApp number.</p>
+        <p className="mt-6 text-xs text-white/40">Prizes are collected at our shop within a week. You can spin again once your prize's week is over.</p>
       </div>
     </div>
   )

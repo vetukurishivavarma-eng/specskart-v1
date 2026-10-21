@@ -10,14 +10,14 @@ import lombok.Setter;
 import java.time.Instant;
 import java.util.UUID;
 
-/** A customer's one spin. lead_id is UNIQUE: the database itself refuses a second spin. */
+/** A customer's spin. One at a time: they can spin again once this prize's week is over (SpinService). */
 @Entity
 @Table(name = "spins")
 @Getter
 @Setter
 public class Spin extends BaseEntity {
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false)
     private UUID leadId;
 
     @Column(nullable = false, length = 80)
@@ -33,7 +33,6 @@ public class Spin extends BaseEntity {
     private String redeemedBy;
 
     /** Bring-a-friend prize: the new customer who messaged us with this code, and their own code. */
-    @Column(unique = true)
     private UUID friendLeadId;
 
     @Column(unique = true, length = 20)

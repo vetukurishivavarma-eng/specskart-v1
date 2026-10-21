@@ -15,6 +15,11 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
 
     Optional<Lead> findByWhatsappWaId(String waId);
 
+    /** Row lock for the rest of the transaction (Spin & Win: two taps at once can't both spin). */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select l from Lead l where l.id = :id")
+    Optional<Lead> lockById(@Param("id") UUID id);
+
     /**
      * Customers due an eye-test recall: they bought something older than the cutoff, they haven't
      * opted out, and we either never nudged them or last did so before the cutoff too. Ordered

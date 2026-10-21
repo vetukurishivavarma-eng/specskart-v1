@@ -77,10 +77,7 @@ class SpinTest {
 
     @Test
     void aCodeIsUsedOnceAtTheShop() {
-        Lead l = customer();
-        String[] sig = new String[1];
-        long exp = expSig(l, sig)[0];
-        String code = spins.spin(l.getId(), exp, sig[0]).code();
+        String code = won(customer(), "Free sunglasses with your first pair", "H").getCode(); // not a friend prize
 
         assertThat(spins.lookup(code.substring(5).toLowerCase()).state()).isEqualTo("VALID"); // typed without SPIN-
         assertThat(spins.redeem(code, "Staff").state()).isEqualTo("USED");
@@ -90,12 +87,7 @@ class SpinTest {
     @Test
     void aBringAFriendCodeUnlocksOnlyWhenANewFriendMessagesWithIt() {
         Lead winner = customer();
-        Spin s = new Spin();
-        s.setLeadId(winner.getId());
-        s.setPrizeLabel("Bring a friend: K100 off for you both");
-        s.setCode("SPIN-F" + (1000 + (int) (Math.random() * 8999)));
-        s.setExpiresAt(java.time.Instant.now().plus(Duration.ofDays(7)));
-        spinRows.saveAndFlush(s);
+        Spin s = won(winner, FRIEND, "F");
 
         assertThat(spins.lookup(s.getCode()).state()).isEqualTo("WAITING_FRIEND");
         assertThatThrownBy(() -> spins.redeem(s.getCode(), "Staff")).hasMessageContaining("Not unlocked");
@@ -114,23 +106,51 @@ class SpinTest {
         assertThat(spins.redeem(after.getFriendCode(), "Staff").state()).isEqualTo("USED");
         assertThatThrownBy(() -> spins.redeem(after.getFriendCode(), "Staff")).hasMessageContaining("already used");
 
-        // a second friend, or a customer who was already with us, can't use it
+        // a second friend can't use it
         Lead late = customer();
         assertThat(spins.claimFriend(late, s.getCode())).contains("already used this code");
+
+        // the friend can't spin while their friend code is in its week; once it's over, both can
+        Lead friend = leads.findByWhatsappWaId(waId).orElseThrow();
+        String[] sig = new String[1];
+        long exp = expSig(friend, sig)[0];
+        assertThatThrownBy(() -> spins.spin(friend.getId(), exp, sig[0])).hasMessageContaining("You can spin after it expires");
+        assertThat(spins.offer(friend)).contains(after.getFriendCode());
+
+        after.setExpiresAt(java.time.Instant.now().minusSeconds(60));
+        spinRows.saveAndFlush(after);
+        assertThat(spins.spin(friend.getId(), exp, sig[0]).code()).isNotIn(s.getCode(), after.getFriendCode());
+        long wExp = expSig(winner, sig)[0];
+        assertThat(spins.spin(winner.getId(), wExp, sig[0]).code()).isNotEqualTo(s.getCode());
     }
 
     @Test
     void anExistingCustomerCannotBeTheFriend() {
         Lead old = customer();
-        Lead winner = customer();
-        Spin s = new Spin();
-        s.setLeadId(winner.getId());
-        s.setPrizeLabel("Bring a friend: K100 off for you both");
-        s.setCode("SPIN-G" + (1000 + (int) (Math.random() * 8999)));
-        s.setExpiresAt(java.time.Instant.now().plus(Duration.ofDays(7)));
-        spinRows.saveAndFlush(s);
+        Spin s = won(customer(), FRIEND, "G");
         assertThat(spins.claimFriend(old, s.getCode())).contains("new customers only");
         assertThat(spinRows.findById(s.getId()).orElseThrow().getFriendLeadId()).isNull();
+    }
+
+    @Test
+    void someoneHoldingAPrizeCodeCannotTakeAFriendsToo() {
+        Spin s = won(customer(), FRIEND, "J");
+        Lead newcomer = customer(); // new since the spin, but already won their own prize
+        won(newcomer, "Free sunglasses with your first pair", "K");
+        assertThat(spins.claimFriend(newcomer, s.getCode())).contains("You already have a prize code");
+        assertThat(spinRows.findById(s.getId()).orElseThrow().getFriendLeadId()).isNull();
+    }
+
+    private static final String FRIEND = "Bring a friend: K100 off for you both";
+
+    /** A spin row with a chosen prize (the wheel itself is random). */
+    private Spin won(Lead lead, String prize, String tag) {
+        Spin s = new Spin();
+        s.setLeadId(lead.getId());
+        s.setPrizeLabel(prize);
+        s.setCode("SPIN-" + tag + (1000 + (int) (Math.random() * 8999)));
+        s.setExpiresAt(java.time.Instant.now().plus(Duration.ofDays(7)));
+        return spinRows.saveAndFlush(s);
     }
 
     @Test

@@ -36,7 +36,7 @@ export default function SpinCodes() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl">Spin &amp; Win</h1>
-        <p className="mt-1 text-sm text-ink/55">Customers spin from WhatsApp (they type “spin” or pick it in the menu). One spin per number; prizes are valid for a week at the shop. A bring-a-friend prize only unlocks once a new friend messages us with the code; the friend gets their own code.</p>
+        <p className="mt-1 text-sm text-ink/55">Customers spin from WhatsApp (they type “spin” or pick it in the menu). One prize at a time per number: a customer can spin again once their prize's week is over (a friend code blocks spinning too). Prizes are valid for a week at the shop. A bring-a-friend prize only unlocks once a new friend messages us with the code; the friend gets their own code.</p>
       </div>
 
       <section className="card p-4">

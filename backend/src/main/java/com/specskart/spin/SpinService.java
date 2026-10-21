@@ -34,9 +34,10 @@ import java.util.UUID;
 /**
  * Spin & Win (2026-10-21): every spin wins a prize that is collected at the shop within a week.
  *
- * One spin per customer, enforced three ways: the spin page is only reachable from a signed link
- * the WhatsApp bot sends (so each spin belongs to a real WhatsApp number), a repeat spin returns
- * the prize they already won, and spins.lead_id is UNIQUE in the database. The server picks the
+ * One prize at a time (client, 2026-10-21): the spin page is only reachable from a signed link the
+ * WhatsApp bot sends (so each spin belongs to a real WhatsApp number), a repeat spin while their prize
+ * (or a friend code they joined with) is still in its week returns / refuses, and the lead row is
+ * locked while spinning so two taps can't both spin. Once the week is over they can spin again. The server picks the
  * prize -- the browser only animates the wheel to it -- and each slice's size on the wheel is its
  * real chance.
  */
@@ -51,11 +52,13 @@ public class SpinService {
     private static final DateTimeFormatter UNTIL = DateTimeFormatter.ofPattern("EEEE d MMM", Locale.ENGLISH)
             .withZone(ZoneId.of("Africa/Lusaka"));
 
-    /** The client's three prizes (2026-10-21); chances are a starting point, editable in the web admin. */
+    /** The client's prizes (2026-10-21, same as V72); chances are a starting point, editable in the web admin. */
     static final List<Object[]> DEFAULT_PRIZES = List.of(
-            new Object[]{"Free eye check for your family", 50},
-            new Object[]{"K100 off photochromatic + blue block lenses", 35},
-            new Object[]{"Free sunglasses with your first pair", 15});
+            new Object[]{"Free eye check for your family", 35},
+            new Object[]{"K100 off photochromatic + blue block lenses", 25},
+            new Object[]{"Free sunglasses with your first pair", 15},
+            new Object[]{"Bring a friend: K100 off for you both", 15},
+            new Object[]{"20% off your second frame", 10});
 
     public record Slice(String label, int weight) {}
     /** shareLink: set for a bring-a-friend prize until the friend has messaged us. */
@@ -88,21 +91,37 @@ public class SpinService {
 
     // ---- the bot's side -----------------------------------------------------------------------
 
-    /** The personal link to this customer's one spin. */
+    /** The personal link to this customer's spin. */
     public String link(Lead lead) {
         String resource = "spin/" + lead.getId();
         return props.frontendBaseUrl() + "/spin/" + lead.getId() + links.query(resource, LINK_TTL);
     }
 
-    /** What the bot says to "spin": the link, or the prize they already won. */
+    /** Their spin whose week isn't over yet (used or not): until it ends they can't spin again. */
+    private java.util.Optional<Spin> activeSpin(UUID leadId) {
+        return spins.findFirstByLeadIdAndExpiresAtAfterOrderByCreatedAtDesc(leadId, Instant.now());
+    }
+
+    /** A friend's code they joined with, still in its week. */
+    private java.util.Optional<Spin> activeFriendCode(UUID leadId) {
+        return spins.findFirstByFriendLeadIdAndExpiresAtAfterOrderByCreatedAtDesc(leadId, Instant.now());
+    }
+
+    private String friendCodeHeld(Spin f) {
+        return "You already have a prize from your friend 🎁 *" + f.getPrizeLabel() + "*, code *" + f.getFriendCode()
+                + "*, valid until " + UNTIL.format(f.getExpiresAt()) + ". You can spin after it expires.";
+    }
+
+    /** What the bot says to "spin": the link, or the prize they already hold. */
     public String offer(Lead lead) {
-        var done = spins.findByLeadId(lead.getId());
+        var held = activeFriendCode(lead.getId());
+        if (held.isPresent() && activeSpin(lead.getId()).isEmpty()) return friendCodeHeld(held.get());
+        var done = activeSpin(lead.getId());
         if (done.isPresent()) {
             Spin s = done.get();
-            if (s.getRedeemedAt() != null) return "You've already had your spin 🎁 — and used your prize (" + s.getPrizeLabel() + "). Thank you!";
-            if (s.getExpiresAt().isBefore(Instant.now())) {
-                return "You've already had your spin 🎁 Your prize (" + s.getPrizeLabel() + ") expired on "
-                        + UNTIL.format(s.getExpiresAt()) + ". It's one spin per customer, sorry!";
+            if (s.getRedeemedAt() != null) {
+                return "You've already used your prize (" + s.getPrizeLabel() + ") 🎁 Thank you! You can spin again after "
+                        + UNTIL.format(s.getExpiresAt()) + ".";
             }
             if (waitingForFriend(s)) {
                 return "You've already had your spin 🎁\nYou won: *" + s.getPrizeLabel() + "*\n\n" + friendSteps(s);
@@ -110,7 +129,7 @@ public class SpinService {
             return "You've already had your spin 🎁\nYou won: *" + s.getPrizeLabel() + "*\nCode: *" + s.getCode()
                     + "* — show it at the shop by " + UNTIL.format(s.getExpiresAt()) + ".\n\n" + lens.shopLines();
         }
-        return "🎁 *Spin & Win!* Every spin wins a prize.\n\nTap to spin (one spin per customer):\n" + link(lead);
+        return "🎁 *Spin & Win!* Every spin wins a prize.\n\nTap to spin:\n" + link(lead);
     }
 
     // ---- the spin page ------------------------------------------------------------------------
@@ -119,18 +138,26 @@ public class SpinService {
     public Page page(UUID leadId, long exp, String sig) {
         Lead lead = authorised(leadId, exp, sig);
         List<SpinPrize> wheel = wheel();
-        Result result = spins.findByLeadId(leadId).map(s -> result(s, wheel)).orElse(null);
+        var own = activeSpin(leadId);
+        if (own.isEmpty()) activeFriendCode(leadId).ifPresent(f -> { throw ApiException.conflict("HAS_PRIZE", friendCodeHeld(f)); });
+        Result result = own.map(s -> result(s, wheel)).orElse(null);
         String first = lead.getName() == null || lead.getName().isBlank() ? null : lead.getName().trim().split("\\s+")[0];
         return new Page(first, wheel.stream().map(p -> new Slice(p.getLabel(), p.getWeight())).toList(), result);
     }
 
-    /** Spins once. A second call (double tap, reload, second phone) returns the first result. */
+    /**
+     * One spin per week-long prize. A second call (double tap, reload, second phone) while the prize
+     * is still in its week returns that prize; a friend's code they hold blocks spinning until it ends.
+     */
     @Transactional
     public Result spin(UUID leadId, long exp, String sig) {
-        Lead lead = authorised(leadId, exp, sig);
+        authorised(leadId, exp, sig);
+        Lead lead = leads.lockById(leadId).orElseThrow(); // two taps at once: the second waits, then sees the first spin
         List<SpinPrize> wheel = wheel();
-        var existing = spins.findByLeadId(leadId);
+        var existing = activeSpin(leadId);
         if (existing.isPresent()) return result(existing.get(), wheel);
+        var held = activeFriendCode(leadId);
+        if (held.isPresent()) throw ApiException.conflict("HAS_PRIZE", friendCodeHeld(held.get()));
 
         SpinPrize won = pick(wheel, RNG.nextInt(wheel.stream().mapToInt(SpinPrize::getWeight).sum()));
         Spin s = new Spin();
@@ -138,11 +165,7 @@ public class SpinService {
         s.setPrizeLabel(won.getLabel());
         s.setCode(freshCode());
         s.setExpiresAt(Instant.now().plus(VALID_FOR));
-        try {
-            spins.saveAndFlush(s);
-        } catch (DataIntegrityViolationException raced) { // two taps at once: the unique lead_id lets one through
-            throw ApiException.conflict("ALREADY_SPUN", "You've already had your spin — reload to see your prize.");
-        }
+        spins.saveAndFlush(s);
         tell(lead, s);
         return result(s, wheel);
     }
@@ -220,8 +243,16 @@ public class SpinService {
         if (friend.getCreatedAt() != null && friend.getCreatedAt().isBefore(s.getCreatedAt())) {
             return "Thanks for messaging! This friend offer is for new customers only. Type *spin* to win your own prize 🎁";
         }
-        if (spins.existsByFriendLeadId(friend.getId())) {
-            return "You've already joined with another friend's code. Type *spin* to win your own prize 🎁";
+        // one prize at a time: someone already holding a code in its week can't take a friend's too
+        var ownHeld = activeSpin(friend.getId());
+        if (ownHeld.isPresent()) {
+            return "You already have a prize code (*" + ownHeld.get().getCode() + "*), so you can't use a friend's code until it expires on "
+                    + UNTIL.format(ownHeld.get().getExpiresAt()) + ".";
+        }
+        var friendHeld = activeFriendCode(friend.getId());
+        if (friendHeld.isPresent()) {
+            return "You already have a prize code (*" + friendHeld.get().getFriendCode() + "*), so you can't use another friend's code until it expires on "
+                    + UNTIL.format(friendHeld.get().getExpiresAt()) + ".";
         }
 
         s.setFriendLeadId(friend.getId());
