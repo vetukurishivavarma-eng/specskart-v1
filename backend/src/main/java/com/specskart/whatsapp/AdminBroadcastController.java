@@ -14,8 +14,9 @@ import java.util.List;
 @RequestMapping("/api/admin/whatsapp/broadcast")
 public class AdminBroadcastController {
 
+    /** freeText: the template's words as plain text, sent instead (free) to customers whose chat is open. */
     public record Request(String faceShape, Boolean excludeConverted, Boolean optedInOnly, String templateName,
-                          String headerImageUrl, List<String> bodyParams, Integer limit) {}
+                          String headerImageUrl, List<String> bodyParams, Integer limit, String freeText) {}
     public record PreviewResponse(int eligible) {}
 
     private final BroadcastService broadcast;
@@ -36,7 +37,7 @@ public class AdminBroadcastController {
     public BroadcastService.SendResult send(@RequestBody Request req) {
         return broadcast.send(filterOf(req), req.templateName(), props.whatsapp().followUpTemplateLang(),
                 req.headerImageUrl(), req.bodyParams() == null ? List.of() : req.bodyParams(),
-                req.limit() == null ? 200 : req.limit());
+                req.limit() == null ? 200 : req.limit(), req.freeText());
     }
 
     public record TextRequest(String text, Boolean excludeConverted, Integer limit) {}

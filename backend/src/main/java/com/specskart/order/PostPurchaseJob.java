@@ -50,12 +50,15 @@ class PostPurchaseJob {
     private final LeadService leadService;
 
     private final com.specskart.whatsapp.ChatLog chatLog;
+    private final com.specskart.whatsapp.ServiceWindow window;
 
     PostPurchaseJob(OrderRepository orders, OrderEventRepository orderEvents, LeadRepository leads,
                     PromoCodeRepository promos, CartService carts, WhatsAppProvider whatsapp,
                     OrderNotificationService notifications, AnalyticsService analytics, AppProperties props,
                     ReviewCaptureService reviewCapture, LeadService leadService,
-            com.specskart.whatsapp.ChatLog chatLog) {
+            com.specskart.whatsapp.ChatLog chatLog,
+            com.specskart.whatsapp.ServiceWindow window) {
+        this.window = window;
         this.chatLog = chatLog;
         this.leadService = leadService;
         this.orders = orders;
@@ -91,7 +94,7 @@ class PostPurchaseJob {
 
             try {
                 // The shared template's "Copy offer code" button needs a code, so no code = plain text.
-                if (props.whatsapp().postPurchaseConfigured() && code != null) {
+                if (props.whatsapp().postPurchaseConfigured() && code != null && !window.isOpen(waId)) { // open chat: free text
                     whatsapp.sendCouponTemplate(waId, props.whatsapp().postPurchaseTemplate(),
                             props.whatsapp().followUpTemplateLang(),
                             // Shared with the lens post-purchase: {{1}} name, {{2}} promo, {{3}} referral.

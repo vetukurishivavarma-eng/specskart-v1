@@ -35,10 +35,13 @@ public class EyeTestRecallService {
     private final AppProperties props;
 
     private final com.specskart.whatsapp.ChatLog chatLog;
+    private final com.specskart.whatsapp.ServiceWindow window;
 
     public EyeTestRecallService(LeadRepository leads, PromoIssuer promoIssuer, WhatsAppProvider whatsapp,
                                 AnalyticsService analytics, AppProperties props,
-            com.specskart.whatsapp.ChatLog chatLog) {
+            com.specskart.whatsapp.ChatLog chatLog,
+            com.specskart.whatsapp.ServiceWindow window) {
+        this.window = window;
         this.chatLog = chatLog;
         this.leads = leads;
         this.promoIssuer = promoIssuer;
@@ -70,7 +73,7 @@ public class EyeTestRecallService {
         leads.save(lead);
 
         try {
-            if (props.whatsapp().recallConfigured()) {
+            if (props.whatsapp().recallConfigured() && !window.isOpen(waId)) { // open chat: plain text is free
                 whatsapp.sendTemplate(waId, props.whatsapp().recallTemplate(),
                         props.whatsapp().followUpTemplateLang(),
                         List.of(hi, String.valueOf(months), offer, shop));

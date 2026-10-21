@@ -168,7 +168,7 @@ public class LensInquiryService {
 
         String link = props.frontendBaseUrl() + "/lens/verify/" + raw;
         String text = "Tap to verify your number and continue configuring your lenses:\n" + link;
-        if (props.whatsapp().lensVerifyConfigured()) {
+        if (props.whatsapp().lensVerifyConfigured() && !window.isOpen(waId)) { // open chat: plain text is free
             try {
                 whatsapp.sendTemplate(waId, props.whatsapp().lensVerifyTemplate(),
                         props.whatsapp().followUpTemplateLang(), List.of(link));

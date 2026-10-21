@@ -110,6 +110,13 @@ public class BroadcastService {
     @Transactional
     public SendResult send(Filter f, String templateName, String languageCode, String headerImageUrl,
                            List<String> bodyParams, int limit) {
+        return send(f, templateName, languageCode, headerImageUrl, bodyParams, limit, null);
+    }
+
+    /** freeText set: customers whose 24h chat is open get it as plain text (free); only the rest get the paid template. */
+    @Transactional
+    public SendResult send(Filter f, String templateName, String languageCode, String headerImageUrl,
+                           List<String> bodyParams, int limit, String freeText) {
         if (templateName == null || templateName.isBlank()) {
             throw ApiException.badRequest("TEMPLATE_REQUIRED",
                     "Name an approved WhatsApp template — that's the only thing Meta delivers to a cold lead at scale.");
@@ -122,7 +129,11 @@ public class BroadcastService {
         int sent = 0, failed = 0;
         for (Lead lead : targets) {
             try {
-                whatsapp.sendMediaTemplate(waId(lead), templateName, languageCode, headerImageUrl, bodyParams);
+                if (freeText != null && !freeText.isBlank() && window.isOpen(waId(lead))) {
+                    whatsapp.sendText(waId(lead), freeText.trim());
+                } else {
+                    whatsapp.sendMediaTemplate(waId(lead), templateName, languageCode, headerImageUrl, bodyParams);
+                }
                 logOutbound(lead.getId(), templateName);
                 sent++;
             } catch (Exception e) {

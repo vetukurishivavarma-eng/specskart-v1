@@ -93,6 +93,21 @@ class BroadcastTest {
     }
 
     @Test
+    void aReadyMessageGoesFreeToOpenChatsAndPaidOnlyToTheRest() {
+        String open = "26097" + (300000 + (int) (Math.random() * 600000));
+        String cold = "26097" + (300000 + (int) (Math.random() * 600000));
+        inbound.process(new com.specskart.whatsapp.InboundMessage(open, open, "Open Chat", "hello", null, "bf:" + open, java.util.Map.of()));
+        lead(cold, FollowUpState.ACTIVE);
+
+        String tpl = "ready_t_" + open;
+        broadcast.send(new BroadcastService.Filter(null, false, false), tpl, "en", null, java.util.List.of(), 1000, "Reply Spin to play");
+        var outbox = ((MockWhatsAppProvider) provider).outbox();
+        assertThat(outbox).anyMatch(s -> open.equals(s.toWaId()) && "Reply Spin to play".equals(s.text()));
+        assertThat(outbox).noneMatch(s -> open.equals(s.toWaId()) && tpl.equals(s.templateName()));
+        assertThat(outbox).anyMatch(s -> cold.equals(s.toWaId()) && tpl.equals(s.templateName()));
+    }
+
+    @Test
     void previewCountsWithoutSendingAnything() {
         int before = ((MockWhatsAppProvider) provider).outbox().size();
         int count = broadcast.previewCount(new BroadcastService.Filter(null, false, false), null);

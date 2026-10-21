@@ -49,11 +49,14 @@ class LensPostPurchaseJob {
     private final ReviewCaptureService reviewCapture;
 
     private final com.specskart.whatsapp.ChatLog chatLog;
+    private final com.specskart.whatsapp.ServiceWindow window;
 
     LensPostPurchaseJob(LensInquiryRepository inquiries, LeadRepository leads, LeadService leadService,
                         PromoIssuer promoIssuer, WhatsAppProvider whatsapp, AnalyticsService analytics,
                         AppProperties props, ReviewCaptureService reviewCapture,
-            com.specskart.whatsapp.ChatLog chatLog) {
+            com.specskart.whatsapp.ChatLog chatLog,
+            com.specskart.whatsapp.ServiceWindow window) {
+        this.window = window;
         this.chatLog = chatLog;
         this.reviewCapture = reviewCapture;
         this.inquiries = inquiries;
@@ -103,7 +106,7 @@ class LensPostPurchaseJob {
         // (#131047). The approved template the frames post-purchase uses -- {{1}} name,
         // {{2}} promo code, {{3}} referral code -- gets through; the plain text stays for dev
         // and an unset template.
-        if (props.whatsapp().postPurchaseConfigured()) {
+        if (props.whatsapp().postPurchaseConfigured() && !window.isOpen(waId)) { // open chat: plain text is free
             // The template carries a "Copy offer code" button for the promo.
             whatsapp.sendCouponTemplate(waId, props.whatsapp().postPurchaseTemplate(),
                     props.whatsapp().followUpTemplateLang(), List.of(firstName(lead, q), promo.getCode(), referral),

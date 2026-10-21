@@ -163,6 +163,9 @@ public class AdminChatController {
     @PostMapping("/start")
     @Transactional
     public Map<String, Object> start(@PathVariable String waId, @RequestBody(required = false) StartRequest req) {
+        // they messaged us in the last 24h: the chat is open, so staff just type (free) -- no paid template
+        String open = com.specskart.shared.PhoneNumbers.normalize(waId, props.whatsapp().defaultCountryCode());
+        if (open != null && window.isOpen(open)) return get(open);
         if (!props.whatsapp().followUpConfigured()) {
             throw ApiException.conflict("FOLLOW_UP_TEMPLATE_NOT_CONFIGURED",
                     "Messaging a new number needs an approved WhatsApp template, which isn't set up yet.");
