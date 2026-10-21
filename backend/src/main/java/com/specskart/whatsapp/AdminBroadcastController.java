@@ -39,6 +39,23 @@ public class AdminBroadcastController {
                 req.limit() == null ? 200 : req.limit());
     }
 
+    public record TextRequest(String text, Boolean excludeConverted, Integer limit) {}
+
+    /** A message staff type: goes only to customers who messaged in the last 24h (WhatsApp's rule; free). */
+    @PostMapping("/text/preview")
+    public PreviewResponse previewText(@RequestBody TextRequest req) {
+        return new PreviewResponse(broadcast.previewText(textFilter(req), req.text()));
+    }
+
+    @PostMapping("/text/send")
+    public BroadcastService.SendResult sendText(@RequestBody TextRequest req) {
+        return broadcast.sendText(textFilter(req), req.text(), req.limit() == null ? 200 : req.limit());
+    }
+
+    private static BroadcastService.Filter textFilter(TextRequest req) {
+        return new BroadcastService.Filter(null, Boolean.TRUE.equals(req.excludeConverted()), false);
+    }
+
     private BroadcastService.Filter filterOf(Request req) {
         return new BroadcastService.Filter(
                 req.faceShape() == null || req.faceShape().isBlank() ? null : req.faceShape(),

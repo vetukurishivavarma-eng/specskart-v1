@@ -49,4 +49,8 @@ public class Spin extends BaseEntity {
     private Instant otpExpiresAt;
     @Column(nullable = false)
     private int otpTries;
+    /** Rate limit on sending codes: when the last went out, and how many this prize has had. */
+    private Instant otpSentAt;
+    @Column(nullable = false)
+    private int otpSends;
 }

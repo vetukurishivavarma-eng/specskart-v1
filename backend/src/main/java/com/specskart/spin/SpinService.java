@@ -384,15 +384,26 @@ public class SpinService {
      * 24h window -- otherwise the customer sends us any message first.
      */
     @Transactional
-    public String sendRedeemCode(String code, String phone) {
+    public OtpSent sendRedeemCode(String code, String phone) {
         Holder h = holder(code);
         String waId = checkAtTill(h, phone);
+        Spin s = h.spin();
+        // rate limit: one code a minute, at most MAX_OTP_SENDS per prize (a till can't spam the customer)
+        if (s.getOtpSentAt() != null && h.code().equals(s.getOtpCode())) {
+            long wait = RESEND_AFTER.toSeconds() - Duration.between(s.getOtpSentAt(), Instant.now()).toSeconds();
+            if (wait > 0) throw ApiException.conflict("WAIT", "Wait " + wait + " seconds before sending another code.");
+        }
+        if (s.getOtpSends() >= MAX_OTP_SENDS) {
+            throw ApiException.conflict("TOO_MANY_CODES", "Too many verification codes for this prize. Check the customer's "
+                    + "WhatsApp for the last one, or ask the manager.");
+        }
         if (!window.isOpen(waId)) {
             throw ApiException.conflict("WINDOW_CLOSED", "Ask the customer to send any message (like \"hi\") to our WhatsApp, "
                     + "then tap Send code again. WhatsApp only lets us message them within 24 hours of their last message.");
         }
         String otp = String.format("%06d", RNG.nextInt(1_000_000));
-        Spin s = h.spin();
+        s.setOtpSentAt(Instant.now());
+        s.setOtpSends(s.getOtpSends() + 1);
         s.setOtpCode(h.code());
         s.setOtpHash(otpHash(s, otp));
         s.setOtpExpiresAt(Instant.now().plus(OTP_TTL));
@@ -402,8 +413,13 @@ public class SpinService {
                 + s.getPrizeLabel() + ". It works for 10 minutes.\nNot at " + props.storeName() + " right now? Ignore this message.");
         // the chat shows that a code went out, never the code itself: staff can read the chat
         chatLog.sent(waId, "🔐 Sent a prize verification code for " + h.code());
-        return masked(waId);
+        return new OtpSent(masked(waId), (int) RESEND_AFTER.toSeconds(), MAX_OTP_SENDS - s.getOtpSends());
     }
+
+    /** sentTo "+260 ••• 9599"; the till may ask again after resendInSeconds, sendsLeft more times. */
+    public record OtpSent(String sentTo, int resendInSeconds, int sendsLeft) {}
+    static final Duration RESEND_AFTER = Duration.ofSeconds(60);
+    static final int MAX_OTP_SENDS = 5;
 
     /** At the till, step 2: the code the customer got on WhatsApp. The prize code is then used, once. */
     @Transactional(noRollbackFor = ApiException.class) // a wrong try is counted even though it throws
@@ -425,6 +441,8 @@ public class SpinService {
         s.setOtpHash(null);
         s.setOtpCode(null);
         s.setOtpExpiresAt(null);
+        s.setOtpSentAt(null);
+        s.setOtpSends(0); // the other code on this spin (winner/friend) starts fresh
         if (h.friend()) {
             s.setFriendRedeemedAt(Instant.now());
             s.setFriendRedeemedBy(staff);

@@ -86,7 +86,7 @@ class SpinTest {
         assertThatThrownBy(() -> spins.sendRedeemCode(code, "260971111111")).hasMessageContaining("different WhatsApp number");
         assertThatThrownBy(() -> spins.redeem(code, waId, "123456", "Staff")).hasMessageContaining("Send code");
 
-        assertThat(spins.sendRedeemCode(code, "+" + waId)).endsWith(waId.substring(waId.length() - 4));
+        assertThat(spins.sendRedeemCode(code, "+" + waId).sentTo()).endsWith(waId.substring(waId.length() - 4));
         String otp = lastOtp(waId);
         String wrong = otp.equals("000000") ? "111111" : "000000";
         assertThatThrownBy(() -> spins.redeem(code, waId, wrong, "Staff")).hasMessageContaining("wrong");
@@ -106,6 +106,28 @@ class SpinTest {
             assertThatThrownBy(() -> spins.redeem(code, l.getWhatsappWaId(), wrong, "Staff")).hasMessageContaining("wrong");
         }
         assertThatThrownBy(() -> spins.redeem(code, l.getWhatsappWaId(), otp, "Staff")).hasMessageContaining("Too many");
+    }
+
+    @Test
+    void codesCanBeSentOnceAMinuteAndFiveTimesAtMost() {
+        Lead l = customer();
+        String waId = l.getWhatsappWaId();
+        String code = won(l, "Free sunglasses with your first pair", "R").getCode();
+        var first = spins.sendRedeemCode(code, waId);
+        assertThat(first.resendInSeconds()).isEqualTo(60);
+        assertThat(first.sendsLeft()).isEqualTo(4);
+        assertThatThrownBy(() -> spins.sendRedeemCode(code, waId)).hasMessageContaining("Wait");
+
+        Spin s = spinRows.findByCodeIgnoreCase(code).orElseThrow();
+        s.setOtpSentAt(java.time.Instant.now().minusSeconds(61)); // a minute later
+        spinRows.saveAndFlush(s);
+        assertThat(spins.sendRedeemCode(code, waId).sendsLeft()).isEqualTo(3);
+
+        s = spinRows.findByCodeIgnoreCase(code).orElseThrow();
+        s.setOtpSentAt(java.time.Instant.now().minusSeconds(61));
+        s.setOtpSends(SpinService.MAX_OTP_SENDS);
+        spinRows.saveAndFlush(s);
+        assertThatThrownBy(() -> spins.sendRedeemCode(code, waId)).hasMessageContaining("Too many verification codes");
     }
 
     /** The verification code in the last WhatsApp sent to this number. */

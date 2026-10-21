@@ -32,8 +32,11 @@ public class BroadcastService {
     private final LeadRepository leads;
     private final WhatsAppProvider whatsapp;
     private final WhatsAppMessageRepository messages;
+    private final ServiceWindow window;
 
-    public BroadcastService(LeadRepository leads, WhatsAppProvider whatsapp, WhatsAppMessageRepository messages) {
+    public BroadcastService(LeadRepository leads, WhatsAppProvider whatsapp, WhatsAppMessageRepository messages,
+                            ServiceWindow window) {
+        this.window = window;
         this.leads = leads;
         this.whatsapp = whatsapp;
         this.messages = messages;
@@ -41,16 +44,62 @@ public class BroadcastService {
 
     /** Matching leads who haven't had this template yet: sending again reaches the rest, never the same person twice (each send is paid). */
     private List<Lead> candidates(Filter f, String templateName) {
-        java.util.Set<UUID> had = templateName == null || templateName.isBlank()
-                ? java.util.Set.of() : messages.leadIdsWithBody("broadcast:" + templateName.trim());
+        return matching(f, templateName == null || templateName.isBlank() ? null : "broadcast:" + templateName.trim()).toList();
+    }
+
+    /** Leads matching the filter who don't already have a message with this body. */
+    private java.util.stream.Stream<Lead> matching(Filter f, String sentBody) {
+        java.util.Set<UUID> had = sentBody == null ? java.util.Set.of() : messages.leadIdsWithBody(sentBody);
         return leads.findTop1000ByArchivedAtIsNullOrderByLastContactAtDesc().stream()
                 .filter(l -> !had.contains(l.getId()))
                 .filter(l -> l.getFollowUpState() != FollowUpState.OPTED_OUT)
                 .filter(l -> waId(l) != null)
                 .filter(l -> f.faceShape() == null || f.faceShape().equalsIgnoreCase(l.getFaceShape()))
                 .filter(l -> !f.excludeConverted() || l.getStatus() != LeadStatus.CONVERTED)
-                .filter(l -> !f.optedInOnly() || l.getMarketingOptInAt() != null)
-                .toList();
+                .filter(l -> !f.optedInOnly() || l.getMarketingOptInAt() != null);
+    }
+
+    // ---- a typed message ----------------------------------------------------------------------
+
+    /**
+     * A message staff type themselves. WhatsApp only delivers free text within 24 hours of the
+     * customer's last message (and it's free then), so it goes to exactly those customers, and
+     * never twice to the same person.
+     */
+    private List<Lead> openChats(Filter f, String text) {
+        return matching(f, text.trim()).filter(l -> window.isOpen(waId(l))).toList();
+    }
+
+    public int previewText(Filter f, String text) {
+        return text == null || text.isBlank() ? 0 : openChats(f, text).size();
+    }
+
+    @Transactional
+    public SendResult sendText(Filter f, String text, int limit) {
+        if (text == null || text.isBlank()) throw ApiException.badRequest("TEXT_REQUIRED", "Type the message to send.");
+        if (text.length() > 1000) throw ApiException.badRequest("TEXT_TOO_LONG", "Keep the message under 1000 characters.");
+        text = text.trim();
+        List<Lead> all = openChats(f, text);
+        List<Lead> targets = all.stream().limit(Math.min(limit <= 0 ? 200 : limit, HARD_CAP)).toList();
+        int sent = 0, failed = 0;
+        for (Lead lead : targets) {
+            try {
+                whatsapp.sendText(waId(lead), text);
+                WhatsAppMessage m = new WhatsAppMessage(); // the text itself, so it shows in the chat
+                m.setLeadId(lead.getId());
+                m.setDirection("OUTBOUND");
+                m.setMessageType("broadcast");
+                m.setBody(text);
+                m.setStatus("sent");
+                messages.save(m);
+                sent++;
+            } catch (Exception e) {
+                failed++;
+                log.warn("text broadcast failed for lead {}: {}", lead.getId(), e.getMessage());
+            }
+        }
+        log.info("text broadcast: {} sent, {} failed, {} over cap", sent, failed, all.size() - targets.size());
+        return new SendResult(sent, failed, all.size() - targets.size());
     }
 
     /** How many leads this filter would reach — call before send() to sanity-check the blast. */

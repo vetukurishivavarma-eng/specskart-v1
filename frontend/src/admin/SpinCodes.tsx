@@ -22,6 +22,14 @@ export default function SpinCodes() {
   const [phone, setPhone] = useState('')
   const [otp, setOtp] = useState('')
   const [sentTo, setSentTo] = useState<string | null>(null)
+  const [resendAt, setResendAt] = useState(0) // the server allows another code after this (ms)
+  const [, tick] = useState(0)
+  const wait = Math.max(0, Math.ceil((resendAt - Date.now()) / 1000))
+  useEffect(() => {
+    if (!wait) return
+    const t = setInterval(() => tick((n) => n + 1), 1000)
+    return () => clearInterval(t)
+  }, [wait > 0])
   const { data: recent } = useQuery({ queryKey: ['admin-spins'], queryFn: () => api<SpinView[]>('/admin/spins', { auth: true }) })
 
   const look = useMutation({
@@ -30,9 +38,9 @@ export default function SpinCodes() {
     onError: (e) => { setFound(null); setMsg((e as Error).message) },
   })
   const send = useMutation({
-    mutationFn: (c: string) => api<{ sentTo: string }>(`/admin/spins/code/${encodeURIComponent(c)}/send-otp`,
+    mutationFn: (c: string) => api<{ sentTo: string; resendInSeconds: number }>(`/admin/spins/code/${encodeURIComponent(c)}/send-otp`,
       { method: 'POST', auth: true, body: JSON.stringify({ phone }) }),
-    onSuccess: (r) => { setSentTo(r.sentTo); setMsg(null) },
+    onSuccess: (r) => { setSentTo(r.sentTo); setResendAt(Date.now() + r.resendInSeconds * 1000); setMsg(null) },
     onError: (e) => setMsg((e as Error).message),
   })
   const use = useMutation({
@@ -64,7 +72,7 @@ export default function SpinCodes() {
                 <p className="text-xs text-ink/60">1. Ask for the WhatsApp number they won with. 2. Send them a verification code. 3. Type the code they got.</p>
                 <div className="flex flex-wrap gap-2">
                   <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Their WhatsApp number" inputMode="tel" className="fld !mt-0 max-w-xs" />
-                  <button className="btn-ghost !px-4 !py-2 text-xs" disabled={!phone.trim() || send.isPending} onClick={() => send.mutate(found.code)}>{sentTo ? 'Send again' : 'Send code'}</button>
+                  <button className="btn-ghost !px-4 !py-2 text-xs" disabled={!phone.trim() || send.isPending || wait > 0} onClick={() => send.mutate(found.code)}>{wait ? `Send again in ${wait}s` : sentTo ? 'Send again' : 'Send code'}</button>
                 </div>
                 {sentTo && (
                   <div className="flex flex-wrap gap-2">
