@@ -88,6 +88,52 @@ class SpinTest {
     }
 
     @Test
+    void aBringAFriendCodeUnlocksOnlyWhenANewFriendMessagesWithIt() {
+        Lead winner = customer();
+        Spin s = new Spin();
+        s.setLeadId(winner.getId());
+        s.setPrizeLabel("Bring a friend: K100 off for you both");
+        s.setCode("SPIN-F" + (1000 + (int) (Math.random() * 8999)));
+        s.setExpiresAt(java.time.Instant.now().plus(Duration.ofDays(7)));
+        spinRows.saveAndFlush(s);
+
+        assertThat(spins.lookup(s.getCode()).state()).isEqualTo("WAITING_FRIEND");
+        assertThatThrownBy(() -> spins.redeem(s.getCode(), "Staff")).hasMessageContaining("Not unlocked");
+        assertThat(spins.claimFriend(winner, s.getCode())).contains("your own code");
+
+        // the friend messages us with the code (the forwarded link's prefilled text)
+        String waId = "26097" + (100000 + (int) (Math.random() * 800000));
+        inbound.process(new InboundMessage(waId, waId, "Mutale Banda", "Hi! My friend's code is " + s.getCode(), null, "f:" + waId, Map.of()));
+        Spin after = spinRows.findById(s.getId()).orElseThrow();
+        assertThat(after.getFriendCode()).startsWith("SPIN-").isNotEqualTo(s.getCode());
+        assertThat(((MockWhatsAppProvider) provider).outbox().stream()
+                .filter(m -> waId.equals(m.toWaId()) && m.text() != null))
+                .anyMatch(m -> m.text().contains(after.getFriendCode()));
+
+        assertThat(spins.redeem(s.getCode(), "Staff").state()).isEqualTo("USED");
+        assertThat(spins.redeem(after.getFriendCode(), "Staff").state()).isEqualTo("USED");
+        assertThatThrownBy(() -> spins.redeem(after.getFriendCode(), "Staff")).hasMessageContaining("already used");
+
+        // a second friend, or a customer who was already with us, can't use it
+        Lead late = customer();
+        assertThat(spins.claimFriend(late, s.getCode())).contains("already used this code");
+    }
+
+    @Test
+    void anExistingCustomerCannotBeTheFriend() {
+        Lead old = customer();
+        Lead winner = customer();
+        Spin s = new Spin();
+        s.setLeadId(winner.getId());
+        s.setPrizeLabel("Bring a friend: K100 off for you both");
+        s.setCode("SPIN-G" + (1000 + (int) (Math.random() * 8999)));
+        s.setExpiresAt(java.time.Instant.now().plus(Duration.ofDays(7)));
+        spinRows.saveAndFlush(s);
+        assertThat(spins.claimFriend(old, s.getCode())).contains("new customers only");
+        assertThat(spinRows.findById(s.getId()).orElseThrow().getFriendLeadId()).isNull();
+    }
+
+    @Test
     void theWheelPicksByChance() {
         SpinPrize a = prize("A", 50), b = prize("B", 35), c = prize("C", 15);
         List<SpinPrize> wheel = List.of(a, b, c);

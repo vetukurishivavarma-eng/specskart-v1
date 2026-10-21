@@ -6,6 +6,7 @@ import com.specskart.lead.LeadRepository;
 import com.specskart.lens.LensInquiryService;
 import com.specskart.push.PushService;
 import com.specskart.shared.ApiException;
+import com.specskart.shared.PhoneNumbers;
 import com.specskart.shared.SignedLinks;
 import com.specskart.whatsapp.ChatLog;
 import com.specskart.whatsapp.LeadNudges;
@@ -16,6 +17,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
@@ -23,6 +26,9 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import java.util.UUID;
 
 /**
@@ -52,7 +58,8 @@ public class SpinService {
             new Object[]{"Free sunglasses with your first pair", 15});
 
     public record Slice(String label, int weight) {}
-    public record Result(String prize, String code, Instant expiresAt, boolean redeemed, int sliceIndex) {}
+    /** shareLink: set for a bring-a-friend prize until the friend has messaged us. */
+    public record Result(String prize, String code, Instant expiresAt, boolean redeemed, int sliceIndex, String shareLink) {}
     public record Page(String firstName, List<Slice> slices, Result result) {}
 
     private final SpinRepository spins;
@@ -96,6 +103,9 @@ public class SpinService {
             if (s.getExpiresAt().isBefore(Instant.now())) {
                 return "You've already had your spin 🎁 Your prize (" + s.getPrizeLabel() + ") expired on "
                         + UNTIL.format(s.getExpiresAt()) + ". It's one spin per customer, sorry!";
+            }
+            if (waitingForFriend(s)) {
+                return "You've already had your spin 🎁\nYou won: *" + s.getPrizeLabel() + "*\n\n" + friendSteps(s);
             }
             return "You've already had your spin 🎁\nYou won: *" + s.getPrizeLabel() + "*\nCode: *" + s.getCode()
                     + "* — show it at the shop by " + UNTIL.format(s.getExpiresAt()) + ".\n\n" + lens.shopLines();
@@ -148,7 +158,9 @@ public class SpinService {
 
     private void tell(Lead lead, Spin s) {
         String waId = lead.getWhatsappWaId() != null ? lead.getWhatsappWaId() : lead.getWhatsappNumber();
-        String body = "🎉 You won: *" + s.getPrizeLabel() + "*!\n\nYour code: *" + s.getCode() + "*\n"
+        String body = isFriendPrize(s.getPrizeLabel())
+                ? "🎉 You won: *" + s.getPrizeLabel() + "*!\n\n" + friendSteps(s)
+                : "🎉 You won: *" + s.getPrizeLabel() + "*!\n\nYour code: *" + s.getCode() + "*\n"
                 + "Show it at the shop by *" + UNTIL.format(s.getExpiresAt()) + "* (valid for 1 week).\n\n" + lens.shopLines();
         try {
             whatsapp.sendButtons(waId, body, List.of(new WhatsAppProvider.Button(LeadNudges.BTN_BOOK, "Book my visit")));
@@ -161,6 +173,111 @@ public class SpinService {
                 + UNTIL.format(s.getExpiresAt()), "/chat/" + waId);
     }
 
+    // ---- bring a friend -----------------------------------------------------------------------
+
+    private static final Pattern CODE_IN_TEXT = Pattern.compile("(?i)\\bSPIN-([A-Z0-9]{5})\\b");
+
+    /** A prize whose name mentions a friend unlocks only when a new customer messages us with the code. */
+    static boolean isFriendPrize(String label) {
+        // ponytail: matched by name; add a flag on spin_prizes if the client wants a friend prize without the word
+        return label != null && label.toLowerCase(Locale.ROOT).contains("friend");
+    }
+
+    /** The SPIN-XXXXX code in a customer's message, if any. */
+    public static String codeIn(String text) {
+        if (text == null) return null;
+        Matcher m = CODE_IN_TEXT.matcher(text);
+        return m.find() ? "SPIN-" + m.group(1).toUpperCase(Locale.ROOT) : null;
+    }
+
+    /**
+     * A customer messaged us with someone's spin code. For a bring-a-friend prize, a customer who is
+     * new (in our system only since that spin) becomes the friend: they get their own code and the
+     * winner's code starts working. Returns the bot's reply.
+     */
+    @Transactional
+    public String claimFriend(Lead friend, String code) {
+        Spin s = spins.findByCodeIgnoreCase(code).orElse(null);
+        if (s == null) {
+            return spins.findByFriendCodeIgnoreCase(code)
+                    .filter(f -> friend.getId().equals(f.getFriendLeadId()))
+                    .map(f -> "That's your code 🎁 *" + f.getFriendCode() + "* — show it at the shop by "
+                            + UNTIL.format(f.getExpiresAt()) + ".\n\n" + lens.shopLines())
+                    .orElse("We couldn't find the code " + code + ". Please check it with your friend.");
+        }
+        if (s.getLeadId().equals(friend.getId())) {
+            return waitingForFriend(s) ? "That's your own code 🙂 " + friendSteps(s) : offer(friend);
+        }
+        if (!isFriendPrize(s.getPrizeLabel())) {
+            return "That code belongs to another customer's prize, so it can't be shared. Type *spin* to win your own 🎁";
+        }
+        if (friend.getId().equals(s.getFriendLeadId())) {
+            return "You've already joined 🎉 Your code: *" + s.getFriendCode() + "* — show it at the shop by "
+                    + UNTIL.format(s.getExpiresAt()) + ".\n\n" + lens.shopLines();
+        }
+        if (s.getFriendLeadId() != null) return "Sorry, a friend has already used this code. Type *spin* to win your own prize 🎁";
+        if (s.getExpiresAt().isBefore(Instant.now())) return "Sorry, this prize expired on " + UNTIL.format(s.getExpiresAt()) + ".";
+        if (friend.getCreatedAt() != null && friend.getCreatedAt().isBefore(s.getCreatedAt())) {
+            return "Thanks for messaging! This friend offer is for new customers only. Type *spin* to win your own prize 🎁";
+        }
+        if (spins.existsByFriendLeadId(friend.getId())) {
+            return "You've already joined with another friend's code. Type *spin* to win your own prize 🎁";
+        }
+
+        s.setFriendLeadId(friend.getId());
+        s.setFriendCode(freshCode());
+        try {
+            spins.saveAndFlush(s);
+        } catch (DataIntegrityViolationException raced) {
+            return "Sorry, a friend has already used this code.";
+        }
+        Lead winner = leads.findById(s.getLeadId()).orElse(null);
+        String winnerName = firstName(winner, "Your friend");
+        String friendName = firstName(friend, "Your friend");
+        if (winner != null) {
+            String body = "🎉 " + friendName + " messaged us with your code — your prize is unlocked!\n\n*" + s.getPrizeLabel()
+                    + "*\nYour code: *" + s.getCode() + "*\nUse it at the shop by *" + UNTIL.format(s.getExpiresAt()) + "*.\n\n" + lens.shopLines();
+            try {
+                whatsapp.sendButtons(waId(winner), body, List.of(new WhatsAppProvider.Button(LeadNudges.BTN_BOOK, "Book my visit")));
+                chatLog.sent(waId(winner), body);
+            } catch (Exception e) {
+                log.warn("friend-unlocked message to lead {} failed: {}", winner.getId(), e.getMessage());
+            }
+        }
+        push.notifyStaff("🤝 " + friendName + " joined with " + winnerName + "'s code",
+                s.getCode() + " + " + s.getFriendCode() + " valid until " + UNTIL.format(s.getExpiresAt()), "/chat/" + waId(friend));
+        return "Welcome to " + props.storeName() + "! 🎉 " + winnerName + " shared a prize with you:\n*" + s.getPrizeLabel()
+                + "*\n\nYour code: *" + s.getFriendCode() + "*\nShow it at the shop by *" + UNTIL.format(s.getExpiresAt())
+                + "*.\n\n" + lens.shopLines();
+    }
+
+    private boolean waitingForFriend(Spin s) {
+        return isFriendPrize(s.getPrizeLabel()) && s.getFriendLeadId() == null;
+    }
+
+    /** What the winner forwards: our WhatsApp link with their code already typed in. */
+    private String shareLink(Spin s) {
+        String business = PhoneNumbers.normalize(props.businessWhatsappNumber(), props.whatsapp().defaultCountryCode());
+        if (business == null) return null;
+        return "https://wa.me/" + business + "?text="
+                + URLEncoder.encode("Hi! My friend's code is " + s.getCode(), StandardCharsets.UTF_8).replace("+", "%20");
+    }
+
+    private String friendSteps(Spin s) {
+        String link = shareLink(s);
+        return "To unlock it, a friend who is new to " + props.storeName() + " must message us with your code *" + s.getCode() + "*"
+                + (link == null ? "." : ":\n" + link) + "\n\nForward this to them 👆 As soon as they message us, you both get a code"
+                + " to use at the shop by *" + UNTIL.format(s.getExpiresAt()) + "*.";
+    }
+
+    private static String firstName(Lead l, String fallback) {
+        return l == null || l.getName() == null || l.getName().isBlank() ? fallback : l.getName().trim().split("\\s+")[0];
+    }
+
+    private static String waId(Lead l) {
+        return l.getWhatsappWaId() != null ? l.getWhatsappWaId() : l.getWhatsappNumber();
+    }
+
     // ---- staff --------------------------------------------------------------------------------
 
     public record SpinView(String code, String prize, String customer, String phone, Instant spunAt,
@@ -168,18 +285,41 @@ public class SpinService {
 
     @Transactional(readOnly = true)
     public List<SpinView> recent() {
-        return spins.findTop100ByOrderByCreatedAtDesc().stream().map(this::view).toList();
+        return spins.findTop100ByOrderByCreatedAtDesc().stream()
+                .flatMap(s -> s.getFriendCode() == null ? Stream.of(view(s)) : Stream.of(view(s), friendView(s)))
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public SpinView lookup(String code) {
-        return view(byCode(code));
+        String c = normalise(code);
+        return spins.findByCodeIgnoreCase(c).map(this::view)
+                .or(() -> spins.findByFriendCodeIgnoreCase(c).map(this::friendView))
+                .orElseThrow(() -> ApiException.notFound("NO_CODE", "No prize with that code."));
     }
 
     /** At the till: the code is used, once. */
     @Transactional
     public SpinView redeem(String code, String staff) {
-        Spin s = byCode(code);
+        String c = normalise(code);
+        var asFriend = spins.findByFriendCodeIgnoreCase(c);
+        if (asFriend.isPresent()) {
+            Spin f = asFriend.get();
+            if (f.getFriendRedeemedAt() != null) {
+                throw ApiException.conflict("ALREADY_USED", "This code was already used on " + UNTIL.format(f.getFriendRedeemedAt()) + ".");
+            }
+            if (f.getExpiresAt().isBefore(Instant.now())) {
+                throw ApiException.conflict("EXPIRED", "This code expired on " + UNTIL.format(f.getExpiresAt()) + ".");
+            }
+            f.setFriendRedeemedAt(Instant.now());
+            f.setFriendRedeemedBy(staff);
+            return friendView(spins.save(f));
+        }
+        Spin s = byCode(c);
+        if (waitingForFriend(s)) {
+            throw ApiException.conflict("WAITING_FRIEND",
+                    "Not unlocked yet: no new friend has messaged us with this code. It works once one does.");
+        }
         if (s.getRedeemedAt() != null) {
             throw ApiException.conflict("ALREADY_USED", "This code was already used on " + UNTIL.format(s.getRedeemedAt()) + ".");
         }
@@ -252,21 +392,35 @@ public class SpinService {
     private Result result(Spin s, List<SpinPrize> wheel) {
         int idx = 0;
         for (int i = 0; i < wheel.size(); i++) if (wheel.get(i).getLabel().equals(s.getPrizeLabel())) idx = i;
-        return new Result(s.getPrizeLabel(), s.getCode(), s.getExpiresAt(), s.getRedeemedAt() != null, idx);
+        return new Result(s.getPrizeLabel(), s.getCode(), s.getExpiresAt(), s.getRedeemedAt() != null, idx,
+                waitingForFriend(s) ? shareLink(s) : null);
+    }
+
+    private static String normalise(String code) {
+        String c = code == null ? "" : code.trim().toUpperCase(Locale.ROOT);
+        return c.startsWith("SPIN-") ? c : "SPIN-" + c;
     }
 
     private Spin byCode(String code) {
-        String c = code == null ? "" : code.trim().toUpperCase(Locale.ROOT);
-        if (!c.startsWith("SPIN-")) c = "SPIN-" + c;
-        return spins.findByCodeIgnoreCase(c).orElseThrow(() -> ApiException.notFound("NO_CODE", "No prize with that code."));
+        return spins.findByCodeIgnoreCase(normalise(code)).orElseThrow(() -> ApiException.notFound("NO_CODE", "No prize with that code."));
     }
 
     private SpinView view(Spin s) {
         Lead l = leads.findById(s.getLeadId()).orElse(null);
-        String state = s.getRedeemedAt() != null ? "USED" : s.getExpiresAt().isBefore(Instant.now()) ? "EXPIRED" : "VALID";
-        return new SpinView(s.getCode(), s.getPrizeLabel(), l == null ? null : l.getName(),
-                l == null ? null : (l.getWhatsappWaId() != null ? l.getWhatsappWaId() : l.getWhatsappNumber()),
+        String state = s.getRedeemedAt() != null ? "USED" : s.getExpiresAt().isBefore(Instant.now()) ? "EXPIRED"
+                : waitingForFriend(s) ? "WAITING_FRIEND" : "VALID";
+        return new SpinView(s.getCode(), s.getPrizeLabel(), l == null ? null : l.getName(), l == null ? null : waId(l),
                 s.getCreatedAt(), s.getExpiresAt(), s.getRedeemedAt(), s.getRedeemedBy(), state);
+    }
+
+    /** The friend's own code, shown like any other prize. */
+    private SpinView friendView(Spin s) {
+        Lead f = leads.findById(s.getFriendLeadId()).orElse(null);
+        Lead w = leads.findById(s.getLeadId()).orElse(null);
+        String state = s.getFriendRedeemedAt() != null ? "USED" : s.getExpiresAt().isBefore(Instant.now()) ? "EXPIRED" : "VALID";
+        return new SpinView(s.getFriendCode(), s.getPrizeLabel() + " (friend of " + firstName(w, "a winner") + ")",
+                f == null ? null : f.getName(), f == null ? null : waId(f),
+                s.getUpdatedAt(), s.getExpiresAt(), s.getFriendRedeemedAt(), s.getFriendRedeemedBy(), state);
     }
 
     private String freshCode() {
@@ -275,7 +429,7 @@ public class SpinService {
             StringBuilder sb = new StringBuilder("SPIN-");
             for (int i = 0; i < 5; i++) sb.append(ALPHABET.charAt(RNG.nextInt(ALPHABET.length())));
             code = sb.toString();
-        } while (spins.existsByCode(code));
+        } while (spins.existsByCode(code) || spins.existsByFriendCode(code));
         return code;
     }
 }

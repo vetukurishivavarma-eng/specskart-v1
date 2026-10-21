@@ -31,4 +31,14 @@ public class Spin extends BaseEntity {
 
     private Instant redeemedAt;
     private String redeemedBy;
+
+    /** Bring-a-friend prize: the new customer who messaged us with this code, and their own code. */
+    @Column(unique = true)
+    private UUID friendLeadId;
+
+    @Column(unique = true, length = 20)
+    private String friendCode;
+
+    private Instant friendRedeemedAt;
+    private String friendRedeemedBy;
 }

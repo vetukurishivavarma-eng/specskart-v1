@@ -211,6 +211,9 @@ public class WhatsAppBotService {
         if (buttonId == null && text != null) {
             var m = BUY_PATTERN.matcher(text.trim());
             if (m.matches()) { handleBuy(lead, Integer.parseInt(m.group(1))); return; }
+            // a spin code: usually a friend unlocking a bring-a-friend prize
+            String spinCode = com.specskart.spin.SpinService.codeIn(text);
+            if (spinCode != null) { sendText(lead, spins.claimFriend(lead, spinCode)); return; }
         }
 
         // A tapped product row names its own product, so it doesn't depend on what was last sent.

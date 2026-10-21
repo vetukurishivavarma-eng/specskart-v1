@@ -5,12 +5,13 @@ import { auth } from '../lib/auth'
 
 type SpinView = {
   code: string; prize: string; customer: string | null; phone: string | null; spunAt: string
-  expiresAt: string; redeemedAt: string | null; redeemedBy: string | null; state: 'VALID' | 'USED' | 'EXPIRED'
+  expiresAt: string; redeemedAt: string | null; redeemedBy: string | null; state: 'VALID' | 'USED' | 'EXPIRED' | 'WAITING_FRIEND'
 }
 type Prize = { label: string; weight: number; active: boolean }
 
 const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
-const TONE = { VALID: 'text-moss', USED: 'text-ink/50', EXPIRED: 'text-coral' }
+const TONE = { VALID: 'text-moss', USED: 'text-ink/50', EXPIRED: 'text-coral', WAITING_FRIEND: 'text-coral' }
+const STATE = { VALID: 'valid', USED: 'used', EXPIRED: 'expired', WAITING_FRIEND: 'waiting for friend' }
 
 /** Spin & Win at the shop: check a customer's code and mark it used (once); the owner edits the wheel. */
 export default function SpinCodes() {
@@ -35,7 +36,7 @@ export default function SpinCodes() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl">Spin &amp; Win</h1>
-        <p className="mt-1 text-sm text-ink/55">Customers spin from WhatsApp (they type “spin” or pick it in the menu). One spin per number; prizes are valid for a week at the shop.</p>
+        <p className="mt-1 text-sm text-ink/55">Customers spin from WhatsApp (they type “spin” or pick it in the menu). One spin per number; prizes are valid for a week at the shop. A bring-a-friend prize only unlocks once a new friend messages us with the code; the friend gets their own code.</p>
       </div>
 
       <section className="card p-4">
@@ -46,7 +47,7 @@ export default function SpinCodes() {
         </form>
         {found && (
           <div className="mt-4 rounded-lg bg-bone p-3 text-sm">
-            <p><b>{found.prize}</b> · <span className={TONE[found.state]}>{found.state === 'VALID' ? `valid until ${day(found.expiresAt)}` : found.state === 'USED' ? `used ${day(found.redeemedAt!)}${found.redeemedBy ? ` by ${found.redeemedBy}` : ''}` : `expired ${day(found.expiresAt)}`}</span></p>
+            <p><b>{found.prize}</b> · <span className={TONE[found.state]}>{found.state === 'WAITING_FRIEND' ? 'locked: no new friend has messaged us with this code yet' : found.state === 'VALID' ? `valid until ${day(found.expiresAt)}` : found.state === 'USED' ? `used ${day(found.redeemedAt!)}${found.redeemedBy ? ` by ${found.redeemedBy}` : ''}` : `expired ${day(found.expiresAt)}`}</span></p>
             <p className="text-ink/60">{found.customer ?? 'Customer'} · +{found.phone}</p>
             {found.state === 'VALID' && (
               <button className="btn-primary mt-3 !px-4 !py-2 text-xs" disabled={use.isPending} onClick={() => use.mutate(found.code)}>Give the prize & mark used</button>
@@ -67,7 +68,7 @@ export default function SpinCodes() {
               <tr key={s.code} className="border-t border-ink/5">
                 <td className="py-1 font-mono">{s.code}</td><td>{s.prize}</td>
                 <td>{s.customer ?? `+${s.phone}`}</td><td>{day(s.spunAt)}</td>
-                <td className={TONE[s.state]}>{s.state.toLowerCase()}</td>
+                <td className={TONE[s.state]}>{STATE[s.state]}</td>
               </tr>
             ))}
             {recent?.length === 0 && <tr><td colSpan={5} className="py-3 text-ink/50">No spins yet.</td></tr>}

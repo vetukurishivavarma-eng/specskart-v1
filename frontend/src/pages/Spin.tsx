@@ -4,7 +4,7 @@ import { api } from '../lib/api'
 import { WA } from '../lib/wa'
 
 type Slice = { label: string; weight: number }
-type Result = { prize: string; code: string; expiresAt: string; redeemed: boolean; sliceIndex: number }
+type Result = { prize: string; code: string; expiresAt: string; redeemed: boolean; sliceIndex: number; shareLink: string | null }
 type Page = { firstName: string | null; slices: Slice[]; result: Result | null }
 
 const COLORS = ['#2342F0', '#0E8C8C', '#E8492E', '#33415C', '#4B65FF', '#2BA7A7']
@@ -105,7 +105,17 @@ export default function Spin() {
           <div className="mt-8 rounded-2xl bg-white p-5 text-left text-ink">
             <p className="text-sm text-ink/60">{result.redeemed ? 'You used your prize:' : 'You won 🎉'}</p>
             <p className="mt-1 text-xl font-semibold">{result.prize}</p>
-            {!result.redeemed && (
+            {!result.redeemed && result.shareLink && (
+              <>
+                <p className="mt-4 text-sm text-ink/70">
+                  To unlock it, a friend who is new to Specskart must message us with your code <b>{result.code}</b>.
+                  As soon as they do, you both get a code for the shop.
+                </p>
+                <a href={`https://wa.me/?text=${encodeURIComponent(`I won a prize at Specskart Opticians 🎁 Message them with my code so we both get it: ${result.shareLink}`)}`}
+                  className="btn-primary mt-4 block text-center">Send to a friend on WhatsApp</a>
+              </>
+            )}
+            {!result.redeemed && !result.shareLink && (
               <>
                 <p className="mt-4 text-sm text-ink/60">Your code</p>
                 <p className="font-display text-2xl tracking-widest">{result.code}</p>

@@ -2,6 +2,14 @@
 
 _Last updated: 2026-10-20._
 
+## 2026-10-21 (3): Spin bring-a-friend unlock (V71, 236 tests)
+- Any prize whose name contains "friend" (`SpinService.isFriendPrize`) is LOCKED (state WAITING_FRIEND, redeem 409) until a
+  customer NEW since the spin messages the bot with the SPIN-code (forwarded wa.me link prefills it; bot catches any
+  SPIN-XXXXX in text -> `claimFriend`). Friend gets own code (spins.friend_code, same expiry); winner WhatsApp'd "unlocked";
+  staff push. One friend per code, a lead can be friend once, existing customers refused. Both codes redeemed in web admin.
+- Client said only #2 (second pair) + #8 (bring a friend) of the 8 extra prize ideas; suggested second pair = 20% off
+  cheaper frame on sale price. Prizes NOT added to the live wheel by Claude (owner adds in web admin -> Spin & Win).
+
 ## 2026-10-21 (2): Spin & Win (`8bae327`, V70) + reactions/system msgs in chat (`99707f8`, V69) + 8:00 push once/day (`d1c1f60`)
 - Customer types "spin" / menu row -> signed 14-day link /spin/<leadId>; server picks prize (weights), spins.lead_id UNIQUE,
   repeat = same result. Code SPIN-XXXXX valid 7 days, WhatsApp msg + staff push. Staff: web admin -> Spin & Win (check/use code;

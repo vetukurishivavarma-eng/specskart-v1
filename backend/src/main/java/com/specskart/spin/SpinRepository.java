@@ -10,5 +10,8 @@ public interface SpinRepository extends JpaRepository<Spin, UUID> {
     Optional<Spin> findByLeadId(UUID leadId);
     Optional<Spin> findByCodeIgnoreCase(String code);
     boolean existsByCode(String code);
+    Optional<Spin> findByFriendCodeIgnoreCase(String code);
+    boolean existsByFriendCode(String code);
+    boolean existsByFriendLeadId(UUID leadId);
     List<Spin> findTop100ByOrderByCreatedAtDesc();
 }
