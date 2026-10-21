@@ -2,6 +2,12 @@
 
 _Last updated: 2026-10-20._
 
+## 2026-10-21 (2): Spin & Win (`8bae327`, V70) + reactions/system msgs in chat (`99707f8`, V69) + 8:00 push once/day (`d1c1f60`)
+- Customer types "spin" / menu row -> signed 14-day link /spin/<leadId>; server picks prize (weights), spins.lead_id UNIQUE,
+  repeat = same result. Code SPIN-XXXXX valid 7 days, WhatsApp msg + staff push. Staff: web admin -> Spin & Win (check/use code;
+  ADMIN edits wheel). Default prizes = client's 3 (family eye check 50 / K100 off photochromatic+blue 35 / free sunglasses 15).
+  Not done: day-5 expiry reminder (needs template), POS-app redeem screen (needs APK). Not live-tested.
+
 ## 2026-10-21: website frame orders = collect at the shop (`d95fb5b`, `59fe7bd`, V67)
 - Checkout asks only name/phone/email; no address, location, door/bus options. New orders get
   delivery_method STORE, ship_address "Collect at <shop>", shipping 0 (store_config fee ignored).
