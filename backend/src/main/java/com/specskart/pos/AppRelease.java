@@ -39,6 +39,19 @@ public class AppRelease extends BaseEntity {
     @Column(nullable = false)
     private String notes = "";
 
+    /**
+     * A link never contains a space, but one pasted into the row can (2026-10-21: "...eng /specskart-pos..."
+     * locked every till on a mandatory update it couldn't download). Stripped on the way in and out,
+     * so a row already saved with spaces works too.
+     */
+    public String getDownloadUrl() {
+        return downloadUrl == null ? null : downloadUrl.replaceAll("\\s+", "");
+    }
+
+    public void setDownloadUrl(String url) {
+        this.downloadUrl = url == null ? null : url.replaceAll("\\s+", "");
+    }
+
     @Column(nullable = false)
     private boolean mandatory = false;
 
