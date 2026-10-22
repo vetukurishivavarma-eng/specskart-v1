@@ -2,6 +2,18 @@
 
 _Last updated: 2026-10-20._
 
+## 2026-10-22 (2): prescriptions per customer + counter axis price fix (POS 1.33.0/vc38)
+- CLIENT BUG fixed: counter bifocal/progressive with axis off 90/180 (+-10) was priced as stock (e.g. K950 BF_BB_2)
+  -> now RX row like online (K1,800 RX_BF_BB). Server walkInInquiry computes specialAxis; app sends axis in the quote.
+  NB tills on <=1.32.0 don't send axis in the QUOTE, so their on-screen price stays stock until updated,
+  but the SAVED sale is priced from the axis server-side (bill total = server price).
+- Lead screen "Prescriptions" card (V76 lead_prescriptions): online orders + counter sales matched by WhatsApp number
+  + chat photos saved via "Save as prescription" (our own copy in prescription_files; Meta drops media ~30 days),
+  "Type the numbers" on a saved photo, ADMIN can remove. Counter bill: typing a phone shows "Last prescription on file"
+  + "Use these numbers". Endpoints GET /api/admin/prescriptions?phone=, /api/admin/leads/{id}/prescriptions[/{pid}[/photo]],
+  POST /api/admin/chat/{waId}/media/{mediaId}/prescription. Photos only (no PDF). Mock provider now serves a 1x1 PNG.
+  248 tests green, tsc clean. Not device-tested.
+
 ## 2026-10-22: broadcast "pick customers" (v1 `6b50a3a`, POS `39c881d` = 1.32.0/vc37, pushed)
 - Message many customers -> Everyone / Pick customers (search + tick, max 200). Backend `leadIds` on both broadcast
   requests; STOP, already-had-it and 24h-window rules still apply. 245 tests green, tsc clean. APK via GitHub Actions,

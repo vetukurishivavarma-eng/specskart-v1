@@ -398,11 +398,11 @@ public class LensInquiryService {
         q.setCylLeft(d.cylLeft());
         q.setAddPower(d.addPower());
         q.setLensStructure(d.lensStructure());
-        // Axis is for the lab only -- the counter's price band is SPH/CYL, so it never makes a
-        // walk-in "special axis" (that would move it to the RX price row).
-        q.setSpecialAxis(false);
         q.setAxisRight(checkedAxis(d.axisRight()));
         q.setAxisLeft(checkedAxis(d.axisLeft()));
+        // Same rule as online: a multifocal with an off-band axis is an Rx lens (client, 2026-10-22).
+        // Single vision ignores it (LensPricing only checks it when add > 0).
+        q.setSpecialAxis(computeSpecialAxis(q));
         if (d.pd() != null && d.pd().strip().length() > 16) {
             throw ApiException.badRequest("BAD_PD", "PD looks wrong — e.g. 62 or 31.5/30.5.");
         }

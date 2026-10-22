@@ -249,7 +249,9 @@ public class LeadService {
         Lead lead = get(leadId);
         // Explicit child deletes so it works on the FK-less test schema too; the
         // prod V2 migration adds ON DELETE CASCADE as a second line of defence.
-        for (String table : List.of("lead_notes", "lead_events", "whatsapp_messages",
+        em.createNativeQuery("delete from prescription_files where id in "
+                + "(select file_id from lead_prescriptions where lead_id = :id)").setParameter("id", leadId).executeUpdate();
+        for (String table : List.of("lead_prescriptions", "lead_notes", "lead_events", "whatsapp_messages",
                 "frame_finder_sessions", "face_analyses", "consent_records")) {
             em.createNativeQuery("delete from " + table + " where lead_id = :id")
                     .setParameter("id", leadId).executeUpdate();

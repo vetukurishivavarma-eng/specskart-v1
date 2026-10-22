@@ -97,8 +97,8 @@ class AdminChatTest {
         assertThat(msgs).anyMatch(m -> "document".equals(m.get("type")) && "prescription.pdf".equals(m.get("body")));
 
         assertThatThrownBy(() -> chat.media(waId, "someone-elses-media")).hasMessageContaining("isn't in this chat");
-        // the mock provider can't download: reported as gone, not a 500
-        assertThatThrownBy(() -> chat.media(waId, "media-" + waId)).hasMessageContaining("no longer has");
+        // the mock provider serves every media id as a tiny PNG
+        assertThat(chat.media(waId, "media-" + waId).getHeaders().getContentType().toString()).isEqualTo("image/png");
     }
 
     @Test

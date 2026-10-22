@@ -136,6 +136,19 @@ class LensInquiryFlowTest {
                 "CASH", "Staff A", "Main Store", null, null, 36_001L, null, null, null, null, null))).hasMessageContaining("Discount");
     }
 
+    /** Client 2026-10-22: Colormatic BB bifocal, axis 120 -> an Rx lens, not the stock bifocal price. */
+    @Test
+    void counterBifocalWithAnOffBandAxisIsPricedAsRx() {
+        java.util.function.BiFunction<Integer, Integer, LensDtos.WalkInSale> bill = (axisR, axisL) -> new LensDtos.WalkInSale(
+                "Axis Customer", null, "PHOTOCHROMATIC", true, new java.math.BigDecimal("0.00"), new java.math.BigDecimal("-0.25"),
+                new java.math.BigDecimal("-0.25"), new java.math.BigDecimal("-0.25"), new java.math.BigDecimal("2.00"), "BIFOCAL",
+                "CASH", "Staff A", "Main Store", null, null, null, axisR, axisL, "62", null, null);
+        long stock = service.walkInQuote(bill.apply(180, 180));
+        long rx = service.walkInQuote(bill.apply(120, 180));
+        assertThat(rx).isGreaterThan(stock);
+        assertThat(service.walkInSale(bill.apply(120, 180)).priceMinor()).isEqualTo(rx);
+    }
+
     @Test
     void counterOrderWithDepositGoesToTheLabQueueAndBalanceIsTakenAtPickup() {
         String phone = "097" + (1_000_000 + (int) (Math.random() * 8_999_999));

@@ -106,6 +106,13 @@ public class MockWhatsAppProvider implements WhatsAppProvider {
         return "wamid.mock-" + outbox.size();
     }
 
+    /** Every media id is a 1x1 PNG locally, so chat photos and "save as prescription" work without Meta. */
+    @Override
+    public Media downloadMedia(String mediaId) {
+        return new Media(java.util.Base64.getDecoder().decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="), "image/png");
+    }
+
     public synchronized List<Sent> outbox() {
         return List.copyOf(outbox);
     }

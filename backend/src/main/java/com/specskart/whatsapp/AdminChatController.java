@@ -48,9 +48,12 @@ public class AdminChatController {
     private final WhatsAppBotService bot;
     private final AppProperties props;
     private final LeadNudges nudges;
+    private final com.specskart.lead.LeadPrescriptionService prescriptions;
 
     public AdminChatController(LeadRepository leads, WhatsAppMessageRepository messages, WhatsAppProvider provider,
-                               ServiceWindow window, WhatsAppBotService bot, AppProperties props, LeadNudges nudges) {
+                               ServiceWindow window, WhatsAppBotService bot, AppProperties props, LeadNudges nudges,
+                               com.specskart.lead.LeadPrescriptionService prescriptions) {
+        this.prescriptions = prescriptions;
         this.nudges = nudges;
         this.leads = leads;
         this.messages = messages;
@@ -144,6 +147,15 @@ public class AdminChatController {
                 // a real extension so the phone knows which app opens it (PDF viewer, video player...)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + mediaId + "." + extension(media.mimeType()) + "\"")
                 .body(media.bytes());
+    }
+
+    /** Keep this chat photo on the customer as a prescription (our own copy: WhatsApp drops media after ~30 days). */
+    @PostMapping("/media/{mediaId}/prescription")
+    public Map<String, Object> saveAsPrescription(@PathVariable String waId, @PathVariable String mediaId,
+                                                  org.springframework.security.core.Authentication auth) {
+        Lead lead = lead(waId);
+        var p = prescriptions.savePhoto(lead, mediaId, auth != null ? String.valueOf(auth.getPrincipal()) : "system");
+        return Map.of("id", p.getId(), "leadId", lead.getId());
     }
 
     /** Outside the 24h window: the approved re-engagement template, the only thing Meta allows. */

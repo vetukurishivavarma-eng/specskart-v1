@@ -10,6 +10,9 @@ import java.util.UUID;
 public interface LensInquiryRepository extends JpaRepository<LensInquiry, UUID> {
     Optional<LensInquiry> findByVerifyTokenHash(String hash);
 
+    /** A customer's lens orders: online ones carry lead_id; counter sales only the WhatsApp number. */
+    List<LensInquiry> findByLeadIdOrWaIdOrderByCreatedAtDesc(UUID leadId, String waId);
+
     /** Has this WhatsApp number ever completed verification? A returning customer is not
      *  asked to prove the same number twice. */
     boolean existsByWaIdAndPhoneVerifiedAtIsNotNull(String waId);
