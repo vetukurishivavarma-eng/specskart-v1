@@ -13,6 +13,10 @@ _Last updated: 2026-10-20._
   + "Use these numbers". Endpoints GET /api/admin/prescriptions?phone=, /api/admin/leads/{id}/prescriptions[/{pid}[/photo]],
   POST /api/admin/chat/{waId}/media/{mediaId}/prescription. Photos only (no PDF). Mock provider now serves a 1x1 PNG.
   248 tests green, tsc clean. Not device-tested.
+- Client confirmed Rx bifocal with blue block = K1,800 (K1,500 without). Added More -> Prescriptions: search by phone,
+  "Add prescription" (camera/gallery photo optional, then Type the numbers) -- POST /api/admin/prescriptions finds the
+  lead by number or saves a WALK_IN lead (WalkInService.manual); photo via multipart .../prescriptions/{id}/photo.
+  Same Add button on the lead screen. Still 1.33.0/vc38 (never released).
 
 ## 2026-10-22: broadcast "pick customers" (v1 `6b50a3a`, POS `39c881d` = 1.32.0/vc37, pushed)
 - Message many customers -> Everyone / Pick customers (search + tick, max 200). Backend `leadIds` on both broadcast

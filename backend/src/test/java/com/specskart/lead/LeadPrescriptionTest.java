@@ -70,6 +70,23 @@ class LeadPrescriptionTest {
     }
 
     @Test
+    void staffAddAPaperPrescriptionForANewNumber() {
+        String local = "097" + (3000000 + (int) (Math.random() * 6000000));
+        var p = prescriptions.create(local, "Paper Rx", "staff@specskart.local");
+        Lead walkIn = leads.findById(p.getLeadId()).orElseThrow();
+        assertThat(walkIn.getName()).isEqualTo("Paper Rx");
+        prescriptions.uploadPhoto(walkIn.getId(), p.getId(), new byte[] {1, 2, 3}, "image/jpeg");
+        prescriptions.setNumbers(walkIn.getId(), p.getId(), new LeadPrescriptionService.Numbers(
+                new BigDecimal("-1"), null, null, null, null, null, null, null));
+        assertThat(prescriptions.forPhone(local)).singleElement().satisfies(e ->
+                assertThat(e).containsEntry("kind", "SAVED").containsEntry("hasPhoto", true));
+        // same number again -> same customer, no duplicate lead
+        assertThat(prescriptions.create(local, null, "x").getLeadId()).isEqualTo(walkIn.getId());
+        assertThatThrownBy(() -> prescriptions.uploadPhoto(walkIn.getId(), p.getId(), new byte[] {1}, "application/pdf"))
+                .hasMessageContaining("Only photos");
+    }
+
+    @Test
     void aChatPhotoIsSavedOnceAndTheNumbersTypedFromIt() {
         Lead l = lead();
         String mediaId = "m-" + UUID.randomUUID();

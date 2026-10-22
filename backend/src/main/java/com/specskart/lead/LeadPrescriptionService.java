@@ -38,10 +38,13 @@ public class LeadPrescriptionService {
     private final WhatsAppProvider provider;
     private final LeadRepository leads;
     private final AppProperties props;
+    private final WalkInService walkIns;
 
     public LeadPrescriptionService(LeadPrescriptionRepository saved, PrescriptionFileRepository files,
                                    LensInquiryRepository inquiries, WhatsAppMessageRepository messages,
-                                   WhatsAppProvider provider, LeadRepository leads, AppProperties props) {
+                                   WhatsAppProvider provider, LeadRepository leads, AppProperties props,
+                                   @org.springframework.context.annotation.Lazy WalkInService walkIns) {
+        this.walkIns = walkIns;
         this.leads = leads;
         this.props = props;
         this.saved = saved;
@@ -74,6 +77,7 @@ public class LeadPrescriptionService {
                     p.getCylRight(), p.getCylLeft(), p.getAxisRight(), p.getAxisLeft(), p.getAddPower(), p.getPd());
             m.put("hasPhoto", p.getFileId() != null);
             m.put("savedBy", p.getSavedBy());
+            m.put("leadId", p.getLeadId());
             out.add(m);
         }
         // never pass null: Spring Data turns it into "lead_id is null" and matches every leadless sale
@@ -125,6 +129,40 @@ public class LeadPrescriptionService {
         p.setFileId(f.getId());
         p.setSavedBy(savedBy);
         return saved.save(p);
+    }
+
+    /** A prescription staff add by hand (paper Rx at the shop): finds the customer by number, or saves
+     *  them as a walk-in. Photo and numbers follow via uploadPhoto / setNumbers. */
+    @Transactional
+    public LeadPrescription create(String phone, String name, String savedBy) {
+        String waId = PhoneNumbers.normalize(phone == null ? "" : phone, props.whatsapp().defaultCountryCode());
+        if (waId == null || waId.length() < 8) {
+            throw ApiException.badRequest("BAD_NUMBER", "Enter the customer's phone number.");
+        }
+        Lead lead = leads.findByWhatsappWaId(waId).orElse(null);
+        if (lead == null) {
+            walkIns.manual(null, name, phone);
+            lead = leads.findByWhatsappWaId(waId).orElseThrow();
+        }
+        LeadPrescription p = new LeadPrescription();
+        p.setLeadId(lead.getId());
+        p.setSavedBy(savedBy);
+        return saved.save(p);
+    }
+
+    /** A photo taken or picked on the till for a prescription added by hand (replaces any earlier one). */
+    @Transactional
+    public void uploadPhoto(UUID leadId, UUID id, byte[] bytes, String contentType) {
+        LeadPrescription p = get(leadId, id);
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw ApiException.badRequest("NOT_A_PHOTO", "Only photos can be saved as a prescription.");
+        }
+        if (p.getFileId() != null) files.deleteById(p.getFileId());
+        PrescriptionFile f = new PrescriptionFile();
+        f.setContentType(contentType);
+        f.setBytes(bytes);
+        p.setFileId(files.save(f).getId());
+        saved.save(p);
     }
 
     /** The numbers typed from a saved photo (or typed again to fix them). */

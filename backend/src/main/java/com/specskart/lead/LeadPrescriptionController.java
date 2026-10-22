@@ -5,7 +5,9 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Duration;
 import java.util.List;
@@ -29,6 +31,22 @@ public class LeadPrescriptionController {
     @GetMapping("/prescriptions")
     public List<Map<String, Object>> byPhone(@RequestParam String phone) {
         return prescriptions.forPhone(phone);
+    }
+
+    public record NewPrescription(String phone, String name) {}
+
+    /** Staff add one by hand for a phone number; the customer is saved as a walk-in if we've never met them. */
+    @PostMapping("/prescriptions")
+    public Map<String, Object> create(@RequestBody NewPrescription body, Authentication auth) {
+        var p = prescriptions.create(body.phone(), body.name(), auth != null ? String.valueOf(auth.getPrincipal()) : "system");
+        return Map.of("id", p.getId(), "leadId", p.getLeadId());
+    }
+
+    @PostMapping(value = "/leads/{leadId}/prescriptions/{id}/photo", consumes = "multipart/form-data")
+    public Map<String, Object> uploadPhoto(@PathVariable UUID leadId, @PathVariable UUID id,
+                                           @RequestParam("file") MultipartFile file) throws java.io.IOException {
+        prescriptions.uploadPhoto(leadId, id, file.getBytes(), file.getContentType());
+        return Map.of("saved", id);
     }
 
     @GetMapping("/leads/{leadId}/prescriptions")
