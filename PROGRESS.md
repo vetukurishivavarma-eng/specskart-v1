@@ -2,6 +2,19 @@
 
 _Last updated: 2026-10-20._
 
+## 2026-10-22 (3) END OF DAY -- RESUME HERE
+- POS **1.33.0/vc38 RELEASED** (GitHub v1.33.0 + app_releases row added by user): prescriptions, Rx bifocal axis
+  price fix, WhatsApp-style chat (photos/files, reply, react, ticks), pick customers, admin Delete frame.
+- POS **1.34.0/vc39** (`01fabcb`, v1 `bf2b04a`): broadcast "Zambian numbers only (+260)" switch, on by default.
+  Release script ran (scratchpad release.sh) -- CHECK GitHub release v1.34.0 exists + Downloads\specskart-pos-1.34.0.apk.
+  User said HOLD: do NOT add the app_releases row until they say.
+- Billing on WABA confirmed working: paid spin_and_win template delivered (Spin button) to user's own number.
+  spin_and_win sent to all 79 leads 2026-10-22. Templates spin_and_win, specskart_followup, eye_test_recall APPROVED.
+- Spin prize "Free eye check for your family" has NO purchase condition; advised client keep it (optionally cap
+  "up to 4 family members"). Client decision pending.
+- WhatsApp calling deferred (needs 2,000/day tier -> business verification first). User: leave it.
+- Not device-tested yet: chat attachments/reactions/ticks on real Meta, prescriptions screens, counter last-Rx.
+
 ## 2026-10-22 (2): prescriptions per customer + counter axis price fix (POS 1.33.0/vc38)
 - CLIENT BUG fixed: counter bifocal/progressive with axis off 90/180 (+-10) was priced as stock (e.g. K950 BF_BB_2)
   -> now RX row like online (K1,800 RX_BF_BB). Server walkInInquiry computes specialAxis; app sends axis in the quote.
