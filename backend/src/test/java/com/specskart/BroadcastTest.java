@@ -108,6 +108,23 @@ class BroadcastTest {
     }
 
     @Test
+    void pickedCustomersOnlyGetIt() {
+        String picked = "26097" + (300000 + (int) (Math.random() * 600000));
+        String other = "26097" + (300000 + (int) (Math.random() * 600000));
+        Lead p = lead(picked, FollowUpState.ACTIVE);
+        lead(other, FollowUpState.ACTIVE);
+        Lead stopped = lead("26097" + (300000 + (int) (Math.random() * 600000)), FollowUpState.OPTED_OUT);
+
+        var only = new BroadcastService.Filter(null, false, false, java.util.List.of(p.getId(), stopped.getId()));
+        String tpl = "pick_t_" + picked;
+        assertThat(broadcast.previewCount(only, tpl)).isEqualTo(1); // STOP still wins over a tick
+        assertThat(broadcast.send(only, tpl, "en", null, java.util.List.of(), 200).sent()).isEqualTo(1);
+        var outbox = ((MockWhatsAppProvider) provider).outbox();
+        assertThat(outbox).anyMatch(s -> picked.equals(s.toWaId()) && tpl.equals(s.templateName()));
+        assertThat(outbox).noneMatch(s -> other.equals(s.toWaId()) && tpl.equals(s.templateName()));
+    }
+
+    @Test
     void previewCountsWithoutSendingAnything() {
         int before = ((MockWhatsAppProvider) provider).outbox().size();
         int count = broadcast.previewCount(new BroadcastService.Filter(null, false, false), null);

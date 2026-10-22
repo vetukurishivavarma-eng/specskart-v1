@@ -25,8 +25,13 @@ public class BroadcastService {
     private static final Logger log = LoggerFactory.getLogger(BroadcastService.class);
     private static final int HARD_CAP = 500;
 
-    /** optedInOnly: just customers who explicitly signed up for offers (walk-in QR). */
-    public record Filter(String faceShape, boolean excludeConverted, boolean optedInOnly) {}
+    /** optedInOnly: just customers who explicitly signed up for offers (walk-in QR).
+     *  leadIds: only these customers (staff ticked them); null = everyone matching. */
+    public record Filter(String faceShape, boolean excludeConverted, boolean optedInOnly, java.util.Collection<UUID> leadIds) {
+        public Filter(String faceShape, boolean excludeConverted, boolean optedInOnly) {
+            this(faceShape, excludeConverted, optedInOnly, null);
+        }
+    }
     public record SendResult(int sent, int failed, int skippedOverCap) {}
 
     private final LeadRepository leads;
@@ -50,7 +55,11 @@ public class BroadcastService {
     /** Leads matching the filter who don't already have a message with this body. */
     private java.util.stream.Stream<Lead> matching(Filter f, String sentBody) {
         java.util.Set<UUID> had = sentBody == null ? java.util.Set.of() : messages.leadIdsWithBody(sentBody);
-        return leads.findTop1000ByArchivedAtIsNullOrderByLastContactAtDesc().stream()
+        List<Lead> pool = f.leadIds() == null
+                ? leads.findTop1000ByArchivedAtIsNullOrderByLastContactAtDesc()
+                : leads.findAllById(f.leadIds());
+        return pool.stream()
+                .filter(l -> l.getArchivedAt() == null)
                 .filter(l -> !had.contains(l.getId()))
                 .filter(l -> l.getFollowUpState() != FollowUpState.OPTED_OUT)
                 .filter(l -> waId(l) != null)

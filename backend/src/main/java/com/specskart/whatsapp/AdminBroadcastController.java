@@ -6,7 +6,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.specskart.shared.ApiException;
+
 import java.util.List;
+import java.util.UUID;
 
 /** Admin: send a one-off WhatsApp broadcast (new arrivals, a sale) to a lead segment.
  *  Always requires an approved template and is capped per call — see BroadcastService. */
@@ -16,7 +19,8 @@ public class AdminBroadcastController {
 
     /** freeText: the template's words as plain text, sent instead (free) to customers whose chat is open. */
     public record Request(String faceShape, Boolean excludeConverted, Boolean optedInOnly, String templateName,
-                          String headerImageUrl, List<String> bodyParams, Integer limit, String freeText) {}
+                          String headerImageUrl, List<String> bodyParams, Integer limit, String freeText,
+                          List<UUID> leadIds) {}
     public record PreviewResponse(int eligible) {}
 
     private final BroadcastService broadcast;
@@ -40,7 +44,8 @@ public class AdminBroadcastController {
                 req.limit() == null ? 200 : req.limit(), req.freeText());
     }
 
-    public record TextRequest(String text, Boolean excludeConverted, Integer limit) {}
+    /** leadIds: only these customers (picked in the app); null = everyone. */
+    public record TextRequest(String text, Boolean excludeConverted, Integer limit, List<UUID> leadIds) {}
 
     /** A message staff type: goes only to customers who messaged in the last 24h (WhatsApp's rule; free). */
     @PostMapping("/text/preview")
@@ -54,13 +59,22 @@ public class AdminBroadcastController {
     }
 
     private static BroadcastService.Filter textFilter(TextRequest req) {
-        return new BroadcastService.Filter(null, Boolean.TRUE.equals(req.excludeConverted()), false);
+        return new BroadcastService.Filter(null, Boolean.TRUE.equals(req.excludeConverted()), false, picked(req.leadIds()));
     }
 
     private BroadcastService.Filter filterOf(Request req) {
         return new BroadcastService.Filter(
                 req.faceShape() == null || req.faceShape().isBlank() ? null : req.faceShape(),
                 Boolean.TRUE.equals(req.excludeConverted()),
-                Boolean.TRUE.equals(req.optedInOnly()));
+                Boolean.TRUE.equals(req.optedInOnly()),
+                picked(req.leadIds()));
+    }
+
+    /** Picked customers are capped like a send, so a bad client can't pass the whole lead base. */
+    private static List<UUID> picked(List<UUID> ids) {
+        if (ids == null) return null;
+        if (ids.isEmpty()) throw ApiException.badRequest("PICK_CUSTOMERS", "Pick at least one customer.");
+        if (ids.size() > 200) throw ApiException.badRequest("TOO_MANY_PICKED", "Pick 200 customers or fewer.");
+        return ids;
     }
 }
