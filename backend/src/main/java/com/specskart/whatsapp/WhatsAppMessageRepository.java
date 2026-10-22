@@ -13,6 +13,8 @@ public interface WhatsAppMessageRepository extends JpaRepository<WhatsAppMessage
     List<WhatsAppMessage> findByLeadIdOrderByCreatedAtAsc(UUID leadId);
 
     boolean existsByLeadIdAndMediaId(UUID leadId, String mediaId);
+    Optional<WhatsAppMessage> findFirstByWaMessageId(String waMessageId);
+    Optional<WhatsAppMessage> findFirstByLeadIdAndDirectionAndWaMessageIdIsNotNullOrderByCreatedAtDesc(UUID leadId, String direction);
     long countByLeadId(UUID leadId);
     Optional<WhatsAppMessage> findFirstByLeadIdAndDirectionOrderByCreatedAtDesc(UUID leadId, String direction);
     List<WhatsAppMessage> findByLeadIdAndDirectionAndCreatedAtAfter(UUID leadId, String direction, java.time.Instant after);

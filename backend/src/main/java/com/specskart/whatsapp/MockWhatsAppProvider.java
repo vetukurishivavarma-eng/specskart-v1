@@ -113,6 +113,25 @@ public class MockWhatsAppProvider implements WhatsAppProvider {
                 "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="), "image/png");
     }
 
+    @Override
+    public synchronized String sendText(String toWaId, String text, String replyToWamid) {
+        return sendText(toWaId, text);
+    }
+
+    @Override
+    public synchronized String sendReaction(String toWaId, String wamid, String emoji) {
+        outbox.add(new Sent(toWaId, "reaction " + emoji + " on " + wamid, List.of()));
+        return "wamid.mock-" + java.util.UUID.randomUUID();
+    }
+
+    @Override
+    public synchronized SentMedia sendUpload(String toWaId, byte[] bytes, String mimeType, String filename,
+                                             String caption, String replyToWamid) {
+        failIfAsked();
+        outbox.add(new Sent(toWaId, caption, List.of(), null, List.of(), null, filename));
+        return new SentMedia("wamid.mock-" + java.util.UUID.randomUUID(), "media-mock-" + java.util.UUID.randomUUID());
+    }
+
     public synchronized List<Sent> outbox() {
         return List.copyOf(outbox);
     }

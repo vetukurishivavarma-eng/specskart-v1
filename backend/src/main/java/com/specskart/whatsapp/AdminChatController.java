@@ -49,10 +49,12 @@ public class AdminChatController {
     private final AppProperties props;
     private final LeadNudges nudges;
     private final com.specskart.lead.LeadPrescriptionService prescriptions;
+    private final SentMessageRepository sent;
 
     public AdminChatController(LeadRepository leads, WhatsAppMessageRepository messages, WhatsAppProvider provider,
                                ServiceWindow window, WhatsAppBotService bot, AppProperties props, LeadNudges nudges,
-                               com.specskart.lead.LeadPrescriptionService prescriptions) {
+                               com.specskart.lead.LeadPrescriptionService prescriptions, SentMessageRepository sent) {
+        this.sent = sent;
         this.prescriptions = prescriptions;
         this.nudges = nudges;
         this.leads = leads;
@@ -63,7 +65,12 @@ public class AdminChatController {
         this.props = props;
     }
 
-    public record SendRequest(String body) {}
+    /** replyToId: one of this chat's messages (our id) to quote, like swipe-to-reply. */
+    public record SendRequest(String body, java.util.UUID replyToId) {
+        public SendRequest(String body) {
+            this(body, null);
+        }
+    }
 
     @GetMapping
     public Map<String, Object> get(@PathVariable String waId) {
@@ -77,14 +84,22 @@ public class AdminChatController {
         out.put("templateAvailable", lead != null && props.whatsapp().followUpConfigured());
         Instant quiet = lead == null ? null : lead.getAgentChatUntil();
         out.put("botQuietUntil", quiet != null && quiet.isAfter(Instant.now()) ? quiet : null);
-        out.put("messages", lead == null ? List.of() : messages.findByLeadIdOrderByCreatedAtAsc(lead.getId()).stream()
-                .map(m -> Map.of(
-                        "at", m.getCreatedAt(),
-                        "direction", m.getDirection(),
-                        "body", m.getBody() == null ? "" : m.getBody(),
-                        "type", m.getMessageType() == null ? "" : m.getMessageType(),
-                        "mediaId", m.getMediaId() == null ? "" : m.getMediaId()))
-                .toList());
+        List<WhatsAppMessage> log = lead == null ? List.of() : messages.findByLeadIdOrderByCreatedAtAsc(lead.getId());
+        Map<String, WhatsAppMessage> byWamid = new java.util.HashMap<>();
+        for (WhatsAppMessage m : log) if (m.getWaMessageId() != null) byWamid.put(m.getWaMessageId(), m);
+        out.put("messages", log.stream().map(m -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", m.getId());
+            row.put("at", m.getCreatedAt());
+            row.put("direction", m.getDirection());
+            row.put("body", m.getBody() == null ? "" : m.getBody());
+            row.put("type", m.getMessageType() == null ? "" : m.getMessageType());
+            row.put("mediaId", m.getMediaId() == null ? "" : m.getMediaId());
+            row.put("status", m.getStatus() == null ? "" : m.getStatus());
+            row.put("canReply", m.getWaMessageId() != null); // reply / react need WhatsApp's id
+            if (m.getReplyToWaId() != null) row.put("replyTo", quote(byWamid.get(m.getReplyToWaId()), m.getReplyToWaId()));
+            return row;
+        }).toList());
         return out;
     }
 
@@ -95,25 +110,114 @@ public class AdminChatController {
         if (text.isEmpty()) throw ApiException.badRequest("EMPTY_MESSAGE", "Type a message first.");
         if (text.length() > 4000) throw ApiException.badRequest("MESSAGE_TOO_LONG", "Keep it under 4000 characters.");
         Lead lead = lead(waId);
+        requireOpen(lead);
+        String replyTo = replyWamid(lead, req.replyToId());
+        String wamid;
+        try {
+            wamid = provider.sendText(lead.getWhatsappWaId(), text, replyTo);
+        } catch (Exception e) {
+            throw ApiException.badRequest("SEND_FAILED", "WhatsApp didn't accept the message. Try again in a minute.");
+        }
+        staffSent(lead, "agent", text, wamid, null, replyTo);
+        return get(waId);
+    }
+
+    /** A photo or file from the staff phone (camera, gallery or files), with an optional caption. */
+    @PostMapping(value = "/attachments", consumes = "multipart/form-data")
+    @Transactional
+    public Map<String, Object> attach(@PathVariable String waId,
+                                      @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+                                      @RequestParam(value = "caption", required = false) String caption,
+                                      @RequestParam(value = "replyToId", required = false) java.util.UUID replyToId)
+            throws java.io.IOException {
+        Lead lead = lead(waId);
+        requireOpen(lead);
+        if (file.isEmpty()) throw ApiException.badRequest("EMPTY_FILE", "Pick a photo or file first.");
+        String mime = file.getContentType() == null ? "application/octet-stream" : file.getContentType();
+        String type = MetaWhatsAppProvider.mediaType(mime);
+        long max = type.equals("image") ? 5_000_000 : 16_000_000; // WhatsApp's own limits
+        if (file.getSize() > max) {
+            throw ApiException.badRequest("TOO_BIG", "That file is too big for WhatsApp (" + max / 1_000_000 + " MB max).");
+        }
+        String name = file.getOriginalFilename() == null || file.getOriginalFilename().isBlank()
+                ? "file." + extension(mime) : file.getOriginalFilename();
+        String replyTo = replyWamid(lead, replyToId);
+        WhatsAppProvider.SentMedia out;
+        try {
+            out = provider.sendUpload(lead.getWhatsappWaId(), file.getBytes(), mime, name,
+                    caption == null ? null : caption.trim(), replyTo);
+        } catch (Exception e) {
+            log.warn("chat attachment to {} failed: {}", waId, e.toString());
+            throw ApiException.badRequest("SEND_FAILED", "WhatsApp didn't accept the file. Try a smaller one, or a photo/PDF.");
+        }
+        String body = caption != null && !caption.isBlank() ? caption.trim()
+                : type.equals("document") ? name : "[" + type + "]";
+        staffSent(lead, type, body, out.messageId(), out.mediaId(), replyTo);
+        return get(waId);
+    }
+
+    public record ReactRequest(String emoji) {}
+
+    /** An emoji on one message, like a long-press in WhatsApp ("" takes it back). */
+    @PostMapping("/messages/{id}/react")
+    @Transactional
+    public Map<String, Object> react(@PathVariable String waId, @PathVariable java.util.UUID id, @RequestBody ReactRequest req) {
+        Lead lead = lead(waId);
+        requireOpen(lead);
+        String emoji = req.emoji() == null ? "" : req.emoji().trim();
+        if (emoji.length() > 16) throw ApiException.badRequest("BAD_EMOJI", "Pick one emoji.");
+        WhatsAppMessage target = messages.findById(id)
+                .filter(m -> m.getLeadId().equals(lead.getId()) && m.getWaMessageId() != null)
+                .orElseThrow(() -> ApiException.notFound("NO_MESSAGE", "That message can't be reacted to."));
+        try {
+            provider.sendReaction(lead.getWhatsappWaId(), target.getWaMessageId(), emoji);
+        } catch (Exception e) {
+            throw ApiException.badRequest("SEND_FAILED", "WhatsApp didn't accept the reaction. Try again in a minute.");
+        }
+        WhatsAppMessage m = new WhatsAppMessage();
+        m.setLeadId(lead.getId());
+        m.setDirection("OUTBOUND");
+        m.setMessageType("reaction");
+        m.setBody((emoji.isEmpty() ? "Took back the reaction" : "Reacted " + emoji) + " to: \"" + quote(target, null) + "\"");
+        m.setStatus("sent");
+        messages.save(m);
+        return get(waId);
+    }
+
+    /** Staff opened the chat: the customer's messages show blue ticks, as when you read them on WhatsApp. */
+    @PostMapping("/read")
+    public Map<String, Object> read(@PathVariable String waId) {
+        Lead lead = lead(waId);
+        messages.findFirstByLeadIdAndDirectionAndWaMessageIdIsNotNullOrderByCreatedAtDesc(lead.getId(), "INBOUND")
+                .ifPresent(m -> provider.markRead(m.getWaMessageId()));
+        return Map.of("ok", true);
+    }
+
+    private void requireOpen(Lead lead) {
         if (!window.isOpen(lead.getWhatsappWaId())) {
             throw ApiException.conflict("WINDOW_CLOSED",
                     "This customer hasn't messaged in the last 24 hours, so WhatsApp only allows an approved "
                             + "template. Send the follow-up template; once they reply you can chat freely.");
         }
+    }
 
-        String wamid;
-        try {
-            wamid = provider.sendText(lead.getWhatsappWaId(), text);
-        } catch (Exception e) {
-            throw ApiException.badRequest("SEND_FAILED", "WhatsApp didn't accept the message. Try again in a minute.");
-        }
+    /** WhatsApp's id for the message being replied to; one without an id is just sent unquoted. */
+    private String replyWamid(Lead lead, java.util.UUID replyToId) {
+        if (replyToId == null) return null;
+        return messages.findById(replyToId).filter(m -> m.getLeadId().equals(lead.getId()))
+                .map(WhatsAppMessage::getWaMessageId).orElse(null);
+    }
 
+    /** Logs what staff sent and keeps the bot quiet while they chat. */
+    private void staffSent(Lead lead, String type, String body, String wamid, String mediaId, String replyTo) {
         WhatsAppMessage m = new WhatsAppMessage();
         m.setLeadId(lead.getId());
         m.setDirection("OUTBOUND");
-        m.setMessageType("agent");
+        m.setMessageType(type);
         m.setWaMessageId(wamid);
-        m.setBody(text);
+        m.setMediaId(mediaId);
+        m.setReplyToWaId(replyTo);
+        m.setBody(body);
         m.setStatus("sent");
         messages.save(m);
 
@@ -121,7 +225,15 @@ public class AdminChatController {
         lead.setLastContactAt(Instant.now());
         leads.save(lead);
         nudges.staffReplied(lead.getId()); // stop the "still waiting" pushes; schedule the one follow-up
-        return get(waId);
+    }
+
+    /** The quoted line above a reply: the words of the message it answers. */
+    private String quote(WhatsAppMessage m, String wamid) {
+        String body = m != null ? m.getBody()
+                : wamid == null ? null : sent.findById(wamid).map(SentMessage::getBody).orElse(null); // a bot message we only indexed
+        if (body == null || body.isBlank()) return "a message";
+        body = body.replace('\n', ' ');
+        return body.length() > 100 ? body.substring(0, 100).trim() + "…" : body;
     }
 
     /**

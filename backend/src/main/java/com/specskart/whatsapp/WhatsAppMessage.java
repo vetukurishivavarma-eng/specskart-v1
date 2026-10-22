@@ -29,4 +29,7 @@ public class WhatsAppMessage extends BaseEntity {
 
     /** Meta media id of an inbound photo/file -- fetched on demand, never stored by us. */
     private String mediaId; // sent | delivered | read | failed
+
+    /** WhatsApp id of the message this one quotes (a reply), either direction. */
+    private String replyToWaId;
 }

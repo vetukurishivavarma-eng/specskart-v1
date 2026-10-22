@@ -28,9 +28,11 @@ public class WhatsAppWebhookController {
     private final ObjectMapper mapper;
     private final StaffAlerts staffAlerts;
     private final SentMessageRepository sent;
+    private final WhatsAppMessageRepository chatLog;
 
     public WhatsAppWebhookController(AppProperties props, WhatsAppInboundService inbound, ObjectMapper mapper,
-                                     StaffAlerts staffAlerts, SentMessageRepository sent) {
+                                     StaffAlerts staffAlerts, SentMessageRepository sent, WhatsAppMessageRepository chatLog) {
+        this.chatLog = chatLog;
         this.staffAlerts = staffAlerts;
         this.sent = sent;
         this.props = props;
@@ -69,6 +71,13 @@ public class WhatsAppWebhookController {
                     JsonNode messages = value.path("messages");
                     for (JsonNode msg : messages) {
                         inbound.process(toInbound(msg, contacts));
+                        String quoted = msg.path("context").path("id").asText("");
+                        if (!quoted.isBlank()) { // they swiped-to-reply on one of our messages
+                            chatLog.findFirstByWaMessageId(msg.path("id").asText("")).ifPresent(m -> {
+                                m.setReplyToWaId(quoted);
+                                chatLog.save(m);
+                            });
+                        }
                     }
                     // delivery / read statuses are logged only -- but a failure loudly: Meta accepts a
                     // send and only reports here that it never arrived (e.g. 131047, outside the 24h
@@ -81,6 +90,7 @@ public class WhatsAppWebhookController {
                         } catch (Exception e) {
                             log.warn("staff alert status update failed: {}", e.getMessage());
                         }
+                        tick(status.path("id").asText(""), status.path("status").asText(""));
                         if ("failed".equals(status.path("status").asText())) {
                             String to = status.path("recipient_id").asText("");
                             log.warn("wa send FAILED to {}•••• msg={} code={} {}",
@@ -98,6 +108,21 @@ public class WhatsAppWebhookController {
             // 200 anyway so Meta does not spam retries for a poison payload; we logged it.
         }
         return ResponseEntity.ok().build();
+    }
+
+    private static final java.util.List<String> TICKS = java.util.List.of("sent", "delivered", "read");
+
+    /** The ticks on a message in the staff chat: only ever forward (a late "delivered" can't undo "read"). */
+    private void tick(String wamid, String status) {
+        if (wamid.isBlank()) return;
+        chatLog.findFirstByWaMessageId(wamid).ifPresent(m -> {
+            boolean forward = "failed".equals(status)
+                    || TICKS.indexOf(status) > TICKS.indexOf(m.getStatus() == null ? "" : m.getStatus());
+            if (forward && !"failed".equals(m.getStatus())) {
+                m.setStatus(status);
+                chatLog.save(m);
+            }
+        });
     }
 
     private InboundMessage toInbound(JsonNode msg, JsonNode contacts) {

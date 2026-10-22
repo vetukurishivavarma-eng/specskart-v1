@@ -78,6 +78,80 @@ public class MetaWhatsAppProvider implements WhatsAppProvider {
     }
 
     @Override
+    public String sendText(String toWaId, String text, String replyToWamid) {
+        if (replyToWamid == null) return sendText(toWaId, text);
+        return post(Map.of(
+                "messaging_product", "whatsapp",
+                "to", toWaId,
+                "context", Map.of("message_id", replyToWamid),
+                "type", "text",
+                "text", Map.of("preview_url", false, "body", text)));
+    }
+
+    @Override
+    public void markRead(String wamid) {
+        try {
+            http.post().uri(url())
+                    .header("Authorization", "Bearer " + props.whatsapp().accessToken())
+                    .body(Map.of("messaging_product", "whatsapp", "status", "read", "message_id", wamid))
+                    .retrieve().toBodilessEntity();
+        } catch (Exception e) { // ticks are a nicety -- never fail the chat screen over them
+            log.warn("mark read {} failed: {}", wamid, e.getMessage());
+        }
+    }
+
+    @Override
+    public String sendReaction(String toWaId, String wamid, String emoji) {
+        return post(Map.of(
+                "messaging_product", "whatsapp",
+                "to", toWaId,
+                "type", "reaction",
+                "reaction", Map.of("message_id", wamid, "emoji", emoji)));
+    }
+
+    @Override
+    public SentMedia sendUpload(String toWaId, byte[] bytes, String mimeType, String filename, String caption,
+                                String replyToWamid) {
+        var form = new org.springframework.util.LinkedMultiValueMap<String, Object>();
+        form.add("messaging_product", "whatsapp");
+        form.add("type", mimeType);
+        var headers = new org.springframework.http.HttpHeaders();
+        headers.setContentType(org.springframework.http.MediaType.parseMediaType(mimeType));
+        form.add("file", new org.springframework.http.HttpEntity<>(new org.springframework.core.io.ByteArrayResource(bytes) {
+            @Override public String getFilename() { return filename; }
+        }, headers));
+        JsonNode up = http.post().uri(props.whatsapp().graphBaseUrl() + "/" + props.whatsapp().phoneNumberId() + "/media")
+                .header("Authorization", "Bearer " + props.whatsapp().accessToken())
+                .contentType(org.springframework.http.MediaType.MULTIPART_FORM_DATA)
+                .body(form)
+                .retrieve().body(JsonNode.class);
+        String mediaId = up == null ? null : up.path("id").asText(null);
+        if (mediaId == null) throw new IllegalStateException("WhatsApp media upload returned no id: " + up);
+
+        String type = mediaType(mimeType);
+        Map<String, Object> part = new java.util.LinkedHashMap<>();
+        part.put("id", mediaId);
+        if (caption != null && !caption.isBlank() && !type.equals("audio")) part.put("caption", cap(caption));
+        if (type.equals("document")) part.put("filename", filename);
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("messaging_product", "whatsapp");
+        payload.put("to", toWaId);
+        if (replyToWamid != null) payload.put("context", Map.of("message_id", replyToWamid));
+        payload.put("type", type);
+        payload.put(type, part);
+        return new SentMedia(post(payload), mediaId);
+    }
+
+    /** WhatsApp's message type for a file: photos/videos/voice play inline, anything else is a document. */
+    public static String mediaType(String mimeType) {
+        if (mimeType == null) return "document";
+        if (mimeType.equals("image/jpeg") || mimeType.equals("image/png")) return "image";
+        if (mimeType.equals("video/mp4") || mimeType.equals("video/3gpp")) return "video";
+        if (mimeType.startsWith("audio/")) return "audio";
+        return "document";
+    }
+
+    @Override
     public void sendButtons(String toWaId, String bodyText, List<Button> buttons) {
         var rows = buttons.stream()
                 .map(b -> Map.of("type", "reply", "reply", Map.of("id", b.id(), "title", cap(b.title()))))

@@ -63,6 +63,29 @@ public interface WhatsAppProvider {
 
     record Media(byte[] bytes, String mimeType) {}
 
+    // ---- staff chat in the POS app (the business number, through the Cloud API) ----
+
+    /** A text quoting one of the chat's messages (replyToWamid null = a plain text). */
+    default String sendText(String toWaId, String text, String replyToWamid) {
+        return sendText(toWaId, text);
+    }
+
+    /** The customer's blue ticks: their message (and everything before it) shows as read. */
+    default void markRead(String wamid) {}
+
+    /** An emoji on one message; "" takes it back. @return the reaction's own wamid. */
+    default String sendReaction(String toWaId, String wamid, String emoji) {
+        throw new UnsupportedOperationException("reactions need the Meta provider");
+    }
+
+    /** A photo/file staff picked on the phone: uploaded to WhatsApp, then sent. */
+    record SentMedia(String messageId, String mediaId) {}
+
+    default SentMedia sendUpload(String toWaId, byte[] bytes, String mimeType, String filename, String caption,
+                                 String replyToWamid) {
+        throw new UnsupportedOperationException("sending files needs the Meta provider");
+    }
+
     record Button(String id, String title) {}
 
     /** One row of a list message. {@code description} may be null. */

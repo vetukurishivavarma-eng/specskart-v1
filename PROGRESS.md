@@ -17,6 +17,15 @@ _Last updated: 2026-10-20._
   "Add prescription" (camera/gallery photo optional, then Type the numbers) -- POST /api/admin/prescriptions finds the
   lead by number or saves a WALK_IN lead (WalkInService.manual); photo via multipart .../prescriptions/{id}/photo.
   Same Add button on the lead screen. Still 1.33.0/vc38 (never released).
+- WhatsApp message types (`186535d`): system notices, location (+maps link), contacts, catalog orders, flow replies and
+  unknown types read plainly; bot stays quiet (STAFF_ONLY marker) and staff get a push. request_welcome = "(Opened the chat)".
+- Staff chat like WhatsApp (V77 reply_to_wa_id + wa_message_id index): ticks from status webhooks (forward only),
+  POST /read marks the customer's last message read, swipe-reply (context.message_id, both directions), reactions
+  POST /messages/{id}/react, attachments POST /attachments (multipart -> Meta /media upload -> send by id).
+  App: long-press sheet (emoji/Reply/Copy), paperclip (camera/gallery/document), new deps expo-document-picker +
+  expo-clipboard. Admin "Delete frame" on the product screen. 253 tests green.
+- WhatsApp CALLING: blocked -- Meta needs messaging limit >= 2,000/day; we're unverified at 250. Revisit after
+  business verification (needs WebRTC native module + calls webhook).
 
 ## 2026-10-22: broadcast "pick customers" (v1 `6b50a3a`, POS `39c881d` = 1.32.0/vc37, pushed)
 - Message many customers -> Everyone / Pick customers (search + tick, max 200). Backend `leadIds` on both broadcast

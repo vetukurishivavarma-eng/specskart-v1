@@ -180,6 +180,49 @@ class AdminChatTest {
         assertThat(sentTo(waId)).isEqualTo(before); // a person answers these, not the menu
     }
 
+    @Autowired com.specskart.whatsapp.WhatsAppMessageRepository chatLog;
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void staffReplyQuoteSendAFileReactAndSeeTicksLikeWhatsApp() {
+        String waId = newLead();
+        customerSays(waId, "do you have round frames?");
+        var msgs = (java.util.List<java.util.Map<String, Object>>) chat.get(waId).get("messages");
+        UUID question = (UUID) msgs.stream().filter(m -> "INBOUND".equals(m.get("direction"))).findFirst().orElseThrow().get("id");
+
+        // swipe-to-reply
+        msgs = (java.util.List<java.util.Map<String, Object>>) chat.send(waId,
+                new AdminChatController.SendRequest("Yes, from K300", question)).get("messages");
+        var reply = msgs.get(msgs.size() - 1);
+        assertThat(reply).containsEntry("replyTo", "do you have round frames?").containsEntry("status", "sent");
+
+        // a file from the phone
+        var file = new org.springframework.mock.web.MockMultipartFile("file", "price-list.pdf", "application/pdf", new byte[] {1, 2});
+        try {
+            msgs = (java.util.List<java.util.Map<String, Object>>) chat.attach(waId, file, null, null).get("messages");
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
+        assertThat(msgs.get(msgs.size() - 1)).containsEntry("type", "document").containsEntry("body", "price-list.pdf");
+        assertThat((String) msgs.get(msgs.size() - 1).get("mediaId")).isNotBlank();
+
+        // a reaction on their message
+        msgs = (java.util.List<java.util.Map<String, Object>>) chat.react(waId, question,
+                new AdminChatController.ReactRequest("👍")).get("messages");
+        assertThat(msgs.get(msgs.size() - 1).get("body")).isEqualTo("Reacted 👍 to: \"do you have round frames?\"");
+
+        // ticks move forward only: read, then a late "delivered" doesn't undo it
+        String wamid = chatLog.findById((UUID) reply.get("id")).orElseThrow().getWaMessageId();
+        for (String st : new String[] {"read", "delivered"}) {
+            String payload = """
+                {"entry":[{"changes":[{"value":{"statuses":[{"id":"%s","status":"%s","recipient_id":"%s"}]}}]}]}
+                """.formatted(wamid, st, waId);
+            webhook.receive(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8), null);
+        }
+        assertThat(chatLog.findById((UUID) reply.get("id")).orElseThrow().getStatus()).isEqualTo("read");
+        assertThat(chat.read(waId)).containsEntry("ok", true);
+    }
+
     @Test
     void theSentMessageIndexKeepsWhatTheCustomerSaw() {
         assertThat(com.specskart.whatsapp.MetaWhatsAppProvider.summary(java.util.Map.of("type", "interactive",
