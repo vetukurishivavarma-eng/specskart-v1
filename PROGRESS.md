@@ -2,6 +2,11 @@
 
 _Last updated: 2026-10-20._
 
+## 2026-10-22: broadcast "pick customers" (v1 `6b50a3a`, POS `39c881d` = 1.32.0/vc37, pushed)
+- Message many customers -> Everyone / Pick customers (search + tick, max 200). Backend `leadIds` on both broadcast
+  requests; STOP, already-had-it and 24h-window rules still apply. 245 tests green, tsc clean. APK via GitHub Actions,
+  then release v1.32.0 + app_releases row (37). Not device-tested. Web admin Broadcast has no picker (not asked).
+
 ## 2026-10-21 (6) END OF DAY — RESUME HERE
 - POS **1.31.0 / vc36 RELEASED** (GitHub v1.31.0, link .../releases/download/v1.31.0/specskart-pos-1.31.0.apk); user adds
   app_releases row (min 36, mandatory). 1.29.0 + 1.30.0 also released today.
