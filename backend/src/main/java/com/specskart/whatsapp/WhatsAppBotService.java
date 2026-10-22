@@ -157,6 +157,11 @@ public class WhatsAppBotService {
 
     /** How a customer's emoji reaction reads in the chat: "Reacted 👍". */
     static final String REACTION = "Reacted ";
+    /** A notice from WhatsApp itself (number changed, security code changed): "WhatsApp: ...". */
+    static final String SYSTEM = "WhatsApp: ";
+    /** Marks what a person must answer (a shared location, contact, catalog order, anything unknown):
+     *  logged without the marker, staff alerted, the bot stays quiet instead of firing a menu back. */
+    static final String STAFF_ONLY = String.valueOf((char) 0x2060); // invisible word joiner
 
     @Transactional
     public void handleInbound(Lead lead, String text, String buttonId, String waMessageId) {
@@ -165,6 +170,8 @@ public class WhatsAppBotService {
 
     @Transactional
     public void handleInbound(Lead lead, String text, String buttonId, String waMessageId, String mediaId, String mediaName) {
+        boolean staffOnly = text != null && text.startsWith(STAFF_ONLY);
+        if (staffOnly) text = text.substring(STAFF_ONLY.length());
         // the filename is only logged for the chat -- never fed to the bot/opt-out matching below
         logInbound(lead.getId(), waMessageId, mediaName != null ? mediaName : text, buttonId, mediaId);
         // a 👍 on our message is not a question: staff see it, but the bot doesn't answer it and it
@@ -173,6 +180,17 @@ public class WhatsAppBotService {
             String who = lead.getName() != null && !lead.getName().isBlank() ? lead.getName() : "+" + waId(lead);
             String emoji = text.substring(REACTION.length()).split(" to: ", 2)[0];
             push.notifyStaff(who + " reacted " + emoji, text, "/chat/" + waId(lead));
+            return;
+        }
+        if (buttonId == null && mediaId == null && text != null && text.startsWith(SYSTEM)) {
+            String who = lead.getName() != null && !lead.getName().isBlank() ? lead.getName() : "+" + waId(lead);
+            push.notifyStaff(who + ": WhatsApp notice", text, "/chat/" + waId(lead));
+            return;
+        }
+        if (staffOnly) {
+            nudges.customerWrote(lead.getId());
+            String who = lead.getName() != null && !lead.getName().isBlank() ? lead.getName() : "+" + waId(lead);
+            push.notifyStaff("Message from " + who, text.length() > 200 ? text.substring(0, 200) + "…" : text, "/chat/" + waId(lead));
             return;
         }
         // opt-out keyword (answered there -- a menu after "STOP" reads as ignoring it), or defer the automated touches

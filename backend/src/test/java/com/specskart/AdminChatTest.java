@@ -140,6 +140,47 @@ class AdminChatTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void aWhatsAppSystemNoticeShowsItsWordsAndGetsNoReply() {
+        String waId = "26097" + (300000 + (int) (Math.random() * 600000));
+        long before = sentTo(waId);
+        String payload = """
+            {"entry":[{"changes":[{"value":{"contacts":[{"profile":{"name":"Changer"},"wa_id":"%s"}],
+              "messages":[{"from":"%s","id":"wamid.%s","type":"system",
+                "system":{"body":"User A changed from %s to 260970000000","wa_id":"260970000000","type":"user_changed_number"}}]}}]}]}
+            """.formatted(waId, waId, UUID.randomUUID(), waId);
+        webhook.receive(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8), null);
+        var msgs = (java.util.List<java.util.Map<String, Object>>) chat.get(waId).get("messages");
+        assertThat(msgs).anyMatch(m -> String.valueOf(m.get("body")).startsWith("WhatsApp: User A changed from"));
+        assertThat(sentTo(waId)).isEqualTo(before); // no menu sent back
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void locationContactAndUnknownMessagesReadPlainlyAndGetNoMenu() {
+        String waId = "26097" + (300000 + (int) (Math.random() * 600000));
+        long before = sentTo(waId);
+        String[] bodies = {
+            "\"type\":\"location\",\"location\":{\"latitude\":-15.41,\"longitude\":28.28,\"name\":\"Manda Hill\"}",
+            "\"type\":\"contacts\",\"contacts\":[{\"name\":{\"formatted_name\":\"Mum\"},\"phones\":[{\"phone\":\"+260971111111\"}]}]",
+            "\"type\":\"poll_vote\""};
+        for (String body : bodies) {
+            String payload = """
+                {"entry":[{"changes":[{"value":{"contacts":[{"profile":{"name":"Types"},"wa_id":"%s"}],
+                  "messages":[{"from":"%s","id":"wamid.%s",%s}]}}]}]}
+                """.formatted(waId, waId, UUID.randomUUID(), body);
+            webhook.receive(payload.getBytes(java.nio.charset.StandardCharsets.UTF_8), null);
+        }
+        var msgs = (java.util.List<java.util.Map<String, Object>>) chat.get(waId).get("messages");
+        assertThat(msgs).anyMatch(m -> String.valueOf(m.get("body")).startsWith("📍 Shared a location: Manda Hill")
+                && String.valueOf(m.get("body")).contains("maps.google.com/?q=-15.41,28.28"));
+        assertThat(msgs).anyMatch(m -> String.valueOf(m.get("body")).contains("Mum · +260971111111"));
+        assertThat(msgs).anyMatch(m -> String.valueOf(m.get("body")).contains("can't show (poll_vote)"));
+        assertThat(msgs).noneMatch(m -> String.valueOf(m.get("body")).startsWith("⁠"));
+        assertThat(sentTo(waId)).isEqualTo(before); // a person answers these, not the menu
+    }
+
+    @Test
     void theSentMessageIndexKeepsWhatTheCustomerSaw() {
         assertThat(com.specskart.whatsapp.MetaWhatsAppProvider.summary(java.util.Map.of("type", "interactive",
                 "interactive", java.util.Map.of("body", java.util.Map.of("text", "Pick a day"))))).isEqualTo("Pick a day");

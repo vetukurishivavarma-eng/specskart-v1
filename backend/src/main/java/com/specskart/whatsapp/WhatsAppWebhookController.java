@@ -124,6 +124,9 @@ public class WhatsAppWebhookController {
                 } else if (i.has("list_reply")) {
                     buttonId = i.path("list_reply").path("id").asText(null);
                     text = i.path("list_reply").path("title").asText(null);
+                } else { // a WhatsApp Flow form (nfm_reply) or a newer kind we don't build
+                    log.info("wa interactive reply from {}: {}", waId, msg);
+                    text = WhatsAppBotService.STAFF_ONLY + "Sent a form reply the app can't read. Ask them what they need.";
                 }
             }
             // Meta hides the content of some messages from the Cloud API (edited, poll, view-once, some
@@ -148,7 +151,39 @@ public class WhatsAppWebhookController {
                         .orElse(""); // a message from before we kept these
                 text = WhatsAppBotService.REACTION + (emoji.isBlank() ? "(took back their reaction)" : emoji) + on;
             }
-            default -> text = "[" + type + "]"; // image/document/...: media id picked up below
+            // WhatsApp's own notice, not something the customer typed: "X changed their phone number to Y",
+            // "security code changed"... Shown in the chat, never answered by the bot.
+            case "system" -> {
+                log.info("wa system message from {}: {}", waId, msg);
+                String body = msg.path("system").path("body").asText("");
+                text = WhatsAppBotService.SYSTEM + (body.isBlank() ? msg.path("system").path("type").asText("notice") : body);
+            }
+            case "location" -> {
+                JsonNode l = msg.path("location");
+                String place = String.join(", ", java.util.stream.Stream.of(l.path("name").asText(""), l.path("address").asText(""))
+                        .filter(x -> !x.isBlank()).toList());
+                text = WhatsAppBotService.STAFF_ONLY + "📍 Shared a location" + (place.isBlank() ? "" : ": " + place)
+                        + "\nhttps://maps.google.com/?q=" + l.path("latitude").asText() + "," + l.path("longitude").asText();
+            }
+            case "contacts" -> {
+                StringBuilder b = new StringBuilder(WhatsAppBotService.STAFF_ONLY + "👤 Shared a contact");
+                for (JsonNode c : msg.path("contacts")) {
+                    b.append("\n").append(c.path("name").path("formatted_name").asText("(no name)"));
+                    for (JsonNode ph : c.path("phones")) b.append(" · ").append(ph.path("phone").asText(""));
+                }
+                text = b.toString();
+            }
+            case "order" -> text = WhatsAppBotService.STAFF_ONLY + "🛒 Sent an order from the WhatsApp catalog ("
+                    + msg.path("order").path("product_items").size() + " item(s)). Ask them which frames they want.";
+            // they opened the chat for the first time: the bot answers it like a hello
+            case "request_welcome" -> text = "(Opened the chat)";
+            // media: shown in the chat by its id (picked up below)
+            case "image", "video", "audio", "document", "sticker" -> text = "[" + type + "]";
+            default -> { // anything WhatsApp adds later: never a blank "[xyz]" with a menu fired back
+                log.warn("wa unhandled message type {} from {}: {}", type, waId, msg);
+                text = WhatsAppBotService.STAFF_ONLY + "Sent a kind of message the app can't show (" + type
+                        + "). Ask them to type it.";
+            }
         }
         Map<String, Object> referral = null;
         if (msg.has("referral")) {
