@@ -20,7 +20,7 @@ public class AdminBroadcastController {
     /** freeText: the template's words as plain text, sent instead (free) to customers whose chat is open. */
     public record Request(String faceShape, Boolean excludeConverted, Boolean optedInOnly, String templateName,
                           String headerImageUrl, List<String> bodyParams, Integer limit, String freeText,
-                          List<UUID> leadIds) {}
+                          List<UUID> leadIds, Boolean localOnly) {}
     public record PreviewResponse(int eligible) {}
 
     private final BroadcastService broadcast;
@@ -45,7 +45,7 @@ public class AdminBroadcastController {
     }
 
     /** leadIds: only these customers (picked in the app); null = everyone. */
-    public record TextRequest(String text, Boolean excludeConverted, Integer limit, List<UUID> leadIds) {}
+    public record TextRequest(String text, Boolean excludeConverted, Integer limit, List<UUID> leadIds, Boolean localOnly) {}
 
     /** A message staff type: goes only to customers who messaged in the last 24h (WhatsApp's rule; free). */
     @PostMapping("/text/preview")
@@ -58,8 +58,9 @@ public class AdminBroadcastController {
         return broadcast.sendText(textFilter(req), req.text(), req.limit() == null ? 200 : req.limit());
     }
 
-    private static BroadcastService.Filter textFilter(TextRequest req) {
-        return new BroadcastService.Filter(null, Boolean.TRUE.equals(req.excludeConverted()), false, picked(req.leadIds()));
+    private BroadcastService.Filter textFilter(TextRequest req) {
+        return new BroadcastService.Filter(null, Boolean.TRUE.equals(req.excludeConverted()), false, picked(req.leadIds()),
+                Boolean.TRUE.equals(req.localOnly()) ? props.whatsapp().defaultCountryCode() : null);
     }
 
     private BroadcastService.Filter filterOf(Request req) {
@@ -67,7 +68,8 @@ public class AdminBroadcastController {
                 req.faceShape() == null || req.faceShape().isBlank() ? null : req.faceShape(),
                 Boolean.TRUE.equals(req.excludeConverted()),
                 Boolean.TRUE.equals(req.optedInOnly()),
-                picked(req.leadIds()));
+                picked(req.leadIds()),
+                Boolean.TRUE.equals(req.localOnly()) ? props.whatsapp().defaultCountryCode() : null);
     }
 
     /** Picked customers are capped like a send, so a bad client can't pass the whole lead base. */

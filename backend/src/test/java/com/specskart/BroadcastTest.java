@@ -125,6 +125,15 @@ class BroadcastTest {
     }
 
     @Test
+    void zambianOnlyLeavesForeignNumbersOut() {
+        Lead zm = lead("26097" + (300000 + (int) (Math.random() * 600000)), FollowUpState.ACTIVE);
+        Lead in = lead("9198" + (10000000 + (int) (Math.random() * 80000000)), FollowUpState.ACTIVE);
+        var both = java.util.List.of(zm.getId(), in.getId());
+        assertThat(broadcast.previewCount(new BroadcastService.Filter(null, false, false, both, "260"), "local_t")).isEqualTo(1);
+        assertThat(broadcast.previewCount(new BroadcastService.Filter(null, false, false, both, null), "local_t")).isEqualTo(2);
+    }
+
+    @Test
     void previewCountsWithoutSendingAnything() {
         int before = ((MockWhatsAppProvider) provider).outbox().size();
         int count = broadcast.previewCount(new BroadcastService.Filter(null, false, false), null);

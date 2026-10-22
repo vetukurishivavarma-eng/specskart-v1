@@ -27,9 +27,13 @@ public class BroadcastService {
 
     /** optedInOnly: just customers who explicitly signed up for offers (walk-in QR).
      *  leadIds: only these customers (staff ticked them); null = everyone matching. */
-    public record Filter(String faceShape, boolean excludeConverted, boolean optedInOnly, java.util.Collection<UUID> leadIds) {
+    public record Filter(String faceShape, boolean excludeConverted, boolean optedInOnly, java.util.Collection<UUID> leadIds,
+                         String onlyCountryCode) {
         public Filter(String faceShape, boolean excludeConverted, boolean optedInOnly) {
-            this(faceShape, excludeConverted, optedInOnly, null);
+            this(faceShape, excludeConverted, optedInOnly, null, null);
+        }
+        public Filter(String faceShape, boolean excludeConverted, boolean optedInOnly, java.util.Collection<UUID> leadIds) {
+            this(faceShape, excludeConverted, optedInOnly, leadIds, null);
         }
     }
     public record SendResult(int sent, int failed, int skippedOverCap) {}
@@ -63,6 +67,8 @@ public class BroadcastService {
                 .filter(l -> !had.contains(l.getId()))
                 .filter(l -> l.getFollowUpState() != FollowUpState.OPTED_OUT)
                 .filter(l -> waId(l) != null)
+                // onlyCountryCode "260": just the shop's own country (staff/test numbers abroad left out)
+                .filter(l -> f.onlyCountryCode() == null || waId(l).replaceAll("[^0-9]", "").startsWith(f.onlyCountryCode()))
                 .filter(l -> f.faceShape() == null || f.faceShape().equalsIgnoreCase(l.getFaceShape()))
                 .filter(l -> !f.excludeConverted() || l.getStatus() != LeadStatus.CONVERTED)
                 .filter(l -> !f.optedInOnly() || l.getMarketingOptInAt() != null);
