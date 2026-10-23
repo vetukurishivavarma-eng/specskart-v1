@@ -10,6 +10,7 @@ import java.util.UUID;
 public interface SpinRepository extends JpaRepository<Spin, UUID> {
     Optional<Spin> findFirstByLeadIdAndExpiresAtAfterOrderByCreatedAtDesc(UUID leadId, Instant now);
     Optional<Spin> findFirstByFriendLeadIdAndExpiresAtAfterOrderByCreatedAtDesc(UUID leadId, Instant now);
+    List<Spin> findByLeadIdAndCreatedAtAfter(UUID leadId, Instant since);
     Optional<Spin> findByCodeIgnoreCase(String code);
     boolean existsByCode(String code);
     Optional<Spin> findByFriendCodeIgnoreCase(String code);

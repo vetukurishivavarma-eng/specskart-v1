@@ -31,6 +31,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Spin & Win (2026-10-21): every spin wins a prize that is collected at the shop within 2 weeks.
@@ -162,15 +164,34 @@ public class SpinService {
         var held = activeFriendCode(leadId);
         if (held.isPresent()) throw ApiException.conflict("HAS_PRIZE", friendCodeHeld(held.get()));
 
-        SpinPrize won = pick(wheel, RNG.nextInt(wheel.stream().mapToInt(SpinPrize::getWeight).sum()));
+        List<SpinPrize> pool = eligible(leadId, wheel);
+        SpinPrize won = pick(pool, RNG.nextInt(pool.stream().mapToInt(SpinPrize::getWeight).sum()));
         Spin s = new Spin();
         s.setLeadId(leadId);
         s.setPrizeLabel(won.getLabel());
         s.setCode(freshCode());
         s.setExpiresAt(Instant.now().plus(VALID_FOR));
         spins.saveAndFlush(s);
-        tell(lead, s);
+        // the wheel turns for SPIN_MS (6s) on the page: send the WhatsApp after it stops, not before
+        CompletableFuture.delayedExecutor(TELL_AFTER.toMillis(), TimeUnit.MILLISECONDS).execute(() -> tell(lead, s));
         return result(s, wheel);
+    }
+
+    static final Duration TELL_AFTER = Duration.ofSeconds(8);
+    static final Duration EYE_CHECK_EVERY = Duration.ofDays(365);
+
+    /** Client (2026-10-23): a free family eye check once a year -- off the draw if they won one in the last year. */
+    private List<SpinPrize> eligible(UUID leadId, List<SpinPrize> wheel) {
+        boolean hadEyeCheck = spins.findByLeadIdAndCreatedAtAfter(leadId, Instant.now().minus(EYE_CHECK_EVERY)).stream()
+                .anyMatch(s -> isEyeCheck(s.getPrizeLabel()));
+        if (!hadEyeCheck) return wheel;
+        List<SpinPrize> rest = wheel.stream().filter(p -> !isEyeCheck(p.getLabel())).toList();
+        return rest.isEmpty() ? wheel : rest;
+    }
+
+    static boolean isEyeCheck(String label) {
+        // ponytail: matched by name like isFriendPrize; add a flag on spin_prizes if it gets renamed without the words
+        return label != null && label.toLowerCase(Locale.ROOT).replace("-", " ").contains("eye check");
     }
 
     /** Weighted pick: {@code roll} in [0, total weight). */
@@ -195,8 +216,12 @@ public class SpinService {
             log.warn("spin prize message to lead {} failed: {}", lead.getId(), e.getMessage());
         }
         String who = lead.getName() != null && !lead.getName().isBlank() ? lead.getName() : "+" + waId;
-        push.notifyStaff("🎁 " + who + " won " + s.getPrizeLabel(), "Code " + s.getCode() + " · valid until "
+        try {
+            push.notifyStaff("🎁 " + who + " won " + s.getPrizeLabel(), "Code " + s.getCode() + " · valid until "
                 + UNTIL.format(s.getExpiresAt()), "/chat/" + waId);
+        } catch (Exception e) { // off the request thread now: nobody else would see it
+            log.warn("spin staff push for lead {} failed: {}", lead.getId(), e.getMessage());
+        }
     }
 
     // ---- bring a friend -----------------------------------------------------------------------

@@ -204,6 +204,22 @@ class SpinTest {
         assertThat(spinRows.findById(s.getId()).orElseThrow().getFriendLeadId()).isNull();
     }
 
+    @Test
+    void aFamilyEyeCheckIsWonOnceAYear() {
+        Lead l = customer();
+        Spin eye = won(l, "Free eye check for your family", "E");
+        String[] sig = new String[1];
+        long exp = expSig(l, sig)[0];
+        for (int i = 0; i < 15; i++) { // 35% chance each spin: 15 spins would hit it if it were still on the draw
+            spinRows.findAll().stream().filter(s -> s.getLeadId().equals(l.getId())).forEach(s -> {
+                s.setExpiresAt(java.time.Instant.now().minusSeconds(60)); // its 2 weeks are over: they can spin again
+                spinRows.saveAndFlush(s);
+            });
+            assertThat(spins.spin(l.getId(), exp, sig[0]).prize()).doesNotContainIgnoringCase("eye check");
+        }
+        assertThat(eye.getPrizeLabel()).satisfies(p -> assertThat(SpinService.isEyeCheck(p)).isTrue());
+    }
+
     private static final String FRIEND = "Bring a friend: K100 off for you both";
 
     /** A spin row with a chosen prize (the wheel itself is random). */
