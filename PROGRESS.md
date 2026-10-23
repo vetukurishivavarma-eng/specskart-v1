@@ -20,8 +20,8 @@ _Last updated: 2026-10-20._
   Stock filter gains Accessories; also carries 1.34.0's broadcast switch (1.34.0 was never released).
   **USER TODO: add the app_releases row (1.35.0, build 40) in More -> App releases** -- not reachable from here
   (Specskart Render is the narsipalli account; the Render MCP only sees the old workspace).
-- Possible bug, NOT verified: lens "ready" via the orderUpdate TEMPLATE (24h window closed) passes a param containing
-  newlines (stageLine READY) -- Meta usually rejects newlines in template params. Check before trusting ready alerts.
+- Checked 2026-10-24: lens "ready" via the orderUpdate template is FINE -- MetaWhatsAppProvider.param() flattens
+  newlines/tabs/4+ spaces in every template param (MetaTemplateParamTest covers the ready text). No bug.
 - Not device-tested: Frame orders screen, Products tabs, accessory add/edit, cart add-ons in a browser.
 - WhatsApp Web gotcha: sends can fail with "Your message was not sent" on a stale tab -- force-reload the tab, resend.
 
