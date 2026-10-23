@@ -77,4 +77,13 @@ class BotClassifyTest {
         assertThat(WhatsAppBotService.classify("Spin", "Spin")).isEqualTo(BotIntent.SPIN);
         assertThat(WhatsAppBotService.classify("Book my visit", WhatsAppBotService.BTN_SPIN)).isEqualTo(BotIntent.SPIN); // our ids still win
     }
+
+    @Test
+    void accessoryQuestionsGetTheAccessoriesAnswer() {
+        assertThat(WhatsAppBotService.classify("do you sell lens cleaning solution?", null)).isEqualTo(BotIntent.ACCESSORIES);
+        assertThat(WhatsAppBotService.classify("how much is a pouch", null)).isEqualTo(BotIntent.ACCESSORIES);
+        assertThat(WhatsAppBotService.classify("I need a glasses case", null)).isEqualTo(BotIntent.ACCESSORIES);
+        assertThat(WhatsAppBotService.classify("in case my glasses break", null)).isEqualTo(BotIntent.FRAMES);
+        assertThat(WhatsAppBotService.classify("how much are photochromic lenses", null)).isEqualTo(BotIntent.PRICE);
+    }
 }

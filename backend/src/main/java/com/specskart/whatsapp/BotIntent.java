@@ -22,5 +22,7 @@ public enum BotIntent {
     BOOK_VISIT, FRAME_PHOTOS,
     // Spin & Win (2026-10-21): one prize spin per customer
     SPIN,
+    // "do you sell cleaning solution / pouches?" (2026-10-23): what's in stock + come to the shop
+    ACCESSORIES,
     GREETING, UNKNOWN
 }

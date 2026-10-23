@@ -55,6 +55,7 @@ public class CatalogService {
 
         var stream = list.stream().filter(p -> {
             if (p.isUpcoming()) return false; // scheduled drop — not yet on sale
+            if (p.isAccessory()) return false; // pouches & cleaning kits: in the cart's add-ons, not the frame grid
             if (maxPrice != null && p.getPriceMinor() > maxPrice * 100) return false;
             if (category != null && !category.isBlank() && !category.equalsIgnoreCase(p.getFrameCategoryCode())) return false;
             if (gender != null && !gender.isBlank() && !gender.equalsIgnoreCase(p.getGender())
@@ -97,13 +98,20 @@ public class CatalogService {
     @Transactional(readOnly = true)
     public List<Product> trending(int limit) {
         List<Product> featured = products.findByStatusAndFeaturedTrueOrderByCreatedAtDesc("ACTIVE").stream()
-                .filter(Product::inStock).filter(p -> !p.isUpcoming()).limit(limit).toList();
+                .filter(Product::inStock).filter(p -> !p.isUpcoming()).filter(p -> !p.isAccessory()).limit(limit).toList();
         if (featured.size() >= limit) return featured;
         List<Product> topUp = products.findByStatusOrderByCreatedAtDesc("ACTIVE").stream()
-                .filter(Product::inStock).filter(p -> !p.isUpcoming())
+                .filter(Product::inStock).filter(p -> !p.isUpcoming()).filter(p -> !p.isAccessory())
                 .filter(p -> featured.stream().noneMatch(f -> f.getId().equals(p.getId())))
                 .limit(limit - featured.size()).toList();
         return java.util.stream.Stream.concat(featured.stream(), topUp.stream()).toList();
+    }
+
+    /** Pouches, cases, cleaning solution… on sale and in stock — for the WhatsApp bot. */
+    @Transactional(readOnly = true)
+    public List<Product> accessories(int limit) {
+        return products.findByStatusAndKindOrderByCreatedAtDesc("ACTIVE", "ACCESSORY").stream()
+                .filter(Product::inStock).limit(limit).toList();
     }
 
     /** Top in-stock products whose category suits this face shape — used by the WhatsApp bot. */
@@ -134,13 +142,13 @@ public class CatalogService {
         List<String> codes = faceShapeOrNull == null ? List.of() : recommendedCategoryCodes(faceShapeOrNull);
         List<Product> pool = codes.isEmpty() ? products.findByStatusOrderByCreatedAtDesc("ACTIVE")
                 : products.findByStatusAndFrameCategoryCodeInOrderByStockQtyDesc("ACTIVE", codes);
-        List<Product> inBudget = pool.stream().filter(Product::inStock).filter(p -> !p.isUpcoming())
+        List<Product> inBudget = pool.stream().filter(Product::inStock).filter(p -> !p.isUpcoming()).filter(p -> !p.isAccessory())
                 .filter(p -> p.getPriceMinor() >= lo && p.getPriceMinor() <= hi)
                 .limit(limit).toList();
         if (!inBudget.isEmpty() || codes.isEmpty()) return inBudget;
         // nothing in that price band for the suited categories — relax the face-shape filter
         return products.findByStatusOrderByCreatedAtDesc("ACTIVE").stream()
-                .filter(Product::inStock).filter(p -> !p.isUpcoming())
+                .filter(Product::inStock).filter(p -> !p.isUpcoming()).filter(p -> !p.isAccessory())
                 .filter(p -> p.getPriceMinor() >= lo && p.getPriceMinor() <= hi)
                 .limit(limit).toList();
     }

@@ -278,6 +278,7 @@ public class WhatsAppBotService {
             case FRAMES, HELP_CHOOSE -> sendSuitsPrompt(lead);
             case FRAME_PHOTOS -> sendFramePhotos(lead);
             case SPIN -> sendText(lead, spins.offer(lead));
+            case ACCESSORIES -> sendAccessories(lead);
             case BOOK_VISIT -> sendBookingDays(lead);
             // budget buttons still sitting in older chats keep working
             case BUDGET_LOW -> sendBudgetPicks(lead, "low");
@@ -552,7 +553,23 @@ public class WhatsAppBotService {
                 + "We're open " + OPENS_AT + ":00–" + closingHour(day) + ":00 that day. Come any time and "
                 + "bring your old glasses or prescription if you have them."
                 + (shops.isBlank() ? "" : "\n\n" + shops)
-                + (today ? "" : "\n\nWe'll send you a reminder that morning."));
+                + (today ? "" : "\n\nWe'll send you a reminder that morning.")
+                + "\n\n" + ADD_ONS);
+    }
+
+    /** One line, where they're already coming in -- never in the greeting or a broadcast. */
+    public static final String ADD_ONS = "🧴 We also sell lens cleaning solution, pouches and cases. Ask at the counter.";
+
+    static final java.util.regex.Pattern ACCESSORY_WORDS = java.util.regex.Pattern.compile(
+            "\\b(accessor\\w*|pouch(es)?|cleaning|cleaner|lens solution|cloth|chains?|cords?|straps?|(glasses|specs?|spectacles?|sunglasses|hard|soft) cases?)\\b");
+
+    private void sendAccessories(Lead lead) {
+        List<Product> items = catalog.accessories(8);
+        String shops = lensInquiries.shopLines();
+        sendText(lead, "Yes 🙂 " + (items.isEmpty() ? "We sell lens cleaning solution, pouches and cases."
+                : "We have these at the shop:\n" + String.join("\n",
+                        items.stream().map(p -> "• " + p.getName() + " · " + kwacha(p.getPriceMinor())).toList()))
+                + "\n\nPick them up at the counter, any time we're open." + (shops.isBlank() ? "" : "\n\n" + shops));
     }
 
     /**
@@ -747,6 +764,8 @@ public class WhatsAppBotService {
         if (t.contains("information") || t.contains("more info") || t.contains("details")) return BotIntent.MORE_INFO;
         if (t.contains("menu") || t.contains("options")) return BotIntent.MENU;
         if (t.matches(".*\\b(book|booking|appointment)\\b.*")) return BotIntent.BOOK_VISIT;
+        // before price and lens: "how much is lens cleaning solution?" is about the bottle, not lenses
+        if (ACCESSORY_WORDS.matcher(t).find()) return BotIntent.ACCESSORIES;
         if (t.contains("faq") || t.contains("question")) return BotIntent.FAQ;
         if (MembershipService.ENABLED && (t.contains("care") || t.contains("member"))) return BotIntent.CARE;
         // Before the lens check on purpose — "where is my lens order" is a tracking question.

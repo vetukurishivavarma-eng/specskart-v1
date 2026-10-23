@@ -691,7 +691,8 @@ public class LensInquiryService {
                         List.of(who, line, ref(q), props.frontendBaseUrl() + "/lens/track/" + q.getId()));
             } else {
                 whatsapp.sendText(q.getWaId(), "Hi " + who + " — " + line + " (" + ref(q) + ").\n\nTrack your order: "
-                        + props.frontendBaseUrl() + "/lens/track/" + q.getId());
+                        + props.frontendBaseUrl() + "/lens/track/" + q.getId()
+                        + ("READY".equals(q.getFulfilment()) ? "\n\n" + com.specskart.whatsapp.WhatsAppBotService.ADD_ONS : ""));
             }
             chatLog.sent(q.getWaId(), "Hi " + who + " — " + line + " (" + ref(q) + ").\n\nTrack your order: "
                     + props.frontendBaseUrl() + "/lens/track/" + q.getId());

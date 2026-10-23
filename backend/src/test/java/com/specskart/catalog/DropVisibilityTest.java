@@ -41,4 +41,20 @@ class DropVisibilityTest {
         assertThat(catalog.browse(null, null, null, null))
                 .anyMatch(c -> c.slug().equals(p.getSlug()) && c.limitedEdition());
     }
+
+    @Test
+    void anAccessoryAddedAtTheShopIsNotShownAsAFrame() {
+        Product p = new Product();
+        p.setSlug("pouch-" + System.nanoTime());
+        p.setName("Soft pouch");
+        p.setPriceMinor(5000);
+        p.setStockQty(5);
+        p.setStatus("ACTIVE");
+        p.setKind("ACCESSORY");
+        products.save(p);
+
+        assertThat(catalog.browse(null, null, null, null)).noneMatch(c -> c.slug().equals(p.getSlug()));
+        assertThat(catalog.trending(500)).noneMatch(x -> x.getId().equals(p.getId()));
+        assertThat(catalog.forBudget(null, "low", 500)).noneMatch(x -> x.getId().equals(p.getId()));
+    }
 }
