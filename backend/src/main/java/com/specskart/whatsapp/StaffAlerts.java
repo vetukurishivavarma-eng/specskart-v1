@@ -112,7 +112,7 @@ public class StaffAlerts {
     /**
      * A real phone notification to every staff phone signed in to the POS app -- free, unlike a
      * WhatsApp template, and works whatever the state of the WhatsApp account's billing. Tapping a
-     * lens order opens it in the app; frame orders have no POS screen, so they open the app.
+     * lens order opens it on Lens orders, a frame order on Frame orders.
      */
     private int notifyPhones(String kind, UUID refId, String refNo, List<String> lines) {
         String title = ("LENS".equals(kind) ? "New lens order " : "New web order ") + refNo;
@@ -121,7 +121,7 @@ public class StaffAlerts {
                 .filter(l -> !l.isEmpty() && !l.contains(refNo))
                 .limit(3)
                 .collect(Collectors.joining("\n"));
-        String path = "LENS".equals(kind) ? "/orders?id=" + refId : null;
+        String path = ("LENS".equals(kind) ? "/orders?id=" : "/web-orders?id=") + refId;
         int sent = push.notifyStaff(title, body.isEmpty() ? "Open the app to see it." : body, path);
         if (push.enabled()) log.info("{} {}: push sent to {} phone(s)", kind, refNo, sent);
         return sent;

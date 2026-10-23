@@ -92,5 +92,5 @@ public final class OrderDtos {
                               String shipAddress, String shipCity, Double deliveryLat, Double deliveryLng,
                               String lensType, boolean hasPrescription, boolean cashOnDelivery,
                               long totalMinor, String currency, UUID fulfilStoreId, String fulfilStoreName,
-                              Instant createdAt, Instant paidAt) {}
+                              Instant createdAt, Instant paidAt, List<String> items, UUID leadId) {}
 }

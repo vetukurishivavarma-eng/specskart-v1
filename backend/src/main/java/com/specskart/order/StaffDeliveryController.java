@@ -32,18 +32,20 @@ public class StaffDeliveryController {
             OrderStatus.CONFIRMED, OrderStatus.PAID, OrderStatus.ACCEPTED,
             OrderStatus.PACKED, OrderStatus.SHIPPED);
 
-    /** The only moves the Delivery screen offers. Cancelling or refunding stays in admin. */
+    /** The only moves the Delivery screen offers. Refunding stays in admin; cancelling only while nothing is paid. */
     private static final Set<OrderStatus> ALLOWED_TARGETS = EnumSet.of(
-            OrderStatus.ACCEPTED, OrderStatus.PACKED, OrderStatus.SHIPPED, OrderStatus.DELIVERED);
+            OrderStatus.ACCEPTED, OrderStatus.PACKED, OrderStatus.SHIPPED, OrderStatus.DELIVERED, OrderStatus.CANCELLED);
 
     private final OrderRepository orders;
+    private final OrderItemRepository items;
     private final StoreRepository stores;
     private final CheckoutService checkout;
     private final CurrentUser currentUser;
 
-    public StaffDeliveryController(OrderRepository orders, StoreRepository stores,
+    public StaffDeliveryController(OrderRepository orders, OrderItemRepository items, StoreRepository stores,
                                    CheckoutService checkout, CurrentUser currentUser) {
         this.orders = orders;
+        this.items = items;
         this.stores = stores;
         this.checkout = checkout;
         this.currentUser = currentUser;
@@ -95,6 +97,10 @@ public class StaffDeliveryController {
             throw ApiException.badRequest("BAD_STATUS",
                     "The Delivery screen can only move an order to " + ALLOWED_TARGETS + ".");
         }
+        // the customer didn't really want it (staff called them): fine while unpaid; paid money is a refund, in admin
+        if (target == OrderStatus.CANCELLED && order.getPaidAt() != null) {
+            throw ApiException.badRequest("PAID", "This order is already paid: refund it from the web admin instead.");
+        }
         Order saved = checkout.updateStatus(order.getId(), target, body.note());
         return row(saved, storeNames(List.of(saved)));
     }
@@ -115,7 +121,9 @@ public class StaffDeliveryController {
                 lensOf(o), o.getPrescriptionFileId() != null, o.cashStillDue(),
                 o.getTotalMinor(), o.getCurrency(),
                 o.getFulfilStoreId(), storeNames.get(o.getFulfilStoreId()),
-                o.getCreatedAt(), o.getPaidAt());
+                o.getCreatedAt(), o.getPaidAt(),
+                items.findByOrderId(o.getId()).stream().map(i -> i.getQty() + " × " + i.getProductName()).toList(),
+                o.getLeadId());
     }
 
     /** Lens orders need the lab before the box is packed, so the packer sees it on the row. */

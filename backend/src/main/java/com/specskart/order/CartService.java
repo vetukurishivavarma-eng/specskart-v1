@@ -248,14 +248,14 @@ public class CartService {
         List<OrderDtos.CartLine> out = new ArrayList<>();
         long subtotal = 0;
         int lensablePairs = 0;
-        boolean hasFrame = false, hasAccessory = false;
+        boolean hasFrame = false;
         Instant earliestHold = null;
         for (CartItem ci : lines) {
             Product p = byId.get(ci.getProductId());
             if (p == null) { items.delete(ci); continue; }
             subtotal += ci.lineTotalMinor();
             if (p.isLensable()) lensablePairs += ci.getQty();
-            if (p.isAccessory()) hasAccessory = true; else hasFrame = true;
+            if (!p.isAccessory()) hasFrame = true;
             if (ci.getHeldUntil() != null && (earliestHold == null || ci.getHeldUntil().isBefore(earliestHold))) {
                 earliestHold = ci.getHeldUntil();
             }
@@ -283,10 +283,13 @@ public class CartService {
         int points = cart.getLeadId() == null ? 0
                 : leads.findById(cart.getLeadId()).map(com.specskart.lead.Lead::getPoints).orElse(0);
 
-        // "complete the look": suggest accessories once there's a frame and none added yet
+        // add-ons with a frame (client, 2026-10-23: cleaning kit, extra pouch, readers): the ones in
+        // stock and not in the bag yet -- adding one leaves the others on offer
         List<OrderDtos.Suggestion> suggestions = List.of();
-        if (hasFrame && !hasAccessory) {
+        if (hasFrame) {
             suggestions = products.findByStatusAndKindOrderByCreatedAtDesc("ACTIVE", "ACCESSORY").stream()
+                    .filter(Product::inStock)
+                    .filter(a -> !byId.containsKey(a.getId()))
                     .limit(3)
                     .map(a -> new OrderDtos.Suggestion(a.getId(), a.getSlug(), a.getName(),
                             a.getPriceMinor(), imageByProduct.get(a.getId())))

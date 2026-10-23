@@ -61,9 +61,9 @@ class LensAndBundleTest {
         assertThat(cart.suggestions()).isNotEmpty();
         assertThat(cart.suggestions().get(0).name()).contains("ACCESSORY");
 
-        // once an accessory is in the bag, stop suggesting
-        var acc = products.findAll().stream().filter(Product::isAccessory).findFirst().orElseThrow();
-        var after = carts.addItem(cart.token(), acc.getId(), 1);
-        assertThat(after.suggestions()).isEmpty();
+        // an add-on in the bag isn't offered again; the other add-ons still are
+        var acc = cart.suggestions().get(0).productId();
+        var after = carts.addItem(cart.token(), acc, 1);
+        assertThat(after.suggestions()).isNotEmpty().noneMatch(s -> s.productId().equals(acc));
     }
 }

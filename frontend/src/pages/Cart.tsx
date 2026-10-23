@@ -137,12 +137,13 @@ export default function Cart() {
 
         {cart.suggestions.length > 0 && (
           <div className="mt-6">
-            <h3 className="text-base">Complete the look</h3>
+            <h3 className="text-base">Add to your order</h3>
+            <p className="mt-1 text-xs text-ink/60">A pouch comes free with your frames. Collect these with them at the shop.</p>
             <div className="mt-3 grid grid-cols-3 gap-3">
               {cart.suggestions.map((s) => (
                 <div key={s.productId} className="card p-2 text-center">
-                  <div className="aspect-square overflow-hidden rounded-lg bg-white">
-                    {s.imageUrl && <img src={assetUrl(s.imageUrl)} alt={s.name} className="h-full w-full object-cover" />}
+                  <div className="flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-white text-3xl">
+                    {s.imageUrl ? <img src={assetUrl(s.imageUrl)} alt={s.name} className="h-full w-full object-cover" /> : '🧴'}
                   </div>
                   <div className="mt-1 text-xs">{s.name}</div>
                   <div className="text-xs text-ink/50">{money(s.priceMinor, cart.currency)}</div>

@@ -558,17 +558,20 @@ public class WhatsAppBotService {
     }
 
     /** One line, where they're already coming in -- never in the greeting or a broadcast. */
-    public static final String ADD_ONS = "🧴 We also sell lens cleaning solution, pouches and cases. Ask at the counter.";
+    // Client's prices (2026-10-23): a pouch is free with every pair; extras are sold at the counter.
+    // ponytail: hardcoded; read from the ACCESSORY products if the client changes prices often
+    public static final String ADD_ONS = "🧴 A pouch comes free with your glasses. Want more? Lens cleaning kit K80, extra pouch K20. Ask at the counter.";
 
     static final java.util.regex.Pattern ACCESSORY_WORDS = java.util.regex.Pattern.compile(
-            "\\b(accessor\\w*|pouch(es)?|cleaning|cleaner|lens solution|cloth|chains?|cords?|straps?|(glasses|specs?|spectacles?|sunglasses|hard|soft) cases?)\\b");
+            "\\b(accessor\\w*|readers?|reading glass(es)?|pouch(es)?|cleaning|cleaner|lens solution|cloth|chains?|cords?|straps?|(glasses|specs?|spectacles?|sunglasses|hard|soft) cases?)\\b");
 
     private void sendAccessories(Lead lead) {
         List<Product> items = catalog.accessories(8);
         String shops = lensInquiries.shopLines();
-        sendText(lead, "Yes 🙂 " + (items.isEmpty() ? "We sell lens cleaning solution, pouches and cases."
+        sendText(lead, "Yes 🙂 " + (items.isEmpty() ? "• Lens cleaning kit · K80\n• Extra pouch · K20\n• Reading glasses (readers) · K100"
                 : "We have these at the shop:\n" + String.join("\n",
                         items.stream().map(p -> "• " + p.getName() + " · " + kwacha(p.getPriceMinor())).toList()))
+                + "\n\nEvery pair of glasses comes with a free pouch."
                 + "\n\nPick them up at the counter, any time we're open." + (shops.isBlank() ? "" : "\n\n" + shops));
     }
 
