@@ -2,7 +2,30 @@
 
 _Last updated: 2026-10-20._
 
-## 2026-10-22 (3) END OF DAY -- RESUME HERE
+## 2026-10-23/24 END OF DAY -- RESUME HERE
+- Backend pushed + deployed (`d323184`, `c3e8aeb`, `c641744`; accessories reply confirmed live in the business chat):
+  - Spin & Win: "Free eye check for your family" can be won once per 365 days per customer (taken out of their draw).
+    Win WhatsApp now sent 8s after the spin so it lands after the 6s wheel animation.
+  - Accessories (client's prices): pouch FREE with every pair, extra pouch K20, lens cleaning kit K80, readers K100.
+    V78 seeds them as ACTIVE ACCESSORY products at 0 STOCK -> staff must add shelf stock in POS (Products -> Accessories)
+    before they show in the website cart. Bot ACCESSORIES intent ("pouch", "cleaning", "readers", "glasses case"...).
+    One add-on line on the booking confirmation + the lens "ready" free-text message (never greeting/broadcast).
+    Website cart: "Add to your order" box with in-stock add-ons not already in the bag + free-pouch note.
+    Accessories kept off the website frame grid / trending / budget picks.
+  - Deliveries API rows carry item lines + leadId; staff may cancel an UNPAID web order; new web-order push opens /web-orders.
+- POS **1.35.0/vc40** (`4246480`) BUILT by CI run 40003961876, verified (aapt vc40, signer 434f19d2...),
+  Downloads\specskart-pos-1.35.0.apk, GitHub release v1.35.0 published, link sent to user's WhatsApp self chat.
+  Contents: Products = Frames | Lenses (lens price list in place) | Accessories; new More -> Frame orders screen
+  (website frame orders: Customer confirmed -> Mark ready for pickup -> Mark collected, cancel while unpaid);
+  Stock filter gains Accessories; also carries 1.34.0's broadcast switch (1.34.0 was never released).
+  **USER TODO: add the app_releases row (1.35.0, build 40) in More -> App releases** -- not reachable from here
+  (Specskart Render is the narsipalli account; the Render MCP only sees the old workspace).
+- Possible bug, NOT verified: lens "ready" via the orderUpdate TEMPLATE (24h window closed) passes a param containing
+  newlines (stageLine READY) -- Meta usually rejects newlines in template params. Check before trusting ready alerts.
+- Not device-tested: Frame orders screen, Products tabs, accessory add/edit, cart add-ons in a browser.
+- WhatsApp Web gotcha: sends can fail with "Your message was not sent" on a stale tab -- force-reload the tab, resend.
+
+## 2026-10-22 (3) END OF DAY
 - POS **1.33.0/vc38 RELEASED** (GitHub v1.33.0 + app_releases row added by user): prescriptions, Rx bifocal axis
   price fix, WhatsApp-style chat (photos/files, reply, react, ticks), pick customers, admin Delete frame.
 - POS **1.34.0/vc39** (`01fabcb`, v1 `bf2b04a`): broadcast "Zambian numbers only (+260)" switch, on by default.
