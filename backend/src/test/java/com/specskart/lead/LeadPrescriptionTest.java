@@ -77,7 +77,11 @@ class LeadPrescriptionTest {
         assertThat(walkIn.getName()).isEqualTo("Paper Rx");
         prescriptions.uploadPhoto(walkIn.getId(), p.getId(), new byte[] {1, 2, 3}, "image/jpeg");
         prescriptions.setNumbers(walkIn.getId(), p.getId(), new LeadPrescriptionService.Numbers(
-                new BigDecimal("-1"), null, null, null, null, null, null, null));
+                new BigDecimal("-1"), null, null, null, null, null, null, null, null));
+        assertThat(leads.findById(walkIn.getId()).orElseThrow().getName()).isEqualTo("Paper Rx"); // blank name: kept
+        prescriptions.setNumbers(walkIn.getId(), p.getId(), new LeadPrescriptionService.Numbers(
+                new BigDecimal("-1"), null, null, null, null, null, null, null, "  Mwila Banda "));
+        assertThat(leads.findById(walkIn.getId()).orElseThrow().getName()).isEqualTo("Mwila Banda");
         assertThat(prescriptions.forPhone(local)).singleElement().satisfies(e ->
                 assertThat(e).containsEntry("kind", "SAVED").containsEntry("hasPhoto", true));
         // same number again -> same customer, no duplicate lead
@@ -103,13 +107,13 @@ class LeadPrescriptionTest {
         assertThatThrownBy(() -> prescriptions.savePhoto(l, "not-in-this-chat", "x")).hasMessageContaining("isn't in this chat");
 
         prescriptions.setNumbers(l.getId(), p.getId(), new LeadPrescriptionService.Numbers(
-                new BigDecimal("-2"), new BigDecimal("-1.75"), new BigDecimal("-0.5"), null, 90, null, null, "62"));
+                new BigDecimal("-2"), new BigDecimal("-1.75"), new BigDecimal("-0.5"), null, 90, null, null, "62", null));
         Map<String, Object> row = prescriptions.forLead(l).get(0);
         assertThat(row).containsEntry("kind", "SAVED").containsEntry("hasPhoto", true).containsEntry("pd", "62");
         assertThat((BigDecimal) row.get("sphRight")).isEqualByComparingTo("-2");
 
         assertThatThrownBy(() -> prescriptions.setNumbers(l.getId(), p.getId(), new LeadPrescriptionService.Numbers(
-                null, null, null, null, 200, null, null, null))).hasMessageContaining("Axis");
+                null, null, null, null, 200, null, null, null, null))).hasMessageContaining("Axis");
         // another customer's lead can't reach it
         assertThatThrownBy(() -> prescriptions.photo(lead().getId(), p.getId())).hasMessageContaining("not found");
     }

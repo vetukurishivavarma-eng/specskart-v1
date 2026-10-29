@@ -55,11 +55,12 @@ public class LeadPrescriptionService {
     }
 
     public record Numbers(BigDecimal sphRight, BigDecimal sphLeft, BigDecimal cylRight, BigDecimal cylLeft,
-                          Integer axisRight, Integer axisLeft, BigDecimal addPower, String pd) {}
+                          Integer axisRight, Integer axisLeft, BigDecimal addPower, String pd,
+                          String customerName) {}
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> forLead(Lead lead) {
-        return list(lead.getId(), waId(lead));
+        return list(lead, waId(lead));
     }
 
     /** At the counter: a number typed on the bill -> that customer's prescriptions, lead or not. */
@@ -70,7 +71,8 @@ public class LeadPrescriptionService {
         return leads.findByWhatsappWaId(waId).map(this::forLead).orElseGet(() -> list(null, waId));
     }
 
-    private List<Map<String, Object>> list(UUID leadId, String waId) {
+    private List<Map<String, Object>> list(Lead lead, String waId) {
+        UUID leadId = lead == null ? null : lead.getId();
         List<Map<String, Object>> out = new ArrayList<>();
         for (LeadPrescription p : leadId == null ? List.<LeadPrescription>of() : saved.findByLeadIdOrderByCreatedAtDesc(leadId)) {
             Map<String, Object> m = rx(p.getId(), "SAVED", p.getCreatedAt(), p.getSphRight(), p.getSphLeft(),
@@ -78,6 +80,7 @@ public class LeadPrescriptionService {
             m.put("hasPhoto", p.getFileId() != null);
             m.put("savedBy", p.getSavedBy());
             m.put("leadId", p.getLeadId());
+            m.put("customerName", lead.getName());
             out.add(m);
         }
         // never pass null: Spring Data turns it into "lead_id is null" and matches every leadless sale
@@ -182,6 +185,14 @@ public class LeadPrescriptionService {
         if (pd != null && pd.length() > 16) throw ApiException.badRequest("BAD_RX", "PD is too long.");
         p.setPd(pd);
         saved.save(p);
+        // staff read the name off the prescription; a WhatsApp profile name is often a nickname
+        if (n.customerName() != null && !n.customerName().isBlank()) {
+            String name = n.customerName().trim();
+            if (name.length() > 120) throw ApiException.badRequest("BAD_NAME", "Name is too long.");
+            Lead lead = leads.findById(leadId).orElseThrow();
+            lead.setName(name);
+            leads.save(lead);
+        }
     }
 
     @Transactional(readOnly = true)
