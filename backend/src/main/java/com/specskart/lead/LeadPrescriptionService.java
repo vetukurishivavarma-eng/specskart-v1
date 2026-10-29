@@ -56,7 +56,7 @@ public class LeadPrescriptionService {
 
     public record Numbers(BigDecimal sphRight, BigDecimal sphLeft, BigDecimal cylRight, BigDecimal cylLeft,
                           Integer axisRight, Integer axisLeft, BigDecimal addPower, String pd,
-                          String customerName) {}
+                          String patientName, Boolean renameCustomer) {}
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> forLead(Lead lead) {
@@ -81,6 +81,7 @@ public class LeadPrescriptionService {
             m.put("savedBy", p.getSavedBy());
             m.put("leadId", p.getLeadId());
             m.put("customerName", lead.getName());
+            m.put("patientName", p.getPatientName());
             out.add(m);
         }
         // never pass null: Spring Data turns it into "lead_id is null" and matches every leadless sale
@@ -95,6 +96,7 @@ public class LeadPrescriptionService {
             m.put("shopName", q.getShopName());
             m.put("lensStructure", q.getLensStructure());
             m.put("hasPhoto", false);
+            m.put("patientName", q.getCustomerName());
             out.add(m);
         }
         out.sort(Comparator.comparing((Map<String, Object> m) -> (Instant) m.get("at")).reversed());
@@ -184,15 +186,20 @@ public class LeadPrescriptionService {
         String pd = n.pd() == null || n.pd().isBlank() ? null : n.pd().trim();
         if (pd != null && pd.length() > 16) throw ApiException.badRequest("BAD_RX", "PD is too long.");
         p.setPd(pd);
-        saved.save(p);
-        // staff read the name off the prescription; a WhatsApp profile name is often a nickname
-        if (n.customerName() != null && !n.customerName().isBlank()) {
-            String name = n.customerName().trim();
-            if (name.length() > 120) throw ApiException.badRequest("BAD_NAME", "Name is too long.");
-            Lead lead = leads.findById(leadId).orElseThrow();
-            lead.setName(name);
-            leads.save(lead);
+        // older POS builds send no name: keep what's there
+        if (n.patientName() != null) {
+            String name = n.patientName().isBlank() ? null : n.patientName().trim();
+            if (name != null && name.length() > 120) throw ApiException.badRequest("BAD_NAME", "Name is too long.");
+            p.setPatientName(name);
+            // the customer's own prescription: its name beats the WhatsApp profile name (often a nickname).
+            // Off for a family member's, so the parent isn't renamed to the child.
+            if (name != null && Boolean.TRUE.equals(n.renameCustomer())) {
+                Lead lead = leads.findById(leadId).orElseThrow();
+                lead.setName(name);
+                leads.save(lead);
+            }
         }
+        saved.save(p);
     }
 
     @Transactional(readOnly = true)

@@ -36,4 +36,7 @@ public class LeadPrescription extends BaseEntity {
     @Column(length = 16)
     private String pd;
     private String savedBy;
+    /** The name written on it -- may be a family member of the customer. */
+    @Column(length = 120)
+    private String patientName;
 }

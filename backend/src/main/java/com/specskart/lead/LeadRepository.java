@@ -93,7 +93,8 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
     // `cast(:q as string)` is load-bearing on PostgreSQL: a bare null bind is
     // untyped, so `lower(concat('%', :q, '%'))` resolves to `lower(bytea)` and
     // the query 500s. The cast gives the driver a varchar to bind. The OR group
-    // is parenthesised so the `:q is null` short-circuit covers both LIKEs.
+    // is parenthesised so the `:q is null` short-circuit covers every LIKE.
+    // A name on a saved prescription counts too: a child's Rx kept on the parent's number.
     @Query("""
         select l from Lead l
         where (:archived = true and l.archivedAt is not null
@@ -103,7 +104,9 @@ public interface LeadRepository extends JpaRepository<Lead, UUID> {
           and (:source is null or l.acquisitionSource = :source)
           and (:q is null
                or lower(l.name) like lower(concat('%', cast(:q as string), '%'))
-               or l.whatsappNumber like concat('%', cast(:q as string), '%'))
+               or l.whatsappNumber like concat('%', cast(:q as string), '%')
+               or exists (select 1 from LeadPrescription p where p.leadId = l.id
+                          and lower(p.patientName) like lower(concat('%', cast(:q as string), '%'))))
         """)
     Page<Lead> search(@Param("status") LeadStatus status,
                       @Param("campaignId") UUID campaignId,
