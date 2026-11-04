@@ -2,7 +2,15 @@
 
 _Last updated: 2026-10-20._
 
-## 2026-10-23/24 END OF DAY -- RESUME HERE
+## 2026-11-04 -- RESUME HERE
+- POS **1.37.0/vc42** (specskart-pos `1502362`) RELEASED: GitHub v1.37.0, APK verified (aapt vc42), link sent to
+  the user's WhatsApp self chat. Client asks (2026-11-04): add-frame "Already added" warning (same code/barcode/name,
+  same name/barcode asks "Add anyway"); keyboard hid the chat composer -> one KeyboardAvoidingView in app/_layout.tsx
+  (Android edge-to-edge), screen-level ones removed, tab bar hides while typing. Not device-tested.
+  **USER TODO: app_releases row (1.37.0, build 42).**
+- Render dashboard shows "Payment failed" (pending invoice, RBI auto-charge rule) -- user to pay.
+
+## 2026-10-23/24 END OF DAY
 - Backend pushed + deployed (`d323184`, `c3e8aeb`, `c641744`; accessories reply confirmed live in the business chat):
   - Spin & Win: "Free eye check for your family" can be won once per 365 days per customer (taken out of their draw).
     Win WhatsApp now sent 8s after the spin so it lands after the 6s wheel animation.
