@@ -2,7 +2,13 @@
 
 _Last updated: 2026-10-20._
 
-## 2026-11-04 -- RESUME HERE
+## 2026-11-16 -- RESUME HERE
+- Client ask: Consultation fee + Fitting charges on sales. Backend `34f1781`: `CreateSale.charges` [{name, amountMinor}]
+  = non-stock pos_sale_items (product_id null; no stock, no discount; fees-only bill OK). No migration.
+  POS `173bced` = 1.38.0/vc43: "Fees" card on the counter sale (two K fields, paid in full today), shown on bill +
+  receipt + day report top items; refund screen hides fee lines. Not device-tested.
+
+## 2026-11-04
 - POS **1.37.0/vc42** (specskart-pos `1502362`) RELEASED: GitHub v1.37.0, APK verified (aapt vc42), link sent to
   the user's WhatsApp self chat. Client asks (2026-11-04): add-frame "Already added" warning (same code/barcode/name,
   same name/barcode asks "Add anyway"); keyboard hid the chat composer -> one KeyboardAvoidingView in app/_layout.tsx
