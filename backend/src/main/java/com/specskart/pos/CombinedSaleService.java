@@ -33,7 +33,8 @@ public class CombinedSaleService {
 
     @Transactional
     public CombinedView create(CombinedSale req, UUID cashierId, String cashierName) {
-        boolean hasFrame = req.frame() != null && req.frame().items() != null && !req.frame().items().isEmpty();
+        boolean hasFrame = req.frame() != null && ((req.frame().items() != null && !req.frame().items().isEmpty())
+                || (req.frame().charges() != null && !req.frame().charges().isEmpty()));
         boolean hasLens = req.lens() != null;
         if (!hasFrame && !hasLens) throw ApiException.badRequest("EMPTY_SALE", "Add a frame or lenses first.");
 

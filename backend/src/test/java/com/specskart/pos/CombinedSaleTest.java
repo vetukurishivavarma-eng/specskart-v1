@@ -78,4 +78,24 @@ class CombinedSaleTest {
                 .hasMessageContaining("Discount");
         assertThat(posSales.findByClientReference(ref + "-f")).isEmpty();
     }
+
+    @Test
+    void consultationAndFittingChargesGoOnTheBillWithoutStock() {
+        seed();
+        String ref = UUID.randomUUID().toString();
+        var charges = List.of(new PosDtos.ChargeRequest("Consultation fee", 10_000), new PosDtos.ChargeRequest("Fitting charges", 5_000));
+        // charges only + lenses: no frame, still one receipt for the fees
+        var bill = combined.create(new CombinedSaleService.CombinedSale(
+                new PosDtos.CreateSale(store.getId(), List.of(), List.of(new PosDtos.PaymentRequest("CASH", 15_000, null)),
+                        "Both Customer", null, "", ref + "-f", charges),
+                lensHalf(ref + "-l", 0)), null, "Cashier");
+        assertThat(bill.frame().totalMinor()).isEqualTo(15_000);
+        assertThat(bill.frame().items()).extracting(PosDtos.SaleItemView::productName).containsExactly("Consultation fee", "Fitting charges");
+        assertThat(bill.totalMinor()).isEqualTo(15_000 + 36_000);
+
+        assertThatThrownBy(() -> combined.create(new CombinedSaleService.CombinedSale(
+                new PosDtos.CreateSale(store.getId(), List.of(), List.of(), null, null, "", UUID.randomUUID() + "-f",
+                        List.of(new PosDtos.ChargeRequest("Consultation fee", -1))), null), null, "Cashier"))
+                .hasMessageContaining("charge");
+    }
 }

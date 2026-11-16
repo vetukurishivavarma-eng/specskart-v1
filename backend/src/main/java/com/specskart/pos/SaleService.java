@@ -48,7 +48,9 @@ public class SaleService {
             var existing = sales.findByClientReference(req.clientReference());
             if (existing.isPresent()) return view(existing.get());
         }
-        if (req.items() == null || req.items().isEmpty()) {
+        List<PosDtos.SaleItemRequest> lines = req.items() == null ? List.of() : req.items();
+        List<PosDtos.ChargeRequest> charges = req.charges() == null ? List.of() : req.charges();
+        if (lines.isEmpty() && charges.isEmpty()) {
             throw ApiException.badRequest("EMPTY_SALE", "A sale needs at least one item.");
         }
         Store store = stores.findById(req.storeId())
@@ -67,7 +69,7 @@ public class SaleService {
 
         long subtotal = 0;      // before discounts
         long discountTotal = 0;
-        for (PosDtos.SaleItemRequest line : req.items()) {
+        for (PosDtos.SaleItemRequest line : lines) {
             if (line.quantity() <= 0) throw ApiException.badRequest("BAD_QTY", "Quantity must be positive.");
             Product product = products.findById(line.productId())
                     .orElseThrow(() -> ApiException.notFound("PRODUCT_NOT_FOUND", "No such product."));
@@ -92,6 +94,20 @@ public class SaleService {
             item.setUnitPriceMinor(unitPrice);
             item.setDiscountMinor(discount);
             item.setLineTotalMinor(lineTotal);
+            saleItems.save(item);
+        }
+        for (PosDtos.ChargeRequest c : charges) {
+            String name = c.name() == null ? "" : c.name().strip();
+            if (name.isEmpty() || name.length() > 200 || c.amountMinor() <= 0) {
+                throw ApiException.badRequest("BAD_CHARGE", "A charge needs a name and an amount above zero.");
+            }
+            subtotal += c.amountMinor();
+            PosSaleItem item = new PosSaleItem(); // productId null: a service, not stock
+            item.setSaleId(sale.getId());
+            item.setProductName(name);
+            item.setQuantity(1);
+            item.setUnitPriceMinor(c.amountMinor());
+            item.setLineTotalMinor(c.amountMinor());
             saleItems.save(item);
         }
 

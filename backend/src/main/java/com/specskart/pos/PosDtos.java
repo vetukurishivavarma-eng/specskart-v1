@@ -20,8 +20,16 @@ public final class PosDtos {
 
     public record SaleItemRequest(UUID productId, int quantity, Long unitPriceMinor, Long discountMinor) {}
     public record PaymentRequest(String method, long amountMinor, String reference) {}
+    /** A non-stock line on the bill (consultation fee, fitting charges): no product, no stock, no discount. */
+    public record ChargeRequest(String name, long amountMinor) {}
     public record CreateSale(UUID storeId, List<SaleItemRequest> items, List<PaymentRequest> payments,
-                             String customerName, String customerPhone, String notes, String clientReference) {}
+                             String customerName, String customerPhone, String notes, String clientReference,
+                             List<ChargeRequest> charges) {
+        public CreateSale(UUID storeId, List<SaleItemRequest> items, List<PaymentRequest> payments,
+                          String customerName, String customerPhone, String notes, String clientReference) {
+            this(storeId, items, payments, customerName, customerPhone, notes, clientReference, null);
+        }
+    }
 
     public record SaleItemView(UUID productId, String productName, String sku, int quantity,
                                long unitPriceMinor, long lineTotalMinor) {}
